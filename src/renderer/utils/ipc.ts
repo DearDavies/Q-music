@@ -242,7 +242,7 @@ export const onUpdateError = (listener: LX.IpcRendererEventListenerParams<string
   }
 }
 
-export const onUpdateProgress = (listener: LX.IpcRendererEventListenerParams<ProgressInfo>): RemoveListener => {
+export const onUpdateProgress = (listener: LX.IpcRendererEventListenerParams<ProgressInfo & { sourceLabel?: string }>): RemoveListener => {
   rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, listener)
   return () => {
     rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, listener)

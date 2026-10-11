@@ -282,6 +282,13 @@ jobs:
               'SHA256SUMS-arch.txt',
               "Q-music_$($env:PACKAGE_VERSION)_x64.pacman"
             )
+            $mobileVersion = node -p "require('./publish/mobile-version.json').version"
+            if ($mobileVersion -eq $env:PACKAGE_VERSION) {
+              $requiredAssets += 'SHA256SUMS-android.txt'
+              foreach ($abi in @('arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64', 'universal')) {
+                $requiredAssets += "Q-music-android-v$env:PACKAGE_VERSION-$abi.apk"
+              }
+            }
             $assetsComplete = $false
             for ($attempt = 1; $attempt -le 180 -and -not $assetsComplete; $attempt++) {
               $assetNames = @(gh release view $env:TAG_NAME --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
@@ -291,7 +298,7 @@ jobs:
               $missingAssets = @($requiredAssets | Where-Object { $_ -notin $assetNames })
               $assetsComplete = $missingAssets.Count -eq 0
               if (-not $assetsComplete) {
-                Write-Host "Waiting for Arch assets ($attempt/180). Missing: $($missingAssets -join ', ')"
+                Write-Host "Waiting for platform assets ($attempt/180). Missing: $($missingAssets -join ', ')"
                 Start-Sleep -Seconds 10
               }
             }

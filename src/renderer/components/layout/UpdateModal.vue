@@ -80,6 +80,7 @@ material-modal(:show="versionInfo.showModal" max-width="60%" @close="handleClose
         p 若遇到问题可以阅读
           strong.hover.underline(aria-label="点击打开" @click="handleOpenUrl('https://lyswhut.github.io/lx-music-doc/desktop/faq')") 桌面版常见问题
           | 。
+        p(v-if="versionInfo.downloadMessage") {{ versionInfo.downloadMessage }}
         p(v-if="progress") 当前下载进度：{{ progress }}
         p(v-else) &nbsp;
       div(:class="$style.btns")
@@ -183,11 +184,14 @@ export default {
     },
     handleDownloadClick() {
       if (this.isIgnored) saveIgnoreVersion(this.ignoreVersion = null)
+      versionInfo.downloadMessage = '正在准备下载，线路不可用时会自动切换…'
+      versionInfo.downloadProgress = null
       versionInfo.status = 'downloading'
       downloadUpdate()
     },
     handleCheckUpdate() {
       if (this.isIgnored) saveIgnoreVersion(this.ignoreVersion = null)
+      versionInfo.downloadMessage = ''
       versionInfo.status = 'checking'
       versionInfo.reCheck = true
       checkUpdate()

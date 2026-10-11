@@ -9,7 +9,7 @@ dd
   .gap-top
     base-checkbox(id="setting__update_showChangeLog" :model-value="appSetting['common.showChangeLog']" :label="$t('setting__update_show_change_log')" @update:model-value="updateSetting({'common.showChangeLog': $event})")
   .gap-top
-    base-btn.btn(min :disabled="versionInfo.status == 'checking'" @click="handleCheckUpdate") {{ versionInfo.status == 'checking' ? $t('setting__update_checking') : $t('setting__update_check_btn') }}
+    base-btn.btn(min :disabled="versionInfo.status == 'checking' || versionInfo.status == 'downloading'" @click="handleCheckUpdate") {{ versionInfo.status == 'checking' ? $t('setting__update_checking') : $t('setting__update_check_btn') }}
   .gap-top
     .gap-top
       .p.small(@click="handleOpenDevTools") {{ $t('setting__update_current_label') }}{{ versionInfo.version }}
@@ -24,6 +24,7 @@ dd
       | {{ $t('setting__update_downloading') }}
       br
       | {{ $t('setting__update_progress') }}{{ downloadProgress }}
+    .p.small(v-if="versionInfo.downloadMessage") {{ versionInfo.downloadMessage }}
     template(v-if="versionInfo.newVersion")
       .p(v-if="versionInfo.isLatest")
         span {{ $t('setting__update_latest') }}

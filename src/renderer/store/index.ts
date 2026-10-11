@@ -121,6 +121,7 @@ export const versionInfo = window.lxData.versionInfo = reactive<{
   reCheck: boolean
   status: LX.UpdateStatus
   downloadProgress: ProgressInfo | null
+  downloadMessage: string
 }>({
   version: pkg.version,
   newVersion: null,
@@ -130,6 +131,7 @@ export const versionInfo = window.lxData.versionInfo = reactive<{
   isLatest: false,
   status: 'checking',
   downloadProgress: null,
+  downloadMessage: '',
 })
 export const userApi = reactive<{
   list: LX.UserApi.UserApiInfo[]

@@ -8,6 +8,7 @@ import {
   getIgnoreVersion,
   getLastStartInfo,
   saveLastStartInfo,
+  checkUpdate,
 } from '@renderer/utils/ipc'
 import { compareVer, isWin } from '@common/utils'
 import { isShowChangeLog, versionInfo } from '@renderer/store'
@@ -151,7 +152,10 @@ export default () => {
     versionInfo.newVersion = {
       version: info.version,
       desc: info.releaseNotes as string,
+      history: [],
     }
+    versionInfo.reCheck = false
+    versionInfoPromise = null
     versionInfo.isLatest = false
     if (appSetting['common.tryAutoUpdate'] && !isPackageManagerInstall) {
       versionInfo.status = 'downloading'
@@ -161,8 +165,11 @@ export default () => {
       showUpdateModal()
     })
   })
-  const rUpdateNotAvailable = onUpdateNotAvailable(() => {
+  const rUpdateNotAvailable = onUpdateNotAvailable(({ params: info }) => {
     clearUpdateTimeout()
+    versionInfo.newVersion = { version: info.version, desc: typeof info.releaseNotes == 'string' ? info.releaseNotes : '', history: [] }
+    versionInfo.reCheck = false
+    versionInfoPromise = null
     void handleGetVersionInfo().then((result) => {
       if (result.version == '0.0.0') {
         versionInfo.isLatest = false
@@ -171,24 +178,28 @@ export default () => {
         versionInfo.showModal = true
         return
       }
-      versionInfo.isLatest = true
+      versionInfo.isLatest = compareVer(versionInfo.version, result.version) >= 0
       versionInfo.isUnknown = false
       versionInfo.status = 'idle'
       handleShowChangeLog()
     })
   })
-  const rUpdateError = onUpdateError((params) => {
+  const rUpdateError = onUpdateError(({ params }) => {
     clearUpdateTimeout()
+    versionInfo.downloadMessage = params
     // versionInfo.status = 'error'
     void nextTick(() => {
       showUpdateModal('error')
     })
   })
   const rUpdateProgress = onUpdateProgress(({ params: progress }) => {
+    versionInfo.status = 'downloading'
+    versionInfo.downloadMessage = progress.sourceLabel ?? ''
     versionInfo.downloadProgress = progress
   })
   const rUpdateDownloaded = onUpdateDownloaded(({ params: info }) => {
     clearUpdateTimeout()
+    versionInfo.downloadMessage = ''
     // versionInfo.status = 'downloaded'
     void nextTick(() => {
       showUpdateModal('downloaded')
@@ -205,9 +216,9 @@ export default () => {
   // 「启动时检查更新」关闭时不自动检查（手动检查按钮仍可用）
   if (appSetting['common.isAutoCheckUpdate'] ?? true) {
     window.setTimeout(() => {
-      showUpdateModal()
+      checkUpdate()
     }, 3000)
-  }
+  } else versionInfo.status = 'idle'
 
   onBeforeUnmount(() => {
     clearUpdateTimeout()

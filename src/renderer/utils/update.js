@@ -1,89 +1,9 @@
 import { httpGet } from './request'
-import { isDesktopRelease } from '@common/utils/release'
+import { getUpdateVersion } from '@common/utils/updateSources'
 
-const address = [
-  ['https://api.github.com/repos/Nshpiter/Q-music/releases?per_page=30', 'githubRelease'],
-  ['https://raw.githubusercontent.com/Nshpiter/Q-music/master/publish/version.json', 'direct'],
-  ['https://cdn.jsdelivr.net/gh/Nshpiter/Q-music@master/publish/version.json', 'direct'],
-]
-
-const request = async(url, retryNum = 0) => {
-  return new Promise((resolve, reject) => {
-    httpGet(url, {
-      timeout: 10000,
-    }, (err, resp, body) => {
-      if (err || resp.statusCode != 200) {
-        ++retryNum >= 3
-          ? reject(err || new Error(resp.statusMessage || resp.statusCode))
-          : request(url, retryNum).then(resolve).catch(reject)
-      } else resolve(body)
-    })
+export const getVersionInfo = async() => getUpdateVersion(async(url) => new Promise((resolve, reject) => {
+  httpGet(url, { timeout: 8000 }, (err, response, body) => {
+    if (err || response?.statusCode != 200) reject(err || new Error('更新信息获取失败'))
+    else resolve(body)
   })
-}
-
-const getDirectInfo = async(url) => {
-  return request(url).then(info => {
-    if (info.version == null) throw new Error('failed')
-    return info
-  })
-}
-
-const getNpmPkgInfo = async(url) => {
-  return request(url).then(json => {
-    if (!json.versionInfo) throw new Error('failed')
-    const info = JSON.parse(json.versionInfo)
-    if (info.version == null) throw new Error('failed')
-    return info
-  })
-}
-
-const normalizeVersion = version => String(version || '').replace(/^v/i, '')
-
-const getGithubReleaseInfo = async(url) => {
-  return request(url).then(releases => {
-    const info = Array.isArray(releases)
-      ? releases.find(release => !release.draft && !release.prerelease && isDesktopRelease(release))
-      : null
-    if (!info) throw new Error('No desktop release found')
-    const version = normalizeVersion(info.tag_name)
-    if (!version) throw new Error('failed')
-    return {
-      version,
-      desc: info.body || info.name || '',
-      history: [],
-    }
-  })
-}
-
-export const getVersionInfo = async(index = 0) => {
-  if (!address.length || !address[index]) {
-    return {
-      version: process.versions.app,
-      desc: '',
-      history: [],
-    }
-  }
-  const [url, source] = address[index]
-  let promise
-  switch (source) {
-    case 'githubRelease':
-      promise = getGithubReleaseInfo(url)
-      break
-    case 'direct':
-      promise = getDirectInfo(url)
-      break
-    case 'npm':
-      promise = getNpmPkgInfo(url)
-      break
-  }
-
-  return promise.catch(async(err) => {
-    index++
-    if (index >= address.length) throw err
-    return getVersionInfo(index)
-  })
-}
-
-// getVersionInfo().then(info => {
-//   console.log(info)
-// })
+}), 'desktop')

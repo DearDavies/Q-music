@@ -1,183 +1,123 @@
 import { autoUpdater } from 'electron-updater'
+import { CancellationToken } from 'builder-util-runtime'
 import { log, isWin } from '@common/utils'
 import { mainOn } from '@common/mainIpc'
 import { isExistWindow, sendEvent } from './index'
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
-import { isDesktopRelease } from '@common/utils/release'
+import { compareVersions, downloadSources, getUpdateVersion } from '@common/utils/updateSources'
+import { createUpdateProvider, loadUpdateMetadata, requestUpdate } from './updateProvider'
 
 autoUpdater.logger = log
 autoUpdater.autoDownload = false
-// autoUpdater.forceDevUpdateConfig = true
-// autoUpdater.autoDownload = false
-
-// let isFirstCheckedUpdate = true
-let isManualDownloadPending = false
-
-const isPackageManagerInstall = () => {
-  return process.platform === 'linux' && process.env.Q_MUSIC_PACKAGE_TYPE === 'pacman'
+let operation: Promise<void> | null = null
+let prepared = false
+let sourceIndex = 0
+let downloadOrder = downloadSources
+let touchDownload: ((transferred?: number) => void) | null = null
+const isPackageManagerInstall = () => process.platform === 'linux' && process.env.Q_MUSIC_PACKAGE_TYPE === 'pacman'
+const report = (type: string, info: any) => {
+  if (isExistWindow()) sendEvent(type, info)
+}
+const reportError = (error: unknown) => {
+  report(WIN_MAIN_RENDERER_EVENT_NAME.update_error, error instanceof Error ? error.message : '更新失败，请检查网络后重试')
+}
+const run = (task: () => Promise<void>) => {
+  if (operation) return
+  operation = task().catch(reportError).finally(() => { operation = null })
 }
 
-log.info('App starting...')
-
-
-// -------------------------------------------------------------------
-// Open a window that displays the version
-//
-// THIS SECTION IS NOT REQUIRED
-//
-// This isn't required for auto-updates to work, but it's easier
-// for the app to show a window than to have to click "About" to see
-// that updates are working.
-// -------------------------------------------------------------------
-// let win
-
-function sendStatusToWindow(text: string) {
-  log.info(text)
-  // ipcMain.send('message', text)
-}
-
-
-// -------------------------------------------------------------------
-// Auto updates
-//
-// For details about these events, see the Wiki:
-// https://github.com/electron-userland/electron-builder/wiki/Auto-Update#events
-//
-// The app doesn't need to listen to any events except `update-downloaded`
-//
-// Uncomment any of the below events to listen for them.  Also,
-// look in the previous section to see them being used.
-// -------------------------------------------------------------------
-// autoUpdater.on('checking-for-update', () => {
-// })
-// autoUpdater.on('update-available', (ev, info) => {
-// })
-// autoUpdater.on('update-not-available', (ev, info) => {
-// })
-// autoUpdater.on('error', (ev, err) => {
-// })
-// autoUpdater.on('download-progress', (ev, progressObj) => {
-// })
-// autoUpdater.on('update-downloaded', (ev, info) => {
-//   // Wait 5 seconds, then quit and install
-//   // In your application, you don't need to wait 5 seconds.
-//   // You could call autoUpdater.quitAndInstall(); immediately
-//   // setTimeout(function() {
-//   // autoUpdater.quitAndInstall()
-//   // }, 5000)
-
-// })
-
-interface WaitEvent {
-  type: string
-  info: any
-}
-
-// let waitEvent: WaitEvent[] = []
-const handleSendEvent = (action: WaitEvent) => {
-  if (isExistWindow()) {
-    setTimeout(() => { // 延迟发送事件，过早发送可能渲染进程还没启动完成
-      sendEvent(action.type, action.info)
-    }, 1000)
+const download = async() => {
+  if (isPackageManagerInstall()) return
+  let lastError: unknown
+  const attempts = [...downloadOrder.map(source => downloadSources.indexOf(source)), downloadSources.indexOf(downloadOrder[0])]
+  for (const [attempt, index] of attempts.entries()) {
+    sourceIndex = index
+    const source = downloadSources[index]
+    const token = new CancellationToken()
+    let timer: ReturnType<typeof setTimeout>
+    let received = -1
+    touchDownload = (transferred = 0) => {
+      if (transferred <= received) return
+      received = transferred
+      clearTimeout(timer)
+      timer = setTimeout(() => { token.cancel() }, 30000)
+    }
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, {
+      total: 0,
+      transferred: 0,
+      percent: 0,
+      bytesPerSecond: 0,
+      delta: 0,
+      sourceLabel: `${attempt ? '正在重试，' : ''}使用${source.name}下载（${attempt + 1}/${attempts.length}）`,
+    })
+    // 镜像不一定支持差分块请求，完整包仍由 electron-updater 校验 SHA-512。
+    autoUpdater.disableDifferentialDownload = source.prefix != ''
+    try {
+      touchDownload()
+      await autoUpdater.downloadUpdate(token)
+      return
+    } catch (error) {
+      lastError = error
+      log.warn(`Update download attempt ${attempt + 1} failed`, error)
+    } finally {
+      clearTimeout(timer!)
+      // run 保证整个检查/下载过程互斥，此处不会覆盖其他下载任务。
+      // eslint-disable-next-line require-atomic-updates
+      touchDownload = null
+    }
   }
+  throw new Error(`下载失败，已尝试全部线路，请检查网络后重试。${lastError instanceof Error ? lastError.message : ''}`)
+}
+
+const check = async(shouldDownload: boolean) => {
+  prepared = false
+  const version = await getUpdateVersion(requestUpdate, 'desktop')
+  if (compareVersions(version.version, process.versions.app ?? autoUpdater.currentVersion.version) <= 0 || isPackageManagerInstall()) {
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, { version: version.version, releaseNotes: version.desc })
+    return
+  }
+  if (isWin && process.arch.includes('arm')) throw new Error('此架构请从发布页下载安装包更新')
+  const { info, sources } = await loadUpdateMetadata(version.version, version.assets)
+  downloadOrder = sources
+  info.releaseNotes = version.desc
+  sourceIndex = 0
+  autoUpdater.setFeedURL({
+    provider: 'custom',
+    updateProvider: createUpdateProvider(info, () => downloadSources[sourceIndex].prefix),
+    timeout: 15000,
+  })
+  const result = await autoUpdater.checkForUpdates()
+  if (!result) throw new Error('当前运行方式不支持自动安装，请使用正式安装版或从发布页下载')
+  prepared = result.isUpdateAvailable
+  if (prepared && shouldDownload) await download()
 }
 
 export default () => {
-  autoUpdater.on('checking-for-update', () => {
-    sendStatusToWindow('Checking for update...')
-  })
   autoUpdater.on('update-available', info => {
-    sendStatusToWindow('Update available.')
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_available, info })
-    if (isManualDownloadPending && !isPackageManagerInstall()) {
-      isManualDownloadPending = false
-      void autoUpdater.downloadUpdate()
-    }
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_available, info)
   })
   autoUpdater.on('update-not-available', info => {
-    isManualDownloadPending = false
-    sendStatusToWindow('Update not available.')
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, info })
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, info)
   })
-  autoUpdater.on('error', err => {
-    isManualDownloadPending = false
-    sendStatusToWindow('Error in auto-updater.')
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_error, info: err.message })
-  })
-  autoUpdater.on('download-progress', progressObj => {
-    let log_message = `Download speed: ${progressObj.bytesPerSecond}`
-    log_message = `${log_message} - Downloaded ${progressObj.percent}%`
-    log_message = `${log_message} (progressObj.transferred/${progressObj.total})`
-    sendStatusToWindow(log_message)
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_progress, info: progressObj })
+  // 中间失败由重试流程处理，全部线路失败后才通知界面。
+  autoUpdater.on('error', error => { log.warn('Auto-updater', error) })
+  autoUpdater.on('download-progress', progress => {
+    touchDownload?.(progress.transferred)
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, { ...progress, sourceLabel: `正在使用${downloadSources[sourceIndex].name}下载` })
   })
   autoUpdater.on('update-downloaded', info => {
-    sendStatusToWindow('Update downloaded.')
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_downloaded, info })
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_downloaded, info)
   })
-
   mainOn(WIN_MAIN_RENDERER_EVENT_NAME.update_check, () => {
-    console.log('check')
-    void checkUpdate()
+    run(async() => check(global.lx.appSetting['common.tryAutoUpdate']))
   })
-
   mainOn(WIN_MAIN_RENDERER_EVENT_NAME.update_download_update, () => {
     if (isPackageManagerInstall()) return
-    if (!autoUpdater.isUpdaterActive()) {
-      isManualDownloadPending = true
-      void checkUpdate(false)
-      return
-    }
-    void autoUpdater.downloadUpdate()
+    run(async() => { if (prepared) await download(); else await check(true) })
   })
-
   mainOn(WIN_MAIN_RENDERER_EVENT_NAME.quit_update, () => {
     if (isPackageManagerInstall()) return
     global.lx.isSkipTrayQuit = true
-
-    setTimeout(() => {
-      autoUpdater.quitAndInstall(true, true)
-    }, 1000)
+    setTimeout(() => { autoUpdater.quitAndInstall(true, true) }, 1000)
   })
-}
-
-const latestReleaseIsDesktop = async() => {
-  try {
-    const response = await fetch('https://api.github.com/repos/Nshpiter/Q-music/releases/latest', {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Q-music-desktop' },
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!response.ok) return true
-    return isDesktopRelease(await response.json() as { assets?: Array<{ name?: string }> })
-  } catch {
-    return true
-  }
-}
-
-const checkUpdate = async(autoDownload = global.lx.appSetting['common.tryAutoUpdate']) => {
-  // if (!isFirstCheckedUpdate) {
-  //   if (waitEvent.length) {
-  //     waitEvent.forEach((event, index) => {
-  //       setTimeout(() => { // 延迟发送事件，过早发送可能渲染进程还没启动完成
-  //         sendEvent(event.type, event.info)
-  //       }, 2000 * (index + 1))
-  //     })
-  //     waitEvent = []
-  //   }
-  //   return
-  // }
-  // isFirstCheckedUpdate = false
-
-  // 由于集合安装包中不包含win arm版，这将会导致arm版更新失败
-  if (isWin && process.arch.includes('arm')) {
-    handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_error, info: 'failed' })
-  } else {
-    if (!await latestReleaseIsDesktop()) {
-      isManualDownloadPending = false
-      handleSendEvent({ type: WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, info: { version: process.versions.app } })
-      return
-    }
-    autoUpdater.autoDownload = autoDownload && !isPackageManagerInstall()
-    void autoUpdater.checkForUpdates()
-  }
 }

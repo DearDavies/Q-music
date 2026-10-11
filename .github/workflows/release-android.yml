@@ -133,15 +133,23 @@ jobs:
           packages: platform-tools
 
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;26.1.10909125"
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;26.1.10909125"
 
       - name: Install dependencies
         working-directory: mobile
         run: npm ci
 
-      - name: Lint playback and cloud library source
+      - name: Lint source
         working-directory: mobile
-        run: npx eslint src/core/music/official.ts src/core/music/utils.ts src/core/music/online.ts src/core/cloudLibrary.ts src/screens/Home/Views/Setting/settings/Sync/CloudLibrary.tsx
+        run: npm run lint
+
+      - name: Verify background playback and lyrics
+        working-directory: mobile
+        run: npm run test:background
+
+      - name: Verify update mirror fallback
+        working-directory: mobile
+        run: npm run test:update
 
       - name: Validate signing secrets
         shell: bash
