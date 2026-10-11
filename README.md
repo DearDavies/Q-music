@@ -12,6 +12,7 @@
   <img alt="Arch Linux" src="https://img.shields.io/badge/Arch%20Linux-x86__64-1793d1">
   <img alt="Electron" src="https://img.shields.io/badge/electron-40.9.2-47848f">
   <img alt="Vue" src="https://img.shields.io/badge/vue-3-42b883">
+  <a href="https://linux.do/"><img alt="LINUX DO 社区" src="https://img.shields.io/badge/LINUX%20DO-社区-f0b84c"></a>
 </p>
 
 <p align="center">面向 Windows、Arch Linux 与 Android 的多端音乐播放器，提供聚合搜索、账号推荐、歌单同步与沉浸式歌词体验。</p>
