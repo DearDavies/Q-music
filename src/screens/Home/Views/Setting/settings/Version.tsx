@@ -35,7 +35,7 @@ export default memo(() => {
       switch (versionInfo.status) {
         case 'downloading':
           setTitle(t('version_title_new'))
-          setTip(t('version_btn_downloading', {
+          setTip(`${versionInfo.downloadMessage}\n` + t('version_btn_downloading', {
             total: sizeFormate(progress.total),
             current: sizeFormate(progress.current),
             progress: progress.total ? (progress.current / progress.total * 100).toFixed(2) : '0',
@@ -43,7 +43,7 @@ export default memo(() => {
           break
         case 'downloaded':
           setTitle(t('version_title_update'))
-          setTip('')
+          setTip(versionInfo.downloadMessage)
           break
         case 'checking':
           setTitle(t('version_title_checking'))
@@ -51,7 +51,7 @@ export default memo(() => {
           break
         case 'error':
           setTitle(t('version_title_failed'))
-          setTip(t('version_tip_failed'))
+          setTip(versionInfo.downloadMessage || t('version_tip_failed'))
           break
         // case 'idle':
         //   break

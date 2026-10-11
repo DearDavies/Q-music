@@ -4,7 +4,6 @@ import { View, ScrollView } from 'react-native'
 import { compareVer, sizeFormate } from '@/utils'
 
 import Button from '@/components/common/Button'
-import { updateApp } from '@/utils/version'
 import { createStyle } from '@/utils/tools'
 import { useTheme } from '@/store/theme/hook'
 import { type VersionInfo } from '@/store/version/state'
@@ -12,7 +11,7 @@ import Text from '@/components/common/Text'
 import { useI18n } from '@/lang'
 import { useVersionDownloadProgressUpdated, useVersionInfo, useVersionInfoIgnoreVersionUpdated } from '@/store/version/hook'
 import ModalContent from './ModalContent'
-import { checkUpdate, downloadUpdate, hideModal, setIgnoreVersion } from '@/core/version'
+import { checkUpdate, downloadUpdate, hideModal, installUpdate, setIgnoreVersion } from '@/core/version'
 
 const VersionItem = ({ version, desc }: VersionInfo) => {
   return (
@@ -105,7 +104,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
       switch (versionInfo.status) {
         case 'downloading':
           setTitle(t('version_title_new'))
-          setTip(t('version_btn_downloading', {
+          setTip(`${versionInfo.downloadMessage}\n` + t('version_btn_downloading', {
             total: sizeFormate(progress.total),
             current: sizeFormate(progress.current),
             progress: progress.total ? (progress.current / progress.total * 100).toFixed(2) : '0',
@@ -116,7 +115,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
           break
         case 'downloaded':
           setTitle(t('version_title_update'))
-          setTip('')
+          setTip(versionInfo.downloadMessage)
           if (ignoreBtnConfig.show) ignoreBtnConfig.show = false
           setConfirmBtn({ text: t('version_btn_update'), show: true, disabled: false })
           setCloseBtnText(t('version_btn_close'))
@@ -130,7 +129,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
           break
         case 'error':
           setTitle(t('version_title_failed'))
-          setTip(t('version_tip_failed'))
+          setTip(versionInfo.downloadMessage || t('version_tip_failed'))
           ignoreBtnConfig.show = true
           ignoreBtnConfig.disabled = false
           setConfirmBtn({ text: t('version_btn_failed'), show: true, disabled: false })
@@ -167,7 +166,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
     if (versionInfo.isLatest || versionInfo.isUnknown) {
       void checkUpdate()
     } else if (versionInfo.status == 'downloaded') {
-      void updateApp()
+      void installUpdate()
     } else if (versionInfo.status == 'idle' || versionInfo.status == 'error') {
       downloadUpdate()
     }

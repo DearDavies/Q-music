@@ -1,5 +1,5 @@
 import { compareVer } from '@/utils'
-import { downloadNewVersion, getVersionInfo } from '@/utils/version'
+import { downloadNewVersion, getVersionInfo, updateApp } from '@/utils/version'
 import versionActions from '@/store/version/action'
 import versionState, { type InitState } from '@/store/version/state'
 import { getIgnoreVersion, getIgnoreVersionFailTipTime, saveIgnoreVersion, saveIgnoreVersionFailTipTime } from '@/utils/data'
@@ -19,8 +19,8 @@ export const hideModal = (componentId: string) => {
   void Navigation.dismissOverlay(componentId)
 }
 
-export const checkUpdate = async() => {
-  versionActions.setVersionInfo({ status: 'checking' })
+const doCheckUpdate = async() => {
+  versionActions.setVersionInfo({ status: 'checking', isLatest: false, isUnknown: false, downloadMessage: '' })
   let versionInfo: InitState['versionInfo'] = { ...versionState.versionInfo }
   try {
     const { version, desc, history } = await getVersionInfo()
@@ -47,9 +47,7 @@ export const checkUpdate = async() => {
   } else {
     versionInfo.status = 'idle'
     versionInfo.isUnknown = false
-    if (compareVer(versionInfo.version, versionInfo.newVersion.version) != -1) {
-      versionInfo.isLatest = true
-    }
+    versionInfo.isLatest = compareVer(versionInfo.version, versionInfo.newVersion.version) != -1
   }
 
   versionActions.setVersionInfo(versionInfo)
@@ -68,21 +66,37 @@ export const checkUpdate = async() => {
   // console.log(process.versions.app, versionInfo.version)
 }
 
+let checkPromise: Promise<void> | null = null
+export const checkUpdate = async() => {
+  if (versionState.versionInfo.status == 'downloading') return
+  if (!checkPromise) checkPromise = doCheckUpdate().finally(() => { checkPromise = null })
+  return checkPromise
+}
+
 export const downloadUpdate = () => {
-  versionActions.setVersionInfo({ status: 'downloading' })
+  if (versionState.versionInfo.status == 'downloading' || !versionState.versionInfo.newVersion) return
+  versionActions.setVersionInfo({ status: 'downloading', downloadMessage: '正在准备下载…' })
   versionActions.setProgress({ total: 0, current: 0 })
 
-  downloadNewVersion(versionState.versionInfo.newVersion!.version, (total: number, current: number) => {
+  downloadNewVersion(versionState.versionInfo.newVersion.version, (total: number, current: number) => {
     // console.log(total, current)
     versionActions.setProgress({ total, current })
-  }).then(() => {
-    versionActions.setVersionInfo({ status: 'downloaded' })
-  }).catch(() => {
-    versionActions.setVersionInfo({ status: 'error' })
-    // console.log(err)
+  }, (downloadMessage: string) => {
+    versionActions.setVersionInfo({ downloadMessage })
+  }).then(async() => {
+    versionActions.setVersionInfo({ status: 'downloaded', downloadMessage: '' })
+    await installUpdate()
+  }).catch((error: Error) => {
+    versionActions.setVersionInfo({ status: 'error', downloadMessage: error.message })
   })
 }
 
+export const installUpdate = async() => {
+  try { await updateApp() } catch {
+    // 安装授权失败不丢弃已校验文件，可再次点击安装。
+    versionActions.setVersionInfo({ downloadMessage: '安装包已下载，请允许安装此来源的应用后再次点击更新' })
+  }
+}
 
 export const setIgnoreVersion = (version: InitState['ignoreVersion']) => {
   versionActions.setIgnoreVersion(version)

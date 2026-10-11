@@ -147,6 +147,10 @@ jobs:
         working-directory: mobile
         run: npm run test:background
 
+      - name: Verify update mirror fallback
+        working-directory: mobile
+        run: npm run test:update
+
       - name: Validate signing secrets
         shell: bash
         env:

@@ -77,6 +77,7 @@ module.exports = {
   },
   ignorePatterns: [
     'node_modules',
+    '/artifacts/',
     '*.min.js',
     'test.js',
     '*Test.ts',

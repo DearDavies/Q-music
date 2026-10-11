@@ -21,6 +21,7 @@ export interface InitState {
     isLatest: boolean
     reCheck: boolean
     status: LX.UpdateStatus
+    downloadMessage: string
   }
   ignoreVersion: string | null
   progress: ProgressInfo
@@ -36,6 +37,7 @@ const state: InitState = {
     isUnknown: false,
     isLatest: false,
     status: 'checking',
+    downloadMessage: '',
   },
   ignoreVersion: null,
   progress: {
