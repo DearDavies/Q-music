@@ -2,9 +2,14 @@
 // 100497308 是互联 client_id，不能直接当作 ptlogin 的 appid。
 const qqRedirect = 'https://y.qq.com/portal/wx_redirect.html?login_type=1&surl=https%3A%2F%2Fy.qq.com%2F'
 export const LOGIN_URLS = {
+  kg: 'https://www.kugou.com/',
   tx: `https://graph.qq.com/oauth2.0/authorize?client_id=100497308&redirect_uri=${encodeURIComponent(qqRedirect)}&response_type=code&scope=all&display=mobile`,
   wy: 'https://music.163.com/m/login',
 } as const
+
+// 通过 QQ 音乐官方回调在当前 WebView 写入微信账号 Cookie，不跳到外部浏览器。
+const wechatRedirect = 'https://y.qq.com/portal/wx_redirect.html?login_type=2&surl=https://y.qq.com/'
+export const QQ_WECHAT_LOGIN_URL = `https://open.weixin.qq.com/connect/qrconnect?appid=wx48db31d50e334801&redirect_uri=${encodeURIComponent(wechatRedirect)}&response_type=code&scope=snsapi_login&state=STATE`
 
 export const QQ_CALLBACK = 'qmusic://account/qq?url='
 export const QQ_RETURN = 'qmusic://account/qq'
@@ -21,7 +26,8 @@ export const getQQCallbackUrl = (url: string): string | null => {
   return /^https:\/\/(?:[a-z0-9-]+\.)*qq\.com(?::443)?(?:[/?#]|$)/i.test(target) && !/[\s\\]/.test(target) ? target : null
 }
 
-export const getLoginAppUrl = (url: string, provider: 'tx' | 'wy'): string | null => {
+export const getLoginAppUrl = (url: string, provider: 'tx' | 'wy' | 'kg'): string | null => {
+  if (provider == 'kg') return null
   if (provider == 'wy' && /^orpheus:\/\//i.test(url)) return url
   if (!/^wtloginmqq:\/\/ptlogin\/qlogin\?/i.test(url)) return null
   // 二维码授权由原 WebView 轮询结果，回跳只负责唤醒应用，不携带登录凭证。

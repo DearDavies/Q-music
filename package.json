@@ -1,7 +1,7 @@
 {
   "name": "q-music-mobile",
-  "version": "0.4.11",
-  "versionCode": 41,
+  "version": "0.4.12",
+  "versionCode": 42,
   "private": true,
   "scripts": {
     "postinstall": "node scripts/patch-android-dependencies.cjs",
@@ -24,7 +24,8 @@
     "clear": "node scripts/run-gradle.js clean",
     "clear:full": "git clean -fdx -e android/keystore.properties -e android/app/*.keystore",
     "build:theme": "node src/theme/themes/createThemes.js",
-    "publish": "node publish"
+    "publish": "node publish",
+    "test:accounts": "node --test scripts/verify-music-accounts.cjs"
   },
   "engines": {
     "node": ">= 18",

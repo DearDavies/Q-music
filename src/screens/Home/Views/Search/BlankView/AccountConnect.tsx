@@ -37,6 +37,7 @@ export default () => {
         <View style={styles.accountLogos}>
           <SourceLogo source="tx" size={24} />
           <SourceLogo source="wy" size={24} />
+          <SourceLogo source="kg" size={24} />
         </View>
         <Text size={13} style={styles.copy} color={theme['q-accent-text']}>{t('setting_music_account_title')}</Text>
         <Icon accessible={false} name="chevron-right" rawSize={18} color={theme['q-accent-text']} />

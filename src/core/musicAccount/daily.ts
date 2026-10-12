@@ -4,14 +4,17 @@ import { getQQCredentials, getProviderCookies, isQQLoginCookieValid, isNeteaseLo
 import { assertAccountSession, openAccountSession, qqRequest, wyRequest, request, fail, type AccountSession } from './requests'
 import type { MusicAccountProvider } from './types'
 import qqSongList from '@/utils/musicSdk/tx/songList'
+import { assertKugouSession, kugouApi, requireKugouSession } from './kugou'
+import kgSongList from '@/utils/musicSdk/kg/songList'
 import wySongList from '@/utils/musicSdk/wy/songList'
 import { toNewMusicInfo } from '@/utils'
 import { getDailyRecommend } from '@/core/dailyRecommend'
+export type DailyProvider = MusicAccountProvider
 
-export type DailyKind = 'official_daily' | 'radar' | 'netease_daily' | 'local'
+export type DailyKind = 'official_daily' | 'radar' | 'netease_daily' | 'kugou_daily' | 'local'
 export type DailyReason = 'login_required' | 'unavailable' | 'official_unavailable' | ''
 export interface DailyRecommendation {
-  provider: MusicAccountProvider
+  provider: DailyProvider
   kind: DailyKind
   reason: DailyReason
   list: LX.Music.MusicInfoOnline[]
@@ -22,19 +25,19 @@ const credentialStore = NativeModules.MusicCredentialModule as {
   clearQQDailyKey: () => Promise<void>
 } | undefined
 const PROVIDER_KEY = '@qmusic_daily_provider'
-const cache = new Map<MusicAccountProvider, { identity: string, day: string, expires: number, value: DailyRecommendation }>()
+const cache = new Map<DailyProvider, { identity: string, day: string, expires: number, value: DailyRecommendation }>()
 const dayKey = () => new Date().toLocaleDateString('en-CA')
 const aborted = (signal?: AbortSignal) => { if (signal?.aborted) fail('cancelled') }
 
-export const getDailyProvider = async(): Promise<MusicAccountProvider> => {
+export const getDailyProvider = async(): Promise<DailyProvider> => {
   const saved = await AsyncStorage.getItem(PROVIDER_KEY).catch(() => null)
-  if (saved == 'tx' || saved == 'wy') return saved
+  if (saved == 'tx' || saved == 'wy' || saved == 'kg') return saved
   const qq = await getProviderCookies('tx').catch(() => ({}))
   if (isQQLoginCookieValid(qq)) return 'tx'
   const wy = await getProviderCookies('wy').catch(() => ({}))
   return isNeteaseLoginCookieValid(wy) ? 'wy' : 'tx'
 }
-export const setDailyProvider = async(provider: MusicAccountProvider) => { await AsyncStorage.setItem(PROVIDER_KEY, provider) }
+export const setDailyProvider = async(provider: DailyProvider) => { await AsyncStorage.setItem(PROVIDER_KEY, provider) }
 export const clearDailyCache = () => { cache.clear() }
 export const clearQQDailyKey = async() => {
   await credentialStore?.clearQQDailyKey()
@@ -135,41 +138,60 @@ const neteaseDaily = async(session: AccountSession, signal?: AbortSignal) => {
   return wySongList.filterListDetail({ playlist: { tracks: songs }, privileges }).map((song: unknown) => toNewMusicInfo(song) as LX.Music.MusicInfoOnline)
 }
 
-export const getAccountDaily = async(provider: MusicAccountProvider, force = false, signal?: AbortSignal): Promise<DailyRecommendation> => {
+export const getAccountDaily = async(provider: DailyProvider, force = false, signal?: AbortSignal): Promise<DailyRecommendation> => {
   let reason: DailyReason = 'unavailable'
   let session: AccountSession | undefined
   let identity = ''
   let key: string | null = null
   let result: DailyRecommendation | undefined
   try {
-    session = await openAccountSession(provider)
-    if (provider == 'tx') key = await credentialStore?.getQQDailyKey(getQQCredentials(session.cookies).uin).catch(() => null) ?? null
-    identity = JSON.stringify([session.cookies, key])
-    const previous = cache.get(provider)
-    if (!force && previous?.identity == identity && previous.day == dayKey() && previous.expires > Date.now()) {
-      await assertAccountSession(session)
+    if (provider == 'kg') {
+      const account = await requireKugouSession()
+      identity = JSON.stringify([account.userId, account.token, account.mid])
+      const previous = cache.get(provider)
+      if (!force && previous?.identity == identity && previous.day == dayKey() && previous.expires > Date.now()) {
+        await assertKugouSession(account)
+        aborted(signal)
+        return previous.value
+      }
+      const hashes = await kugouApi.getDailyHashes(account, signal)
       aborted(signal)
-      return previous.value
-    }
-    if (provider == 'wy') {
-      const list = await neteaseDaily(session, signal)
-      if (list.length) result = { provider, kind: 'netease_daily', reason: '', list }
+      if (hashes.length) {
+        const tracks = await kgSongList.getMusicInfos(hashes.map(hash => ({ hash })))
+        if (tracks.length != hashes.length) fail('incomplete')
+        result = { provider, kind: 'kugou_daily', reason: '', list: tracks.map((item: unknown) => toNewMusicInfo(item) as LX.Music.MusicInfoOnline) }
+      }
+      await assertKugouSession(account)
     } else {
-      if (key) {
-        try {
-          const ids = await requestQQOfficialDailyIds(session, key, signal)
-          const list = await qqTracks(session, ids, signal)
-          if (list.length) result = { provider, kind: 'official_daily', reason: '', list }
-        } catch {}
-        if (!result) reason = 'official_unavailable'
+      session = await openAccountSession(provider)
+      if (provider == 'tx') key = await credentialStore?.getQQDailyKey(getQQCredentials(session.cookies).uin).catch(() => null) ?? null
+      identity = JSON.stringify([session.cookies, key])
+      const previous = cache.get(provider)
+      if (!force && previous?.identity == identity && previous.day == dayKey() && previous.expires > Date.now()) {
+        await assertAccountSession(session)
+        aborted(signal)
+        return previous.value
       }
-      aborted(signal)
-      if (!result) {
-        const list = await qqRadar(session, signal)
-        if (list.length) result = { provider, kind: 'radar', reason: key ? 'official_unavailable' : '', list }
+      if (provider == 'wy') {
+        const list = await neteaseDaily(session, signal)
+        if (list.length) result = { provider, kind: 'netease_daily', reason: '', list }
+      } else {
+        if (key) {
+          try {
+            const ids = await requestQQOfficialDailyIds(session, key, signal)
+            const list = await qqTracks(session, ids, signal)
+            if (list.length) result = { provider, kind: 'official_daily', reason: '', list }
+          } catch {}
+          if (!result) reason = 'official_unavailable'
+        }
+        aborted(signal)
+        if (!result) {
+          const list = await qqRadar(session, signal)
+          if (list.length) result = { provider, kind: 'radar', reason: key ? 'official_unavailable' : '', list }
+        }
       }
+      await assertAccountSession(session)
     }
-    await assertAccountSession(session)
   } catch (error) {
     result = undefined
     if (error instanceof Error && ['login_required', 'account_changed'].includes(error.message)) reason = 'login_required'

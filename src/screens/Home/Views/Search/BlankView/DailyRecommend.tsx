@@ -1,8 +1,8 @@
 import Button from '@/components/common/Button'
 import Text from '@/components/common/Text'
 import { LIST_IDS } from '@/config/constant'
-import { getAccountDaily, getDailyProvider, setDailyProvider, type DailyRecommendation } from '@/core/musicAccount/daily'
-import type { MusicAccountProvider } from '@/core/musicAccount'
+import { getAccountDaily, getDailyProvider, setDailyProvider, type DailyRecommendation, type DailyProvider } from '@/core/musicAccount/daily'
+
 import { useNavigationComponentDidAppear } from '@/navigation'
 import { pushMusicAccountScreen, pushPlayDetailScreen } from '@/navigation/navigation'
 import commonState from '@/store/common/state'
@@ -26,14 +26,14 @@ export default () => {
   const theme = useTheme()
   const isPlay = useIsPlay()
   const playMusicInfo = usePlayMusicInfo()
-  const sourceRef = useRef<MusicAccountProvider>('tx')
+  const sourceRef = useRef<DailyProvider>('tx')
   const ready = useRef(false)
   const requestIdRef = useRef(0)
   const request = useRef<AbortController>()
-  const pendingSource = useRef<MusicAccountProvider>()
-  const shownSource = useRef<MusicAccountProvider>()
+  const pendingSource = useRef<DailyProvider>()
+  const shownSource = useRef<DailyProvider>()
   const isUnmountedRef = useRef(false)
-  const [provider, setProvider] = useState<MusicAccountProvider>('tx')
+  const [provider, setProvider] = useState<DailyProvider>('tx')
   const [result, setResult] = useState<DailyRecommendation>()
   const [list, setList] = useState<LX.Music.MusicInfoOnline[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +43,7 @@ export default () => {
   const [startingPlayback, setStartingPlayback] = useState(false)
   const playbackPending = useRef(false)
 
-  const load = useCallback(async(source: MusicAccountProvider, force = false) => {
+  const load = useCallback(async(source: DailyProvider, force = false) => {
     if (!force && pendingSource.current == source && request.current && !request.current.signal.aborted) return
     request.current?.abort()
     const controller = new AbortController()
@@ -92,11 +92,17 @@ export default () => {
     return () => { isUnmountedRef.current = true; ready.current = false; request.current?.abort(); listener.remove() }
   }, [load])
   const resume = useCallback(() => {
-    if (ready.current && commonState.navActiveId == 'nav_search') void load(sourceRef.current)
+    if (!ready.current || commonState.navActiveId != 'nav_search') return
+    void getDailyProvider().then(source => {
+      if (isUnmountedRef.current) return
+      sourceRef.current = source
+      setProvider(source)
+      void load(source)
+    })
   }, [load])
   useNavigationComponentDidAppear(commonState.componentIds.home ?? '', resume)
 
-  const changeProvider = (source: MusicAccountProvider) => {
+  const changeProvider = (source: DailyProvider) => {
     if (!ready.current || source == sourceRef.current || playbackPending.current) return
     sourceRef.current = source
     setProvider(source)
@@ -108,7 +114,7 @@ export default () => {
     setSettingsVisible(false)
     if (commonState.componentIds.home) pushMusicAccountScreen(commonState.componentIds.home, sourceRef.current)
   }
-  const sourceLabel = t(loading && !result ? 'search_daily_recommend_loading' : loadError ? 'load_failed' : result?.kind == 'official_daily' ? 'daily_official_daily' : result?.kind == 'radar' ? 'daily_radar' : result?.kind == 'netease_daily' ? 'daily_netease_daily' : 'daily_local')
+  const sourceLabel = t(loading && !result ? 'search_daily_recommend_loading' : loadError ? 'load_failed' : result?.kind == 'official_daily' ? 'daily_official_daily' : result?.kind == 'radar' ? 'daily_radar' : result?.kind == 'netease_daily' ? 'daily_netease_daily' : result?.kind == 'kugou_daily' ? 'daily_kugou_daily' : 'daily_local')
   const playingDaily = list.some(item => item.id == playMusicInfo.musicInfo?.id)
 
   const handlePlay = useCallback(async(index = 0) => {
@@ -144,7 +150,7 @@ export default () => {
       }}
     >
       <View style={styles.providerBar}>
-        {(['tx', 'wy'] as const).map(source => <Button key={source} ripple={null} disabled={startingPlayback} accessibilityRole="tab" accessibilityState={{ selected: provider == source }} onPress={() => { changeProvider(source) }} style={[styles.providerChip, { backgroundColor: provider == source ? theme['q-surface-tint'] : 'transparent' }]}><Text size={12} color={provider == source ? theme['q-accent-text'] : theme['q-text-secondary']}>{t(source == 'tx' ? 'setting_music_account_qq' : 'setting_music_account_netease')}</Text></Button>)}
+        {(['tx', 'wy', 'kg'] as const).map(source => <Button key={source} ripple={null} disabled={startingPlayback} accessibilityRole="tab" accessibilityState={{ selected: provider == source }} onPress={() => { changeProvider(source) }} style={[styles.providerChip, { backgroundColor: provider == source ? theme['q-surface-tint'] : 'transparent' }]}><Text size={12} color={provider == source ? theme['q-accent-text'] : theme['q-text-secondary']}>{t(source == 'tx' ? 'setting_music_account_qq' : source == 'kg' ? 'setting_music_account_kugou' : 'setting_music_account_netease')}</Text></Button>)}
         <Button accessibilityLabel={t('daily_settings')} style={styles.settingsButton} onPress={() => { setSettingsVisible(true) }}><Icon name="slider" rawSize={19} color={theme['q-text-secondary']} /></Button>
       </View>
       <Button accessibilityLabel={t('search_daily_open')} style={styles.feature} onPress={() => { setDetailVisible(true) }}>
@@ -276,8 +282,8 @@ export default () => {
 }
 
 const styles = createStyle({
-  providerBar: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 14 },
-  providerChip: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, justifyContent: 'center' },
+  providerBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 14 },
+  providerChip: { minHeight: 40, paddingHorizontal: 10, borderRadius: 20, justifyContent: 'center' },
   settingsButton: { marginLeft: 'auto', width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   sourceNotice: { paddingTop: 12, paddingBottom: 4, minHeight: 36, justifyContent: 'center' },
   container: {

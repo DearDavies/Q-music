@@ -2,6 +2,7 @@ import { clearOfficialUrlCache, getOfficialUrlCache, setOfficialUrlCache } from 
 import { getQQOfficialMusicUrl, hasQQLoginCookie } from './qq'
 import { getNeteaseOfficialMusicUrl, hasNeteaseLoginCookie } from './netease'
 import type { MusicAccountProvider, MusicAccountUrlResult } from './types'
+import { clearKugouSession, readKugouSession } from './kugou'
 
 export type { MusicAccountProvider, MusicAccountConnectionState, MusicAccountUrlResult } from './types'
 export { clearProviderCookies } from './cookies'
@@ -9,6 +10,7 @@ export { clearProviderCookies } from './cookies'
 export const isMusicAccountConnected = async(provider: MusicAccountProvider): Promise<boolean> => {
   // 原生桥或 CookieManager 异常时一律按未登录处理，绝不向上抛
   try {
+    if (provider == 'kg') return Boolean(await readKugouSession())
     return provider == 'tx' ? await hasQQLoginCookie() : await hasNeteaseLoginCookie()
   } catch (err) {
     console.warn('[musicAccount] cookie check failed', err)
@@ -17,6 +19,12 @@ export const isMusicAccountConnected = async(provider: MusicAccountProvider): Pr
 }
 
 export const logoutMusicAccount = async(provider: MusicAccountProvider) => {
+  if (provider == 'kg') {
+    await clearKugouSession()
+    const { clearDailyCache } = await import('./daily')
+    clearDailyCache()
+    return
+  }
   const { clearProviderCookies } = await import('./cookies')
   await clearProviderCookies(provider)
   clearOfficialUrlCache()
@@ -49,6 +57,7 @@ export const getMusicAccountMusicUrl = async(
     quality,
   })
 
+  if (provider == 'kg') return unavailable('unavailable')
   if (!await isMusicAccountConnected(provider)) return unavailable('login_required')
 
   const cached = getOfficialUrlCache(provider, songId, mediaId, quality)

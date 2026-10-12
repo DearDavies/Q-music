@@ -712,5 +712,11 @@
   "daily_refresh": "重新整理推薦",
   "daily_authorization_tip": "在 QQ 音樂官方頁面完成推薦授權，產生 Key 後會自動驗證並儲存。",
   "list_create_failed": "建立歌單失敗，請重試。輸入內容已保留。",
-  "list_create_saving": "正在儲存…"
+  "list_create_saving": "正在儲存…",
+  "setting_music_account_kugou": "酷狗音樂",
+  "daily_kugou_daily": "酷狗 · 帳號每日推薦",
+  "daily_kg_explanation": "登入酷狗後取得帳號每日推薦，無需額外授權；可在帳號頁匯入預設收藏、我喜歡與自己的歌單。",
+  "daily_provider_current": "首頁正在使用",
+  "daily_provider_use": "設為首頁推薦",
+  "daily_provider_saved": "已設定首頁推薦來源"
 }

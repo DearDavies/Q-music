@@ -4,6 +4,9 @@ import type { MusicAccountProvider } from './types'
 import qqSongList from '@/utils/musicSdk/tx/songList'
 import wySongList from '@/utils/musicSdk/wy/songList'
 import { toNewMusicInfo } from '@/utils'
+import kgSongList from '@/utils/musicSdk/kg/songList'
+import { assertKugouSession, kugouApi, requireKugouSession } from './kugou'
+import type { KugouSession } from './kugouApi'
 
 export interface AccountPlaylist {
   id: string
@@ -13,6 +16,7 @@ export interface AccountPlaylist {
   kind: 'created' | 'favorite'
 }
 export interface PlaylistSession {
+  kugou?: KugouSession
   provider: MusicAccountProvider
   owner: string
   encryptedUin: string
@@ -22,6 +26,10 @@ type Row = Record<string, any>
 const MAX_PAGES = 1000
 const more = (value: unknown) => value === true || value === 1 || value === '1'
 export const openPlaylistSession = async(provider: MusicAccountProvider, signal?: AbortSignal): Promise<PlaylistSession> => {
+  if (provider == 'kg') {
+    const kugou = await requireKugouSession()
+    return { provider, owner: kugou.userId, cookies: {}, encryptedUin: '', kugou }
+  }
   const { cookies } = await openAccountSession(provider)
   const session: PlaylistSession = { provider, cookies, owner: '', encryptedUin: '' }
   if (provider == 'tx') {
@@ -40,7 +48,12 @@ export const openPlaylistSession = async(provider: MusicAccountProvider, signal?
   return session
 }
 
-export const assertPlaylistSession = assertAccountSession
+export const assertPlaylistSession = async(session: PlaylistSession) => {
+  if (session.provider == 'kg') {
+    if (!session.kugou) fail('login_required')
+    await assertKugouSession(session.kugou!)
+  } else await assertAccountSession(session)
+}
 
 const unique = <T extends { id: string }>(items: T[]): T[] => [...new Map(items.map(item => [item.id, item])).values()]
 const coverUrl = (value: unknown): string => {
@@ -74,6 +87,12 @@ const qqDetailCall = (session: PlaylistSession, id: string, offset: number, size
 })
 
 export const getAccountPlaylists = async(session: PlaylistSession, signal?: AbortSignal): Promise<AccountPlaylist[]> => {
+  if (session.provider == 'kg') {
+    if (!session.kugou) fail('login_required')
+    const lists = await kugouApi.getPlaylists(session.kugou!, signal)
+    await assertPlaylistSession(session)
+    return lists
+  }
   const lists: AccountPlaylist[] = []
   if (session.provider == 'wy') {
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -117,6 +136,19 @@ export const getAccountPlaylists = async(session: PlaylistSession, signal?: Abor
 export const getAccountPlaylistTracks = async(session: PlaylistSession, id: string, signal?: AbortSignal): Promise<LX.Music.MusicInfoOnline[]> => {
   if (!/^(?:dir:)?\d+$/.test(id)) fail()
   const tracks: LX.Music.MusicInfoOnline[] = []
+  if (session.provider == 'kg') {
+    if (!session.kugou) fail('login_required')
+    const hashes = await kugouApi.getPlaylistHashes(session.kugou!, id, signal)
+    for (let offset = 0; offset < hashes.length; offset += 100) {
+      if (signal?.aborted) fail('cancelled')
+      const group = hashes.slice(offset, offset + 100)
+      const details = await kgSongList.getMusicInfos(group.map(hash => ({ hash })))
+      if (details.length != group.length) fail('incomplete')
+      tracks.push(...details.map((item: unknown) => toNewMusicInfo(item) as LX.Music.MusicInfoOnline))
+    }
+    await assertPlaylistSession(session)
+    return tracks
+  }
   if (session.provider == 'wy') {
     const result = await wyRequest(session, 'v6/playlist/detail', { id, n: 100000, s: 0 }, signal)
     const playlist = result.playlist

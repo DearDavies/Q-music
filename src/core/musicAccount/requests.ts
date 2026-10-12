@@ -1,6 +1,7 @@
 import { buildCookieHeader, getProviderCookies, getQQCredentials, isNeteaseLoginCookieValid, isQQLoginCookieValid } from './cookies'
 import { weapi } from '@/utils/musicSdk/wy/utils/crypto'
 import type { MusicAccountProvider } from './types'
+import { getQQRequestComm } from './qqCredentials'
 
 export interface AccountSession {
   provider: MusicAccountProvider
@@ -13,6 +14,7 @@ export const checkCode = (code: unknown, success: number) => {
   fail([301, 401, 403, 1000, 104400, 104401].includes(Number(code)) ? 'login_required' : 'unavailable')
 }
 export const openAccountSession = async(provider: MusicAccountProvider): Promise<AccountSession> => {
+  if (provider == 'kg') fail('unavailable')
   const cookies = await getProviderCookies(provider)
   if (!(provider == 'tx' ? isQQLoginCookieValid(cookies) : isNeteaseLoginCookieValid(cookies))) fail('login_required')
   return { provider, cookies }
@@ -24,7 +26,7 @@ export const assertAccountSession = async(session: AccountSession) => {
   } else {
     const before = getQQCredentials(session.cookies)
     const after = getQQCredentials(current)
-    if (before.uin != after.uin || before.authst != after.authst) fail('account_changed')
+    if (before.uin != after.uin || before.authst != after.authst || before.tmeLoginType != after.tmeLoginType) fail('account_changed')
   }
 }
 
@@ -51,11 +53,10 @@ export const request = async(url: string, cookies: Record<string, string>, init:
   }
 }
 export const qqRequest = async(session: AccountSession, calls: Row, signal?: AbortSignal, ct = 24) => {
-  const { uin, authst } = getQQCredentials(session.cookies)
   const result = await request('https://u.y.qq.com/cgi-bin/musicu.fcg', session.cookies, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json;charset=UTF-8', Referer: 'https://y.qq.com/', Origin: 'https://y.qq.com' },
-    body: JSON.stringify({ comm: { uin, authst, ct, cv: 0, format: 'json' }, ...calls }),
+    body: JSON.stringify({ comm: getQQRequestComm(session.cookies, ct), ...calls }),
   }, signal)
   checkCode(result.code, 0)
   for (const key of Object.keys(calls)) {

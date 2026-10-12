@@ -7,7 +7,7 @@ import { useTheme } from '@/store/theme/hook'
 import { useI18n } from '@/lang'
 import { getQQDailyKeyStatus, saveQQDailyKey, clearQQDailyKey } from '@/core/musicAccount/daily'
 import type { MusicAccountProvider } from '@/core/musicAccount'
-import { LoginPage } from '@/screens/MusicAccount'
+import LoginPage from '@/screens/MusicAccount/LoginPage'
 import { QQ_DAILY_PAGE } from '@/core/musicAccount/dailyAuthorization'
 
 const noop = () => {}
@@ -15,7 +15,7 @@ export default ({ provider, onClose, onChanged, onLogin }: {
   provider: MusicAccountProvider
   onClose: () => void
   onChanged: () => void
-  onLogin: () => void
+  onLogin?: () => void
 }) => {
   const theme = useTheme()
   const t = useI18n()
@@ -71,9 +71,9 @@ export default ({ provider, onClose, onChanged, onLogin }: {
       {notice ? <Text accessibilityLiveRegion="polite" size={12} color={theme['q-accent-text']} style={styles.notice}>{notice}</Text> : null}
       {saving ? <View style={styles.busy}><ActivityIndicator color={theme['q-accent']} /><Text size={12}>{t('daily_key_saving')}</Text></View> : null}
       {authorizing ? <LoginPage provider="tx" initialUrl={QQ_DAILY_PAGE} connected={false} onConnected={noop} onDailyKey={value => { void save(value) }} /> : <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text size={22} style={styles.heading}>{t(provider == 'tx' ? 'setting_music_account_qq' : 'setting_music_account_netease')}</Text>
-        <Text size={13} color={theme['q-text-secondary']} style={styles.description}>{t(provider == 'tx' ? 'daily_qq_explanation' : 'daily_wy_explanation')}</Text>
-        <Button style={[styles.button, { backgroundColor: theme['q-surface-tint'] }]} onPress={onLogin}><Text color={theme['q-accent-text']}>{t('daily_manage_account')}</Text><Icon name="chevron-right" size={18} color={theme['q-accent-text']} /></Button>
+        <Text size={22} style={styles.heading}>{t(provider == 'tx' ? 'setting_music_account_qq' : provider == 'kg' ? 'setting_music_account_kugou' : 'setting_music_account_netease')}</Text>
+        <Text size={13} color={theme['q-text-secondary']} style={styles.description}>{t(provider == 'tx' ? 'daily_qq_explanation' : provider == 'kg' ? 'daily_kg_explanation' : 'daily_wy_explanation')}</Text>
+        {onLogin ? <Button style={[styles.button, { backgroundColor: theme['q-surface-tint'] }]} onPress={onLogin}><Text color={theme['q-accent-text']}>{t('daily_manage_account')}</Text><Icon name="chevron-right" size={18} color={theme['q-accent-text']} /></Button> : null}
         {provider == 'tx' ? <View style={[styles.card, { backgroundColor: theme['q-surface-raised'], borderColor: theme['q-outline'] }]}>
           <View style={styles.row}><Text size={17} style={styles.heading}>{t('daily_official_daily')}</Text><Text size={12} color={theme['q-accent-text']}>{t(status.configured ? 'daily_key_enabled' : 'daily_key_disabled')}</Text></View>
           <Text size={12} color={theme['q-text-secondary']} style={styles.description}>{t('daily_key_description')}</Text>

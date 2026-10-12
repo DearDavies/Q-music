@@ -360,7 +360,7 @@ export function pushCommentScreen(componentId: string) {
   })
 }
 
-export function pushMusicAccountScreen(componentId: string, initialProvider: 'tx' | 'wy' = 'tx') {
+export function pushMusicAccountScreen(componentId: string, initialProvider: 'tx' | 'wy' | 'kg' = 'tx') {
   requestAnimationFrame(() => {
     const theme = themeState.theme
 

@@ -712,5 +712,11 @@
   "daily_refresh": "Refresh recommendations",
   "daily_authorization_tip": "Complete recommendation authorization on QQ Music. The generated key is verified and saved automatically.",
   "list_create_failed": "Could not create the playlist. Your name is preserved; please try again.",
-  "list_create_saving": "Saving…"
+  "list_create_saving": "Saving…",
+  "setting_music_account_kugou": "Kugou Music",
+  "daily_kugou_daily": "Kugou · Personal daily recommendations",
+  "daily_kg_explanation": "Sign in to Kugou for personal daily recommendations. Import saved songs and playlists from the account screen. No extra authorization needed.",
+  "daily_provider_current": "Used on home",
+  "daily_provider_use": "Use on home",
+  "daily_provider_saved": "Home recommendation source saved"
 }

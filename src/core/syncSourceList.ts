@@ -25,7 +25,7 @@ export default async(targetListInfo: LX.List.UserListInfo) => {
   // console.log(targetListInfo)
   if (!targetListInfo.source || !targetListInfo.sourceListId) return
   const account = parseAccountSourceId(targetListInfo.sourceListId)
-  if (account && (targetListInfo.source == 'tx' || targetListInfo.source == 'wy')) {
+  if (account && (targetListInfo.source == 'tx' || targetListInfo.source == 'wy' || targetListInfo.source == 'kg')) {
     const session = await openPlaylistSession(targetListInfo.source)
     if (session.owner != account.owner) throw new Error('account_changed')
     await syncAccountPlaylist(session, { id: account.id, name: targetListInfo.name }, undefined, targetListInfo)

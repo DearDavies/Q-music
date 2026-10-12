@@ -1,9 +1,12 @@
 import { NativeModules } from 'react-native'
 import type { MusicAccountProvider } from './types'
+import { getQQCredentials } from './qqCredentials'
+export { getQQCredentials } from './qqCredentials'
 
 const { UtilsModule } = NativeModules
 
 const COOKIE_URLS: Record<MusicAccountProvider, string[]> = {
+  kg: [],
   tx: ['https://y.qq.com', 'https://u.y.qq.com'],
   wy: ['https://music.163.com'],
 }
@@ -34,15 +37,6 @@ export const getProviderCookies = async(provider: MusicAccountProvider): Promise
 
 export const buildCookieHeader = (cookies: Record<string, string>): string => {
   return Object.entries(cookies).map(([name, value]) => `${name}=${value}`).join('; ')
-}
-
-/** 对齐 PC：QQ 网页授权的新旧 Cookie 名称归一化，避免授权成功仍显示未连接。 */
-export const getQQCredentials = (cookies: Record<string, string>) => {
-  const rawUin = [cookies.uin, cookies.qqmusic_uin, cookies.musicid].find(value => /^o?\d+$/i.test(value ?? '')) ?? ''
-  return {
-    uin: rawUin.replace(/^o/i, '').replace(/^0+/, ''),
-    authst: [cookies.qm_keyst, cookies.qqmusic_key, cookies.musickey].find(value => value?.trim()) ?? '',
-  }
 }
 
 /** QQ 需要音乐账号与音乐凭证；仅有 QQ 通用 skey 不算音乐授权成功。 */

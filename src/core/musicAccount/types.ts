@@ -1,4 +1,4 @@
-export type MusicAccountProvider = 'tx' | 'wy'
+export type MusicAccountProvider = 'tx' | 'wy' | 'kg'
 
 export type MusicAccountConnectionState = 'connected' | 'expired' | 'disconnected'
 

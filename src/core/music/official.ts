@@ -1,6 +1,7 @@
 import { httpFetch } from '@/utils/request'
 import { weapi } from '@/utils/musicSdk/wy/utils/crypto'
 import { getProviderCookies, isQQLoginCookieValid, isNeteaseLoginCookieValid, buildCookieHeader } from '@/core/musicAccount/cookies'
+import { getQQRequestComm } from '@/core/musicAccount/qqCredentials'
 
 const officialUrlCache = new Map<string, { url: string, quality: LX.Quality, expiresAt: number }>()
 
@@ -29,10 +30,14 @@ const getQQMusicUrl = async(musicInfo: LX.Music.MusicInfo_tx, quality: LX.Qualit
   if (!songId || !mediaId || !candidates.length) return null
 
   // 登录态优先（qm_keyst 即 authst 凭证，可解锁高音质与会员曲目），失败回落游客态
-  let credential: { uin: string, authst: string } | null = null
+  let credential: ReturnType<typeof getQQRequestComm> | null = null
+  let accountCookies: Record<string, string> = {}
   try {
     const cookies = await getProviderCookies('tx')
-    if (isQQLoginCookieValid(cookies)) credential = { uin: cookies.uin, authst: cookies.qm_keyst }
+    if (isQQLoginCookieValid(cookies)) {
+      credential = getQQRequestComm(cookies)
+      accountCookies = cookies
+    }
   } catch {}
 
   const request = httpFetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
@@ -40,12 +45,10 @@ const getQQMusicUrl = async(musicInfo: LX.Music.MusicInfo_tx, quality: LX.Qualit
     headers: {
       Referer: 'https://y.qq.com/',
       Origin: 'https://y.qq.com',
-      ...(credential ? { Cookie: buildCookieHeader(await getProviderCookies('tx')) } : {}),
+      ...(credential ? { Cookie: buildCookieHeader(accountCookies) } : {}),
     },
     body: {
-      comm: credential
-        ? { uin: credential.uin, format: 'json', ct: 24, cv: 0, authst: credential.authst }
-        : { uin: '0', format: 'json', ct: 24, cv: 0 },
+      comm: credential ?? { uin: '0', format: 'json', ct: 24, cv: 0 },
       url: {
         module: 'vkey.GetVkeyServer',
         method: 'CgiGetVkey',
