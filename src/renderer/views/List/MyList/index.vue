@@ -158,6 +158,10 @@ export default {
     const handleOpenSourceDetailPage = async(listInfo) => {
       const { source, sourceListId } = listInfo
       if (!sourceListId) return
+      if (source == 'kg' && /^account:/.test(sourceListId)) {
+        void openUrl('https://www.kugou.com/')
+        return
+      }
       let url
       if (/board__/.test(sourceListId)) {
         const id = sourceListId.replace(/board__/, '')

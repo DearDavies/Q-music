@@ -10,6 +10,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from '@common/utils/vueTools'
+import kugouIcon from '@renderer/assets/images/sources/kg.svg'
+import qqMusicIcon from '@renderer/assets/images/sources/tx.svg'
+import neteaseIcon from '@renderer/assets/images/sources/wy.svg'
 
 const props = withDefaults(defineProps<{
   source: string
@@ -30,9 +33,9 @@ const sourceLabels: Record<string, string> = {
   local: '本地音乐',
 }
 const officialIcons: Record<string, string> = {
-  tx: 'https://y.qq.com/favicon.ico',
-  wy: 'https://s1.music.126.net/style/favicon.ico?v20180823',
-  kg: 'https://www.kugou.com/favicon.ico',
+  tx: qqMusicIcon,
+  wy: neteaseIcon,
+  kg: kugouIcon,
   kw: 'https://h5s.kuwo.cn/favicon.ico',
   mg: 'https://h5.nf.migu.cn/app/favicon.ico',
   spotify: 'https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png',

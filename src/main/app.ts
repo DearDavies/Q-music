@@ -12,6 +12,7 @@ import createWorkers from './worker'
 import { migrateDBData } from './utils/migrate'
 import { openDirInExplorer } from '@common/utils/electron'
 import { setProxyByHost } from '@common/utils/request'
+import { installNavigationGuard } from './utils/navigationPolicy'
 
 export const initGlobalData = () => {
   if (process.platform === 'linux' && process.env.NODE_ENV === 'production') {
@@ -199,17 +200,7 @@ export const registerDeeplink = (startApp: () => void) => {
 
 export const listenerAppEvent = (startApp: () => void) => {
   app.on('web-contents-created', (event, contents) => {
-    contents.on('will-navigate', (event, navigationUrl) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('navigation to url:', navigationUrl.length > 130 ? navigationUrl.substring(0, 130) + '...' : navigationUrl)
-        return
-      }
-      if (!navigationUrlWhiteList.some(url => url.test(navigationUrl))) {
-        event.preventDefault()
-        return
-      }
-      console.log('navigation to url:', navigationUrl)
-    })
+    installNavigationGuard(contents, process.env.NODE_ENV !== 'production')
     contents.setWindowOpenHandler(({ url }) => {
       if (!/^devtools/.test(url) && /^https?:\/\//.test(url)) {
         void shell.openExternal(url)

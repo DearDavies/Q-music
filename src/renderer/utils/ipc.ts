@@ -40,7 +40,7 @@ export const getOtherSourceCount = async() => {
   return rendererInvoke<number>(WIN_MAIN_RENDERER_EVENT_NAME.get_other_source_count)
 }
 
-export type MusicAccountProvider = 'tx' | 'wy'
+export type MusicAccountProvider = 'tx' | 'wy' | 'kg'
 export type MusicAccountConnectionState = 'connected' | 'expired' | 'disconnected' | 'unavailable'
 export interface MusicAccountProfile {
   state: MusicAccountConnectionState
@@ -52,6 +52,7 @@ export interface MusicAccountProfile {
 export interface MusicAccountStatus {
   tx: boolean
   wy: boolean
+  kg: boolean
   accounts: Record<MusicAccountProvider, MusicAccountProfile>
 }
 export interface MusicAccountLoginResult {
@@ -66,7 +67,7 @@ export interface MusicAccountDailyResult {
   provider: MusicAccountProvider
   ids: string[]
   status: 'personalized' | 'login_required' | 'unavailable'
-  kind?: 'official_daily' | 'radar' | 'netease_daily'
+  kind?: 'official_daily' | 'radar' | 'netease_daily' | 'kugou_daily'
 }
 export interface QQDailyKeyStatus {
   configured: boolean

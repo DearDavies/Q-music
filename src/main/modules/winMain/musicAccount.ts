@@ -1,9 +1,14 @@
 import { BrowserWindow, safeStorage, session, shell, type Session, type WebContents } from 'electron'
 import { getProxy } from '@main/utils'
+import { allowOfficialNavigation, setWindowNavigationPolicy } from '@main/utils/navigationPolicy'
 import getStore from '@main/utils/store'
 import { constants, createCipheriv, createHash, publicEncrypt, randomBytes } from 'node:crypto'
+import { getQQCredentials, getQQRequestComm } from '@common/utils/qqCredentials'
+import { closeOfficialAccountLogin, openOfficialAccountLogin } from './officialAccountLogin'
+import { fitAccountLoginWindow, getAccountLoginBounds } from './accountLoginLayout'
+import { getKugouDailyHashes, getKugouPlaylistHashes, getKugouPlaylists, logoutKugou, openKugouLogin, readKugouSession } from './kugouAccount'
 
-export type MusicAccountProvider = 'tx' | 'wy'
+export type MusicAccountProvider = 'tx' | 'wy' | 'kg'
 
 export type MusicAccountConnectionState = 'connected' | 'expired' | 'disconnected' | 'unavailable'
 
@@ -18,6 +23,7 @@ export interface MusicAccountProfile {
 export interface MusicAccountStatus {
   tx: boolean
   wy: boolean
+  kg: boolean
   accounts: Record<MusicAccountProvider, MusicAccountProfile>
 }
 
@@ -35,7 +41,7 @@ export interface MusicAccountDailyResult {
   provider: MusicAccountProvider
   ids: string[]
   status: 'personalized' | 'login_required' | 'unavailable'
-  kind?: 'official_daily' | 'radar' | 'netease_daily'
+  kind?: 'official_daily' | 'radar' | 'netease_daily' | 'kugou_daily'
 }
 
 export interface QQDailyKeyStatus {
@@ -102,6 +108,12 @@ export interface MusicAccountPlaybackReportResult {
 }
 
 const providerConfig = {
+  kg: {
+    partition: 'persist:qmusic-account-kugou',
+    title: '酷狗音乐账号登录',
+    loginUrl: 'https://www.kugou.com/',
+    domains: ['kugou.com'],
+  },
   tx: {
     partition: 'persist:qmusic-account-qq',
     title: 'QQ音乐账号登录',
@@ -116,7 +128,6 @@ const providerConfig = {
   },
 } as const
 
-const loginWindows = new Map<MusicAccountProvider, Electron.BrowserWindow>()
 const accountValidationCache = new Map<MusicAccountProvider, { connected: boolean, state: MusicAccountConnectionState, expiresAt: number }>()
 const officialMusicUrlCache = new Map<string, { url: string, quality: LX.Quality, reportSongId?: string, expiresAt: number }>()
 let qqPlaybackGuid = ''
@@ -159,42 +170,43 @@ const buildNeteaseEapiForm = (path: string, data: Record<string, unknown>) => {
 }
 
 const isAllowedHost = (provider: MusicAccountProvider, target: string) => {
-  if (target == 'about:blank') return true
-  try {
-    const hostname = new URL(target).hostname
-    return providerConfig[provider].domains.some(domain => hostname == domain || hostname.endsWith(`.${domain}`))
-  } catch {
-    return false
-  }
+  return allowOfficialNavigation(target, providerConfig[provider].domains)
 }
 
 const hasLoginCookie = async(provider: MusicAccountProvider) => {
+  if (provider == 'kg') return Boolean(readKugouSession())
+  if (provider == 'tx') {
+    const { uin, authst } = await getQQAccountCredentials()
+    return Boolean(uin && authst)
+  }
   const cookies = await session.fromPartition(providerConfig[provider].partition).cookies.get({})
   const names = new Set(cookies.map(cookie => cookie.name.toLowerCase()))
-  if (provider == 'wy') return names.has('music_u') || names.has('music_a')
-  const hasIdentifier = names.has('uin') || names.has('qqmusic_uin') || names.has('musicid') || names.has('wxopenid')
-  const hasMusicKey = names.has('qqmusic_key') || names.has('qm_keyst') || names.has('musickey')
-  return hasIdentifier && hasMusicKey
+  return names.has('music_u') || names.has('music_a')
 }
 
 const configureAccountSessionProxy = async(provider: MusicAccountProvider) => {
   const accountSession = session.fromPartition(providerConfig[provider].partition)
   const proxy = getProxy()
-  await accountSession.setProxy(proxy?.host
-    ? { mode: 'fixed_servers', proxyRules: `http://${proxy.host}:${proxy.port}` }
-    : { mode: 'system' })
+  let timer: NodeJS.Timeout | undefined
+  try {
+    await Promise.race([
+      accountSession.setProxy(proxy?.host
+        ? { mode: 'fixed_servers', proxyRules: `http://${proxy.host}:${proxy.port}` }
+        : { mode: 'system' }),
+      new Promise<never>((resolve, reject) => { timer = setTimeout(() => { reject(new Error('Account proxy timeout')) }, 12_000) }),
+    ])
+  } finally { clearTimeout(timer) }
   return accountSession
 }
 
 const getQQAccountCredentials = async() => {
   const accountSession = session.fromPartition(providerConfig.tx.partition)
-  const cookies = await accountSession.cookies.get({})
-  const cookieMap = new Map(cookies.map(cookie => [cookie.name.toLowerCase(), cookie.value]))
-  const rawUin = cookieMap.get('uin') ?? cookieMap.get('qqmusic_uin') ?? cookieMap.get('musicid') ?? ''
+  const cookies = (await Promise.all(['https://u.y.qq.com/', 'https://y.qq.com/'].map(async url => accountSession.cookies.get({ url })))).flat()
+  const cookieMap = Object.fromEntries(cookies.map(cookie => [cookie.name.toLowerCase(), cookie.value]))
   return {
     accountSession,
-    uin: rawUin.replace(/\D/g, '').replace(/^0+/, '') || '0',
-    authst: cookieMap.get('qm_keyst') ?? cookieMap.get('qqmusic_key') ?? cookieMap.get('musickey') ?? '',
+    ...getQQCredentials(cookieMap),
+    cookies: cookieMap,
   }
 }
 
@@ -211,9 +223,9 @@ const maskAccountId = (value: string) => {
 }
 
 const getQQAccountProfile = async() => {
-  const { accountSession, uin } = await getQQAccountCredentials()
-  const emptyProfile = { displayName: '', avatar: '', encryptedUin: '', accountHint: uin == '0' ? '' : `QQ · ${maskAccountId(uin)}` }
-  if (uin == '0') return emptyProfile
+  const { accountSession, uin, isWeChat } = await getQQAccountCredentials()
+  const emptyProfile = { displayName: '', avatar: '', encryptedUin: '', accountHint: uin ? `${isWeChat ? '微信' : 'QQ'} · ${maskAccountId(uin)}` : '' }
+  if (!uin) return emptyProfile
   try {
     const url = new URL('https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg')
     url.search = new URLSearchParams({ ct: '20', cv: '4747474', cid: '205360838', userid: uin }).toString()
@@ -277,7 +289,7 @@ const isQQMusicLoginRequiredError = (error: unknown) => {
 }
 
 const requestQQMusicU = async<T extends object>(requests: Record<string, unknown>, signal?: AbortSignal): Promise<T> => {
-  const { accountSession, uin, authst } = await getQQAccountCredentials()
+  const { accountSession, cookies } = await getQQAccountCredentials()
   const response = await accountSession.fetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
     method: 'POST',
     headers: {
@@ -286,10 +298,10 @@ const requestQQMusicU = async<T extends object>(requests: Record<string, unknown
       Referer: 'https://y.qq.com/',
     },
     body: JSON.stringify({
-      comm: { uin, format: 'json', ct: 24, cv: 0, authst },
+      comm: getQQRequestComm(cookies),
       ...requests,
     }),
-    signal,
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000),
   })
   if (!response.ok) {
     const error = new QQMusicURequestError(
@@ -404,6 +416,8 @@ const configureLoginContents = (
   accountSession: Session,
   onChildWindow?: (window: BrowserWindow) => void,
 ) => {
+  // 全局拦截器先于账号窗口创建；两层监听必须使用同一条规则，否则微信的顶层回调会被提前阻止。
+  setWindowNavigationPolicy(contents, target => isAllowedHost(provider, target))
   contents.setUserAgent(getCompatibleUserAgent(contents.getUserAgent()))
   contents.setWindowOpenHandler(({ url }) => {
     if (!isAllowedHost(provider, url)) {
@@ -413,10 +427,7 @@ const configureLoginContents = (
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
-        width: 520,
-        height: 720,
-        minWidth: 420,
-        minHeight: 560,
+        ...getAccountLoginBounds(BrowserWindow.fromWebContents(contents) ?? undefined, true),
         show: true,
         autoHideMenuBar: true,
         backgroundColor: '#f7faf8',
@@ -437,6 +448,7 @@ const configureLoginContents = (
   })
   contents.on('did-create-window', childWindow => {
     childWindow.setMenuBarVisibility(false)
+    fitAccountLoginWindow(childWindow, 'https://graph.qq.com/')
     onChildWindow?.(childWindow)
     configureLoginContents(childWindow.webContents, provider, accountSession, onChildWindow)
   })
@@ -607,12 +619,7 @@ export const openQQDailyKeyPage = async(): Promise<QQDailyKeySaveResult> => {
 }
 
 const getQQDailySongIds = async(): Promise<string[]> => {
-  const accountSession = session.fromPartition(providerConfig.tx.partition)
-  const cookies = await accountSession.cookies.get({})
-  const cookieMap = new Map(cookies.map(cookie => [cookie.name.toLowerCase(), cookie.value]))
-  const rawUin = cookieMap.get('uin') ?? cookieMap.get('qqmusic_uin') ?? cookieMap.get('musicid') ?? ''
-  const uin = rawUin.replace(/\D/g, '').replace(/^0+/, '') || '0'
-  const authst = cookieMap.get('qm_keyst') ?? cookieMap.get('qqmusic_key') ?? cookieMap.get('musickey') ?? ''
+  const { accountSession, cookies } = await getQQAccountCredentials()
   const ids = new Set<string>()
 
   for (let page = 1; page <= 4 && ids.size < 30; page++) {
@@ -624,7 +631,7 @@ const getQQDailySongIds = async(): Promise<string[]> => {
         Referer: 'https://y.qq.com/',
       },
       body: JSON.stringify({
-        comm: { uin, format: 'json', ct: 19, cv: 0, authst },
+        comm: getQQRequestComm(cookies, 19),
         radio: {
           module: 'music.recommend.TrackRelationServer',
           method: 'GetRadarSong',
@@ -705,6 +712,7 @@ export const getMusicAccountMusicUrl = async(request: MusicAccountMusicUrlReques
     url: '',
     quality: request.quality,
   })
+  if (request.provider == 'kg') return unavailable('unavailable')
   try {
     if (!await hasLoginCookie(request.provider)) return unavailable('login_required')
     await configureAccountSessionProxy(request.provider)
@@ -750,7 +758,7 @@ const withPlaybackReportTimeout = async<T>(handler: (signal: AbortSignal) => Pro
 
 const reportQQPlayback = async(request: MusicAccountPlaybackReportRequest) => withPlaybackReportTimeout(async signal => {
   const { accountSession, uin } = await getQQAccountCredentials()
-  if (uin == '0') return 'login_required' as const
+  if (!uin) return 'login_required' as const
   const songId = /^\d+$/.test(request.songId) ? request.songId : await getQQNumericSongId(request.songId, signal)
   if (!songId) return 'unavailable' as const
   const cookies = await accountSession.cookies.get({ url: 'https://y.qq.com' })
@@ -906,6 +914,7 @@ export const reportMusicAccountPlayback = async(request: MusicAccountPlaybackRep
     provider: request.provider,
     status,
   })
+  if (request.provider == 'kg') return unavailable('unavailable')
   try {
     if (
       (request.provider == 'wy' ? !/^\d+$/.test(request.songId) : !request.songId.trim()) ||
@@ -920,7 +929,7 @@ export const reportMusicAccountPlayback = async(request: MusicAccountPlaybackRep
     return unavailable(status)
   } catch (error) {
     console.warn(`[musicAccount] ${request.provider} playback report unavailable`, error)
-    return unavailable(isQQMusicLoginRequiredError(error) ? 'login_required' : 'unavailable')
+    return unavailable((isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable')
   }
 }
 
@@ -951,6 +960,10 @@ const getNeteaseAccountProfile = async() => {
 const getNeteaseUserId = async(): Promise<string> => (await getNeteaseAccountProfile()).userId
 
 const validateMusicAccount = async(provider: MusicAccountProvider, force = false) => {
+  if (provider == 'kg') {
+    const connected = Boolean(readKugouSession())
+    return { connected, state: (connected ? 'connected' : 'disconnected') as MusicAccountConnectionState, expiresAt: Date.now() + 2000 }
+  }
   const cached = accountValidationCache.get(provider)
   if (!force && cached && cached.expiresAt > Date.now()) return cached
 
@@ -968,7 +981,7 @@ const validateMusicAccount = async(provider: MusicAccountProvider, force = false
       connected = !!await getNeteaseUserId()
     } else {
       const { uin, authst } = await getQQAccountCredentials()
-      if (uin != '0' && authst) {
+      if (uin && authst) {
         await requestQQMusicU<{
           status?: { code?: number, data?: Record<string, unknown> }
         }>({
@@ -1002,12 +1015,16 @@ const resolveQQAccountFailureStatus = async(): Promise<'login_required' | 'unava
 
 export const getMusicAccountStatus = async(): Promise<MusicAccountStatus> => {
   const inspectAccount = async(provider: MusicAccountProvider): Promise<MusicAccountProfile> => {
+    if (provider == 'kg') {
+      const account = readKugouSession()
+      return { state: account ? 'connected' : 'disconnected', displayName: account?.nickname ?? '', avatar: account?.avatar ?? '', accountHint: account ? `酷狗 · ${maskAccountId(account.userId)}` : '', hasSession: Boolean(account) }
+    }
     const validation = await validateMusicAccount(provider, true)
     if (!validation.connected) {
       let accountHint = ''
       if (provider == 'tx' && validation.state != 'disconnected') {
-        const { uin } = await getQQAccountCredentials().catch(() => ({ uin: '0' }))
-        if (uin != '0') accountHint = `QQ · ${maskAccountId(uin)}`
+        const { uin, isWeChat } = await getQQAccountCredentials().catch(() => ({ uin: '', isWeChat: false }))
+        if (uin) accountHint = `${isWeChat ? '微信' : 'QQ'} · ${maskAccountId(uin)}`
       }
       return {
         state: validation.state,
@@ -1026,17 +1043,19 @@ export const getMusicAccountStatus = async(): Promise<MusicAccountStatus> => {
     return { state: 'connected', displayName: profile.displayName, avatar: profile.avatar, accountHint: profile.accountHint, hasSession: true }
   }
 
-  const [txAccount, wyAccount] = await Promise.all([inspectAccount('tx'), inspectAccount('wy')])
+  const [txAccount, wyAccount, kgAccount] = await Promise.all([inspectAccount('tx'), inspectAccount('wy'), inspectAccount('kg')])
   return {
     tx: txAccount.state == 'connected',
     wy: wyAccount.state == 'connected',
-    accounts: { tx: txAccount, wy: wyAccount },
+    kg: kgAccount.state == 'connected',
+    accounts: { tx: txAccount, wy: wyAccount, kg: kgAccount },
   }
 }
 
 export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): Promise<MusicAccountPlaylistsResult> => {
   if (!await verifyMusicAccount(provider)) return { provider, playlists: [], status: 'login_required' }
   try {
+    if (provider == 'kg') return { provider, playlists: await getKugouPlaylists(), status: 'available' }
     if (provider == 'tx') {
       const { uin } = await getQQAccountCredentials()
       const encryptedUin = await getQQEncryptedUin()
@@ -1180,7 +1199,7 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
     return { provider, playlists, status: playlists.length ? 'available' : 'unavailable' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlists unavailable`, error)
-    return { provider, playlists: [], status: isQQMusicLoginRequiredError(error) ? 'login_required' : 'unavailable' }
+    return { provider, playlists: [], status: (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
   }
 }
 
@@ -1190,6 +1209,7 @@ export const getMusicAccountPlaylistDetail = async(
 ): Promise<MusicAccountPlaylistDetailResult> => {
   if (!await verifyMusicAccount(provider)) return { provider, id, ids: [], status: 'login_required' }
   try {
+    if (provider == 'kg') return { provider, id, ids: await getKugouPlaylistHashes(id), status: 'available' }
     if (provider == 'tx') {
       const dirMatch = /^dir:(\d+)$/.exec(id)
       const dirId = dirMatch ? Number(dirMatch[1]) : id == '0' ? 201 : 0
@@ -1285,13 +1305,17 @@ export const getMusicAccountPlaylistDetail = async(
     return { provider, id, ids, status: ids.length ? 'available' : 'unavailable' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlist detail unavailable`, error)
-    return { provider, id, ids: [], status: isQQMusicLoginRequiredError(error) ? 'login_required' : 'unavailable' }
+    return { provider, id, ids: [], status: (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
   }
 }
 
 export const getMusicAccountDailySongIds = async(provider: MusicAccountProvider): Promise<MusicAccountDailyResult> => {
   if (!await verifyMusicAccount(provider)) return { provider, ids: [], status: 'login_required' }
   try {
+    if (provider == 'kg') {
+      const ids = await getKugouDailyHashes()
+      return { provider, ids, status: ids.length ? 'personalized' : 'unavailable', kind: 'kugou_daily' }
+    }
     if (provider == 'tx') {
       const apiKey = readQQDailyApiKey()
       if (apiKey) {
@@ -1310,85 +1334,24 @@ export const getMusicAccountDailySongIds = async(provider: MusicAccountProvider)
 }
 
 export const openMusicAccountLogin = async(provider: MusicAccountProvider): Promise<MusicAccountLoginResult> => {
-  const existingWindow = loginWindows.get(provider)
-  if (existingWindow && !existingWindow.isDestroyed()) {
-    existingWindow.show()
-    existingWindow.focus()
-    return { provider, status: await verifyMusicAccount(provider, true) ? 'connected' : 'cancelled' }
-  }
-
-  if (await verifyMusicAccount(provider, true)) return { provider, status: 'connected' }
-
-  const config = providerConfig[provider]
-  const accountSession = await configureAccountSessionProxy(provider)
-
-  return new Promise(resolve => {
-    const parent = BrowserWindow.getFocusedWindow() ?? undefined
-    const loginWindow = new BrowserWindow({
-      parent,
-      modal: !!parent,
-      width: 520,
-      height: 720,
-      minWidth: 420,
-      minHeight: 560,
-      show: false,
-      autoHideMenuBar: true,
-      title: config.title,
-      backgroundColor: '#f7faf8',
-      webPreferences: {
-        session: accountSession,
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-        spellcheck: false,
-      },
-    })
-    loginWindows.set(provider, loginWindow)
-
-    let settled = false
-    let checkingLogin = false
-    let cookieTimer: NodeJS.Timeout | undefined
-    const childWindows = new Set<BrowserWindow>()
-    const handleChildWindow = (childWindow: BrowserWindow) => {
-      childWindows.add(childWindow)
-      childWindow.once('closed', () => { childWindows.delete(childWindow) })
-    }
-    const checkLogin = () => {
-      if (settled || checkingLogin) return
-      checkingLogin = true
-      void verifyMusicAccount(provider, true).then(connected => {
-        if (connected) finish('connected')
-      }).finally(() => {
-        checkingLogin = false
-      })
-    }
-    const handleCookieChanged = () => { checkLogin() }
-    const finish = (status: MusicAccountLoginResult['status']) => {
-      if (settled) return
-      settled = true
-      if (cookieTimer) clearInterval(cookieTimer)
-      accountSession.cookies.off('changed', handleCookieChanged)
-      loginWindows.delete(provider)
-      resolve({ provider, status })
-      for (const childWindow of childWindows) {
-        if (!childWindow.isDestroyed()) childWindow.close()
-      }
-      if (!loginWindow.isDestroyed()) loginWindow.close()
-    }
-
-    configureLoginContents(loginWindow.webContents, provider, accountSession, handleChildWindow)
-    accountSession.cookies.on('changed', handleCookieChanged)
-    cookieTimer = setInterval(checkLogin, 1200)
-    loginWindow.once('ready-to-show', () => { loginWindow.show() })
-    loginWindow.on('closed', () => { finish('cancelled') })
-    void loginWindow.loadURL(config.loginUrl)
+  if (provider == 'kg') return { provider, status: await openKugouLogin() }
+  const accountSession = session.fromPartition(providerConfig[provider].partition)
+  const status = await openOfficialAccountLogin(provider, {
+    title: providerConfig[provider].title,
+    url: providerConfig[provider].loginUrl,
+    session: accountSession,
+    configureProxy: async() => configureAccountSessionProxy(provider),
+    verify: async() => verifyMusicAccount(provider, true),
+    configureContents: (contents, onChildWindow) => { configureLoginContents(contents, provider, accountSession, onChildWindow) },
   })
+  accountValidationCache.delete(provider)
+  return { provider, status }
 }
 
 export const logoutMusicAccount = async(provider: MusicAccountProvider): Promise<MusicAccountLogoutResult> => {
   try {
-    const loginWindow = loginWindows.get(provider)
-    if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close()
+    if (provider == 'kg') { logoutKugou(); return { provider, status: 'disconnected' } }
+    closeOfficialAccountLogin(provider)
     if (provider == 'tx' && qqDailyKeyWindow && !qqDailyKeyWindow.isDestroyed()) qqDailyKeyWindow.close()
 
     const accountSession = session.fromPartition(providerConfig[provider].partition)

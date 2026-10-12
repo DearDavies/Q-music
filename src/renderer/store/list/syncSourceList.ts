@@ -12,7 +12,9 @@ const fetchList = async(id: string, source: LX.OnlineSource, sourceListId: strin
     const id = sourceListId.replace(/^board__/, '')
     promise = id ? getBoardListAll(id, true) : Promise.reject(new Error('id not defined: ' + sourceListId))
   } else {
-    promise = getListDetailAll(sourceListId, source, true)
+    promise = source == 'kg' && /^account:\d+:\d+$/.test(sourceListId)
+      ? import('@renderer/views/List/MyList/importPlaylist').then(async({ loadAccountPlaylistMusic }) => loadAccountPlaylistMusic('kg', sourceListId))
+      : getListDetailAll(sourceListId, source, true)
   }
   return promise.finally(() => {
     setFetchingListStatus(id, false)

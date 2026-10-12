@@ -178,11 +178,13 @@ const sourceNames = {
 const accountProviderOptions = [
   { id: 'tx', name: 'source_tx' },
   { id: 'wy', name: 'source_wy' },
+  { id: 'kg', name: 'source_kg' },
 ]
 
 export default {
   components: { SourceIcon },
   props: {
+    initialProvider: { type: String, default: '' },
     visible: {
       type: Boolean,
       default: false,
@@ -207,7 +209,7 @@ export default {
     const cancelRequested = ref(false)
     const statusText = ref('')
     const accountProvider = ref('tx')
-    const accountStatus = ref({ tx: false, wy: false })
+    const accountStatus = ref({ tx: false, wy: false, kg: false })
     const accountPlaylists = ref(/** @type {import('@renderer/utils/ipc').MusicAccountPlaylist[]} */ ([]))
     const selectedAccountPlaylistId = ref('')
     const isAccountLoading = ref(false)
@@ -296,7 +298,7 @@ export default {
     }
 
     const refreshAccountStatus = async() => {
-      accountStatus.value = await getMusicAccountStatus().catch(() => ({ tx: false, wy: false }))
+      accountStatus.value = await getMusicAccountStatus().catch(() => ({ tx: false, wy: false, kg: false }))
     }
 
     const loadAccountPlaylists = async(provider = accountProvider.value) => {
@@ -424,7 +426,8 @@ export default {
       mode.value = 'account'
       target.value = 'new'
       await refreshAccountStatus()
-      const preferredProvider = accountStatus.value.tx ? 'tx' : accountStatus.value.wy ? 'wy' : 'tx'
+      const preferredProvider = accountProviderOptions.some(item => item.id == props.initialProvider) ? props.initialProvider
+        : ['tx', 'wy', 'kg'].find(provider => accountStatus.value[provider]) ?? 'tx'
       await loadAccountPlaylists(preferredProvider)
     })
 

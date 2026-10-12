@@ -1,0 +1,312 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const vm = require('node:vm')
+const ts = require('typescript')
+const { createHash } = require('node:crypto')
+const root = path.join(__dirname, '..')
+const mobile = fs.existsSync(path.join(root, 'src/core/musicAccount/kugouApi.ts'))
+const base = mobile ? 'src/core/musicAccount' : 'src/common/utils'
+function load(file, dependencies = {}, extra = {}) {
+  const context = { exports: {}, Error, URL, URLSearchParams, AbortController, AbortSignal, setTimeout, clearTimeout, console, ...extra,
+    require: id => { if (!(id in dependencies)) throw Error(id); return dependencies[id] },
+  }
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+  }).outputText, context)
+  return context.exports
+}
+const qq = load(`${base}/qqCredentials.ts`)
+const kg = load(`${base}/${mobile ? 'kugouApi' : 'kugouAccount'}.ts`)
+const md5 = value => createHash('md5').update(value).digest('hex')
+const session = { userId: '123', token: 'private-test-token', mid: 'a'.repeat(32), nickname: '测试', avatar: '' }
+const qr = { key: 'test-code', mid: session.mid, expiresAt: Date.now() + 120000 }
+const response = data => ({ ok: true, status: 200, json: async () => ({ status: 1, error_code: 0, data }) })
+const hash = n => n.toString(16).padStart(32, '0').toUpperCase()
+
+test('微信凭证使用 wxuin 和微信音乐令牌，不混入残留的 QQ 身份', () => {
+  const result = qq.getQQRequestComm({ login_type: '2', wxuin: '009876', uin: 'o1234', qqmusic_key: 'Q_H_L_old', qm_keyst: 'W_X_current' })
+  assert.equal(result.uin, '9876')
+  assert.equal(result.authst, 'W_X_current')
+  assert.equal(result.tmeLoginType, 1)
+  assert.equal(qq.getQQCredentials({ login_type: '2', uin: 'o1234', qm_keyst: 'W_X_key' }).uin, '')
+})
+test('QQ 登录不受残留微信 Cookie 影响；空字段、通用 skey 不视为音乐凭证', () => {
+  const result = qq.getQQRequestComm({ login_type: '1', wxuin: '9876', uin: 'o001234', qm_keyst: 'Q_H_L_current', qqmusic_key: '' })
+  assert.equal(result.uin, '1234')
+  assert.equal(result.tmeLoginType, 2)
+  assert.equal(qq.getQQCredentials({ uin: '1234', skey: 'generic', wxopenid: 'openid' }).authst, '')
+  assert.equal(qq.getQQCredentials({ wxuin: '9876', qm_keyst: 'W_X_key' }).isWeChat, true)
+  assert.equal(qq.getQQCredentials({ uin: 'o000', qm_keyst: 'key' }).uin, '')
+})
+test('酷狗二维码等待、确认、过期、成功均有独立状态，非法成功响应不保存', async () => {
+  let data = { status: 1 }
+  const api = kg.createKugouApi(async () => response(data), md5)
+  for (const [code, status] of [[1, 'waiting'], [2, 'scanned'], [0, 'expired']]) {
+    data = { status: code }
+    assert.equal((await api.checkQr(qr)).status, status)
+  }
+  data = { status: 4, userid: '123', token: session.token, nickname: '测试' }
+  const connected = await api.checkQr(qr)
+  assert.equal(connected.status, 'connected')
+  assert.equal(connected.session.mid, qr.mid)
+  delete data.token
+  await assert.rejects(api.checkQr(qr), /unavailable/)
+  assert.equal((await api.checkQr({ ...qr, expiresAt: 0 })).status, 'expired')
+})
+test('创建二维码校验图片，官方请求签名包含完整 query 和 body', async () => {
+  const api = kg.createKugouApi(async (url, init) => {
+    const parsed = new URL(url)
+    assert.equal(parsed.origin, 'https://login-user.kugou.com')
+    const signature = parsed.searchParams.get('signature')
+    parsed.searchParams.delete('signature')
+    const params = [...parsed.searchParams].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('')
+    const salt = 'NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt'
+    assert.equal(signature, md5(salt + params + salt))
+    assert.equal(init.credentials, 'omit')
+    assert.equal(init.headers.mid, parsed.searchParams.get('mid'))
+    return response({ qrcode: 'test', qrcode_img: 'data:image/png;base64,YQ==' })
+  }, md5)
+  assert.match((await api.createQr()).image, /^data:image\/png/)
+  await assert.rejects(kg.createKugouApi(async () => response({ qrcode: 'x', qrcode_img: 'https://third-party.test/image' }), md5).createQr())
+})
+test('酷狗完整分页后返回歌曲，签名和设备标识与登录保持一致', async () => {
+  let calls = 0
+  const api = kg.createKugouApi(async (url, init) => {
+    calls++
+    const parsed = new URL(url)
+    const body = JSON.parse(init.body)
+    assert.equal(parsed.origin, 'https://gateway.kugou.com')
+    assert.equal(parsed.searchParams.get('token'), session.token)
+    assert.equal(body.userid, session.userId)
+    assert.equal(init.headers['x-router'], 'cloudlist.service.kugou.com')
+    const signature = parsed.searchParams.get('signature')
+    parsed.searchParams.delete('signature')
+    const params = [...parsed.searchParams].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('')
+    const salt = 'OIlwieks28dk2k092lksi2UIkp'
+    assert.equal(signature, md5(salt + params + init.body + salt))
+    return response({ count: 301, info: body.page === 1 ? Array.from({ length: 300 }, (_, i) => ({ hash: hash(i + 1) })) : [{ hash: hash(301) }] })
+  }, md5)
+  const result = await api.getPlaylistHashes(session, '7')
+  assert.equal(result.length, 301)
+  assert.equal(calls, 2)
+  assert.equal(result[300], hash(301))
+})
+test('缺失分页、总数变化、非法歌曲不返回可覆盖本地歌单的结果', async () => {
+  for (const data of [{ count: 2, info: [{ hash: hash(1) }] }, { count: 1, info: [{ hash: 'bad' }] }]) {
+    await assert.rejects(kg.createKugouApi(async () => response(data), md5).getPlaylistHashes(session, '7'), /incomplete/)
+  }
+  let page = 0
+  const api = kg.createKugouApi(async () => response(++page === 1 ? { count: 301, info: Array.from({ length: 300 }, (_, i) => ({ hash: hash(i) })) } : { count: 302, info: [] }), md5)
+  await assert.rejects(api.getPlaylistHashes(session, '7'), /incomplete/)
+  const repeated = kg.createKugouApi(async () => response({ count: 600, info: Array.from({ length: 300 }, (_, i) => ({ hash: hash(i) })) }), md5)
+  await assert.rejects(repeated.getPlaylistHashes(session, '7'), /incomplete/)
+})
+test('账号歌单分页完整、重复页失败，封面只接受 HTTP(S)', async () => {
+  let page = 0
+  const api = kg.createKugouApi(async () => response({ total: 2, info: [{ listid: ++page, name: '我的歌单', pic: 'http://example.test/{size}.png' }] }), md5)
+  const lists = await api.getPlaylists(session)
+  assert.equal(lists.length, 2)
+  assert.equal(lists[0].cover, 'https://example.test/240.png')
+  await assert.rejects(kg.createKugouApi(async () => response({ total: 2, info: [{ listid: 1 }] }), md5).getPlaylists(session), /incomplete/)
+})
+test('网络错误不泄露带 token 的 URL，取消与权限错误可区分', async () => {
+  const api = kg.createKugouApi(async () => { throw Error(`failed https://gateway.kugou.com/?token=${session.token}`) }, md5)
+  await assert.rejects(api.getPlaylists(session), error => error.message === 'unavailable' && !error.message.includes(session.token))
+  const controller = new AbortController()
+  controller.abort()
+  await assert.rejects(api.getPlaylists(session, controller.signal), /cancelled/)
+  await assert.rejects(kg.createKugouApi(async () => ({ ok: false, status: 401 }), md5).getPlaylists(session), /login_required/)
+  assert.equal(kg.parseKugouSession({ ...session, userId: '000' }), null)
+  assert.equal(kg.parseKugouSession({ ...session, token: '' }), null)
+})
+
+if (!mobile) {
+  test('酷狗登录先显示前置窗口；代理初始化超时可重试，关闭后不再启动扫码', async () => {
+    const { EventEmitter } = require('node:events')
+    const parent = {}
+    const windows = []
+    const timers = []
+    let proxyReady = false
+    let createCalls = 0
+    let releaseProxy
+    class Window extends EventEmitter {
+      constructor(options) {
+        super(); this.options = options; this.messages = []; this.webContents = new EventEmitter()
+        this.webContents.executeJavaScript = async code => { this.messages.push(code) }
+        this.webContents.setWindowOpenHandler = handler => { this.openHandler = handler }
+        windows.push(this)
+      }
+      static getFocusedWindow() { return parent }
+      loadURL() { this.emit('ready-to-show'); return Promise.resolve() }
+      isDestroyed() { return !!this.destroyed }
+      show() { this.visible = true }
+      focus() { this.focused = true }
+      close() { this.destroyed = true; this.emit('closed') }
+    }
+    const main = load('src/main/modules/winMain/kugouAccount.ts', {
+      electron: { BrowserWindow: Window, safeStorage: { isEncryptionAvailable: () => true }, session: { fromPartition: () => ({ setProxy: () => proxyReady ? Promise.resolve() : new Promise(resolve => { releaseProxy = resolve }) }) } },
+      '@main/utils': { getProxy: () => null }, '@main/utils/store': () => ({}), 'node:crypto': require('node:crypto'),
+      '@common/utils/kugouAccount': { ...kg, createKugouApi: () => ({ createQr: async () => { createCalls++; return { ...qr, image: 'data:image/png;base64,YQ==' } }, checkQr: async () => ({ status: 'waiting' }) }) },
+    }, { setTimeout: (callback, delay) => { const timer = { callback, delay }; timers.push(timer); return timer }, clearTimeout: () => {} })
+    const pending = main.openKugouLogin()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(windows[0].visible, true)
+    assert.equal(windows[0].focused, true)
+    assert.equal(windows[0].options.parent, parent)
+    assert.equal(windows[0].options.modal, true)
+    assert.equal(createCalls, 0)
+    timers.find(timer => timer.delay === 12000).callback()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.ok(windows[0].messages.some(message => message.includes('二维码加载失败')))
+    proxyReady = true
+    assert.equal(windows[0].openHandler({ url: 'about:blank#refresh' }).action, 'deny')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(createCalls, 1)
+    const repeated = main.openKugouLogin()
+    assert.equal(windows.length, 1)
+    windows[0].close()
+    assert.equal(await pending, 'cancelled')
+    assert.equal(await repeated, 'cancelled')
+    proxyReady = false
+    const next = main.openKugouLogin()
+    await new Promise(resolve => setImmediate(resolve))
+    windows[1].close()
+    releaseProxy()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(await next, 'cancelled')
+    assert.equal(createCalls, 1)
+  })
+
+  test('PC 账号入口恢复官方网页登录，并将验证后的凭证用于歌单请求', async () => {
+    const { EventEmitter } = require('node:events')
+    const navigation = load('src/main/utils/navigationPolicy.ts', { '@common/config': load('src/common/config.ts') })
+    const contents = new EventEmitter()
+    contents.getUserAgent = () => 'Chrome/1 Electron/40'
+    contents.setUserAgent = () => {}
+    contents.setWindowOpenHandler = () => {}
+    // 模拟真实创建顺序：全局 guard 先安装，账号窗口的专属规则后注册。
+    navigation.installNavigationGuard(contents)
+    const current = { login_type: '2', wxuin: '9876', qm_keyst: 'W_X_key' }
+    let comm
+    const accountSession = { cookies: { get: async () => Object.entries(current).map(([name, value]) => ({ name, value })) },
+      setProxy: async () => {}, fetch: async (_url, init) => {
+        if (!init?.body) return { ok: true, json: async () => ({ data: { creator: {} } }) }
+        comm = JSON.parse(init.body).comm
+        return { ok: true, json: async () => ({ code: 0, status: { code: 0 } }) }
+      } }
+    const main = load('src/main/modules/winMain/musicAccount.ts', {
+      electron: { session: { fromPartition: () => accountSession }, safeStorage: {}, shell: {} },
+      '@main/utils': { getProxy: () => null }, '@main/utils/store': () => ({}),
+      '@main/utils/navigationPolicy': navigation,
+      'node:crypto': require('node:crypto'), '@common/utils/qqCredentials': qq,
+      './kugouAccount': { readKugouSession: () => null },
+      './accountLoginLayout': {},
+      './officialAccountLogin': { openOfficialAccountLogin: async (provider, options) => {
+        assert.equal(provider, 'tx'); assert.equal(options.session, accountSession)
+        assert.equal(options.url, 'https://y.qq.com/n/ryqq/profile')
+        options.configureContents(contents, () => {})
+        const allowed = { defaultPrevented: false, preventDefault() { this.defaultPrevented = true } }
+        contents.emit('will-navigate', allowed, 'https://y.qq.com/portal/wx_redirect.html?login_type=2&code=test')
+        assert.equal(allowed.defaultPrevented, false)
+        assert.equal(await options.verify(), true)
+        return 'connected'
+      } },
+    }, { Buffer, console: { warn() {} } })
+    assert.equal((await main.openMusicAccountLogin('tx')).status, 'connected')
+    assert.equal((await main.getMusicAccountStatus()).tx, true)
+    assert.equal(comm.uin, '9876')
+    assert.equal(comm.tmeLoginType, 1)
+  })
+
+}
+
+if (mobile) {
+  test('安卓微信凭证进入真实请求路径，切换身份后拒绝导入', async () => {
+    let current = { login_type: '2', wxuin: '9876', qm_keyst: 'W_X_key', uin: '1234' }
+    const cookies = load(`${base}/cookies.ts`, {
+      './qqCredentials': qq,
+      'react-native': { NativeModules: { UtilsModule: { getWebCookie: async () => Object.entries(current).map(([k, v]) => `${k}=${v}`).join('; ') } } },
+    })
+    let comm
+    const requests = load(`${base}/requests.ts`, { './cookies': cookies, './qqCredentials': qq, '@/utils/musicSdk/wy/utils/crypto': {} }, {
+      fetch: async (_url, init) => { comm = JSON.parse(init.body).comm; return { ok: true, json: async () => ({ code: 0, list: { code: 0, data: {} } }) } },
+    })
+    const before = await requests.openAccountSession('tx')
+    await requests.qqRequest(before, { list: {} })
+    assert.equal(comm.uin, '9876')
+    assert.equal(comm.tmeLoginType, 1)
+    current = { login_type: '1', uin: '1234', qm_keyst: 'Q_H_L_key' }
+    await assert.rejects(requests.assertAccountSession(before), /account_changed/)
+  })
+  test('安卓导入失败、取消、切换账号不写入，成功后才更新原歌单', async () => {
+    let failure
+    let changed = false
+    let writes = 0
+    let saved
+    const original = { id: 'local', source: 'kg', sourceListId: 'account:123:7' }
+    const state = { userList: [original] }
+    const sync = load(`${base}/playlistSync.ts`, {
+      '@/store/list/state': state,
+      '@/core/list': { setFetchingListStatus() {}, createList: async () => { writes++ }, overwriteListMusics: async (_id, tracks) => { writes++; saved = tracks } },
+      '@/utils/data': { setListUpdateTime: async () => {} },
+      './playlists': {
+        assertPlaylistSession: async () => { if (changed) throw Error('account_changed') },
+        getAccountPlaylistTracks: async () => { if (failure) throw Error(failure); return [{ id: 'song' }] },
+      },
+    })
+    const account = { provider: 'kg', owner: '123' }
+    for (const reason of ['incomplete', 'unavailable']) {
+      failure = reason
+      await assert.rejects(sync.syncAccountPlaylist(account, { id: '7', name: '歌单' }), new RegExp(reason))
+    }
+    failure = undefined
+    changed = true
+    await assert.rejects(sync.syncAccountPlaylist(account, { id: '7', name: '歌单' }), /account_changed/)
+    changed = false
+    const controller = new AbortController()
+    controller.abort()
+    await assert.rejects(sync.syncAccountPlaylist(account, { id: '7', name: '歌单' }, controller.signal), /cancelled/)
+    assert.equal(writes, 0)
+    const result = await sync.syncAccountPlaylist(account, { id: '7', name: '歌单' })
+    assert.equal(result.id, 'local')
+    assert.equal(writes, 1)
+    assert.equal(saved[0].id, 'song')
+    assert.equal(sync.findAccountList({ provider: 'kg', owner: '999' }, '7'), undefined)
+  })
+}
+
+test('酷狗日推携带当前账号并使用专属路由，保留推荐顺序并去重', async () => {
+  const api = kg.createKugouApi(async (url, init) => {
+    const parsed = new URL(url)
+    assert.equal(parsed.origin, 'https://gateway.kugou.com')
+    assert.equal(parsed.pathname, '/everyday_song_recommend')
+    assert.equal(parsed.searchParams.get('userid'), session.userId)
+    assert.equal(parsed.searchParams.get('token'), session.token)
+    assert.equal(init.headers['x-router'], 'everydayrec.service.kugou.com')
+    assert.equal(init.credentials, 'omit')
+    assert.equal(JSON.parse(init.body).platform, 'android')
+    const signature = parsed.searchParams.get('signature')
+    parsed.searchParams.delete('signature')
+    const params = [...parsed.searchParams].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('')
+    const salt = 'OIlwieks28dk2k092lksi2UIkp'
+    assert.equal(signature, md5(salt + params + init.body + salt))
+    return response({ song_list: [{ hash: hash(5).toLowerCase() }, { hash: hash(2) }, { hash: hash(5) }] })
+  }, md5)
+  assert.equal(JSON.stringify(await api.getDailyHashes(session)), JSON.stringify([hash(5), hash(2)]))
+  await assert.rejects(kg.createKugouApi(async () => response({ song_list: [{ hash: 'invalid' }] }), md5).getDailyHashes(session), /incomplete/)
+  await assert.rejects(kg.createKugouApi(async () => response({}), md5).getDailyHashes(session), /unavailable/)
+  const controller = new AbortController()
+  controller.abort()
+  await assert.rejects(kg.createKugouApi(async (_url, init) => { assert.equal(init.signal.aborted, true); throw Error('aborted') }, md5).getDailyHashes(session, controller.signal), /cancelled/)
+})
+
+test('酷狗默认收藏和我喜欢归入自建，收藏他人的歌单按创建者区分', async () => {
+  const lists = await kg.createKugouApi(async () => response({ info: [
+    { listid: 1, name: '默认收藏', list_create_userid: session.userId, is_mine: 0, is_def: 1 },
+    { listid: 2, name: '我喜欢', list_create_userid: session.userId, is_mine: 0, is_def: 2 },
+    { listid: 3, name: '收藏的歌单', list_create_userid: '456', is_mine: 0 },
+  ] }), md5).getPlaylists(session)
+  assert.equal(lists.map(x => x.kind).join(','), 'created,created,favorite')
+})

@@ -336,7 +336,7 @@ const writeMusicList = async(params: ExternalImportParams, list: LX.Music.MusicI
   return musicInfos.length
 }
 
-const loadAccountPlaylistMusic = async(
+export const loadAccountPlaylistMusic = async(
   provider: MusicAccountProvider,
   playlistId: string,
   onProgress?: (progress: ExternalImportProgress) => void,
@@ -344,6 +344,7 @@ const loadAccountPlaylistMusic = async(
 ) => {
   const result = await getMusicAccountPlaylistDetail(provider, playlistId)
   if (result.status != 'available' || !result.ids.length) throw new ExternalImportError('account_unavailable')
+  if (provider == 'kg') return loadKugouHashMusic(result.ids, onProgress, shouldCancel)
 
   const list: LX.Music.MusicInfo[] = []
   const chunkSize = provider == 'wy' ? 200 : 16
@@ -362,6 +363,19 @@ const loadAccountPlaylistMusic = async(
       current: Math.min(index + ids.length, result.ids.length),
       total: result.ids.length,
     })
+  }
+  return filterMusicList(list)
+}
+
+export const loadKugouHashMusic = async(ids: string[], onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel) => {
+  const list: LX.Music.MusicInfo[] = []
+  for (let index = 0; index < ids.length; index += 100) {
+    assertNotCancelled(shouldCancel)
+    const group = ids.slice(index, index + 100)
+    const songs = await musicSdk.kg.songList.getMusicInfos(group.map(hash => ({ hash })))
+    if (songs.length != group.length) throw new ExternalImportError('account_unavailable')
+    list.push(...songs.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
+    onProgress?.({ stage: 'fetch', current: Math.min(index + group.length, ids.length), total: ids.length })
   }
   return filterMusicList(list)
 }

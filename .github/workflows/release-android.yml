@@ -143,6 +143,10 @@ jobs:
         working-directory: mobile
         run: npm run lint
 
+      - name: Verify music accounts and recommendations
+        working-directory: mobile
+        run: npm run test:accounts
+
       - name: Verify background playback and lyrics
         working-directory: mobile
         run: npm run test:background

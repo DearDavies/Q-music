@@ -7,193 +7,206 @@
         :enter-from-class="isShowDailyDetail ? $style.panelFromRight : $style.panelFromLeft"
         :leave-to-class="$style.panelFade"
       >
-      <div v-if="!isShowDailyDetail" class="scroll" :class="$style.noitemShell">
-        <header :class="$style.welcomeBar">
-          <div :class="$style.welcomeCopy">
-            <span :class="$style.greetingTag">{{ $t('search__home_eyebrow') }}</span>
-            <h2>{{ $t('search__welcome') }}</h2>
-            <p>{{ $t('search__welcome_subtitle') }}</p>
+        <div v-if="!isShowDailyDetail" class="scroll" :class="$style.noitemShell">
+          <header :class="$style.welcomeBar">
+            <div :class="$style.welcomeCopy">
+              <span :class="$style.greetingTag">{{ $t('search__home_eyebrow') }}</span>
+              <h2>{{ $t('search__welcome') }}</h2>
+              <p>{{ $t('search__welcome_subtitle') }}</p>
+            </div>
+            <button type="button" :class="[$style.syncAction, { [$style.connected]: hasMusicAccount }]" @click="openAccountModal">
+              <span :class="$style.accountIcons">
+                <source-icon v-if="accountStatus.accounts.tx.hasSession" source="tx" :size="20" />
+                <source-icon v-if="accountStatus.accounts.wy.hasSession" source="wy" :size="20" />
+                <source-icon v-if="accountStatus.accounts.kg.hasSession" source="kg" :size="20" />
+                <svg-icon v-if="!hasMusicAccountSession" name="headphones" />
+              </span>
+              <span>{{ accountActionText }}</span>
+              <b aria-hidden="true">›</b>
+            </button>
+          </header>
+
+          <div v-if="hasDiscoveryContent" :class="$style.noitemListContainer">
+            <dl v-if="appSetting['search.isShowHotSearch']" :class="[$style.noitemList, $style.noitemHotSearchList]">
+              <dt :class="$style.noitemListTitle">
+                <span>{{ $t('search__hot_search') }}</span>
+                <button type="button" :class="$style.listActionBtn" :disabled="isHotSearchLoading" @click="refreshHotSearch">
+                  {{ isHotSearchLoading ? $t('search__hot_search_loading') : $t('search__hot_search_refresh') }}
+                </button>
+              </dt>
+              <div v-if="isHotSearchLoading && !hotSearchList.length" :class="$style.chipSkeletons" aria-hidden="true">
+                <i v-for="index in 6" :key="index" />
+              </div>
+              <dd v-else-if="!hotSearchList.length" :class="$style.listEmpty">{{ $t('search__hot_search_empty') }}</dd>
+              <template v-else>
+                <dd v-for="(item, index) in hotSearchList" :key="index" :class="$style.noitemListItem" @click="handleSearch(item)">{{ item }}</dd>
+              </template>
+            </dl>
+            <dl v-if="appSetting['search.isShowHistorySearch'] && historyList.length" :class="$style.noitemList">
+              <dt :class="$style.noitemListTitle">
+                <span>{{ $t('history_search') }}</span><button type="button" :class="$style.historyClearBtn" :aria-label="$t('history_clear')" @click="clearHistoryList">
+                  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 512 512" space="preserve">
+                    <use xlink:href="#icon-eraser" />
+                  </svg></button>
+              </dt>
+              <dd v-for="(item, index) in historyList" :key="index + item" :class="$style.noitemListItem" :aria-label="$t('history_remove')" @contextmenu="removeHistoryWord(index)" @click="handleSearch(item)">{{ item }}</dd>
+            </dl>
           </div>
-          <button type="button" :class="[$style.syncAction, { [$style.connected]: hasMusicAccount }]" @click="openAccountModal">
-            <span :class="$style.accountIcons">
-              <source-icon v-if="accountStatus.accounts.tx.hasSession" source="tx" :size="20" />
-              <source-icon v-if="accountStatus.accounts.wy.hasSession" source="wy" :size="20" />
-              <svg-icon v-if="!hasMusicAccountSession" name="headphones" />
-            </span>
-            <span>{{ accountActionText }}</span>
-            <b aria-hidden="true">›</b>
-          </button>
-        </header>
 
-        <div v-if="hasDiscoveryContent" :class="$style.noitemListContainer">
-          <dl v-if="appSetting['search.isShowHotSearch']" :class="[$style.noitemList, $style.noitemHotSearchList]">
-            <dt :class="$style.noitemListTitle">
-              <span>{{ $t('search__hot_search') }}</span>
-              <button type="button" :class="$style.listActionBtn" :disabled="isHotSearchLoading" @click="refreshHotSearch">
-                {{ isHotSearchLoading ? $t('search__hot_search_loading') : $t('search__hot_search_refresh') }}
+          <nav :class="$style.recommendProviders" :aria-label="$t('search__recommend_provider')">
+            <span>{{ $t('search__recommend_provider') }}</span>
+            <button
+              v-for="provider in accountProviderOptions" :key="provider.id" type="button"
+              :aria-pressed="selectedDailyProvider == provider.id" :class="{ [$style.providerSelected]: selectedDailyProvider == provider.id }"
+              @click="selectDailyProvider(provider.id)"
+            >
+              <source-icon :source="provider.id" :size="18" />{{ $t(provider.nameKey) }}
+            </button>
+          </nav>
+          <div :class="$style.featureGrid">
+            <section
+              :class="$style.dailyCard" role="button" tabindex="0"
+              :aria-label="$t('search__daily_open')" @click="openDailyDetail"
+              @keydown.enter="openDailyDetail" @keydown.space.prevent="openDailyDetail"
+            >
+              <div :class="$style.dailyCover" aria-hidden="true">
+                <div v-for="index in 4" :key="index" :class="$style.coverTile">
+                  <img v-if="dailyCoverUrls[index - 1]" :class="$style.fadeImg" :src="dailyCoverUrls[index - 1]" alt="" @load="handleCoverLoad" @error="handleDailyCoverError(index - 1)">
+                  <svg-icon v-else name="music" />
+                </div>
+                <div :class="$style.dateBadge">
+                  <strong>{{ todayDay }}</strong>
+                  <span>{{ todayMonth }}</span>
+                </div>
+              </div>
+              <div :class="$style.dailyContent">
+                <div :class="$style.dailySourceRow">
+                  <span :class="$style.eyebrow">{{ $t('search__daily_eyebrow') }}</span>
+                </div>
+                <h3>{{ dailyTitle }}</h3>
+                <p>{{ $t(dailyRecommendMode == 'personalized' ? 'search__daily_personalized_desc' : 'search__daily_recommend_subtitle') }}</p>
+                <p :class="[$style.sourceStatus, { [$style.personalized]: dailyRecommendMode == 'personalized' }]">
+                  <source-icon :source="selectedDailyProvider" :size="15" />{{ dailySourceText }}
+                </p>
+                <ol v-if="dailyRecommendList.length" :class="$style.trackPreview">
+                  <li v-for="item in dailyRecommendList.slice(0, 3)" :key="item.id"><strong>{{ item.name }}</strong><span>{{ item.singer }}</span></li>
+                </ol>
+                <ol v-else-if="isDailyLoading" :class="[$style.trackPreview, $style.trackPreviewSkeleton]" :aria-label="$t('search__daily_recommend_loading')">
+                  <li v-for="index in 3" :key="index"><i /><i /></li>
+                </ol>
+                <div v-else :class="$style.dailyLoading">{{ $t('search__daily_recommend_empty') }}</div>
+                <div :class="$style.dailyActions">
+                  <button type="button" :disabled="!dailyRecommendList.length" @click.stop="playDailyRecommend()">{{ $t('search__daily_recommend_play') }}</button>
+                  <button type="button" :disabled="isDailyLoading" @click.stop="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</button>
+                  <span :class="$style.openHint">{{ $t('search__daily_open') }} ›</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section v-if="dailyRecommendList.length" :class="$style.playlistShelf">
+            <header>
+              <div>
+                <h3>{{ $t('search__today_discovery') }}</h3>
+                <p>{{ $t('search__today_discovery_desc') }}</p>
+              </div>
+            </header>
+            <div :class="[$style.playlistRail, $style.discoveryGrid]">
+              <button v-for="(item, index) in dailyRecommendList.slice(0, 9)" :key="`${item.source}_${item.id}`" type="button" @click="playDailyRecommend(index)">
+                <span :class="$style.playlistCover">
+                  <img v-if="dailyCoverUrls[index] || item.meta.picUrl" :class="$style.fadeImg" :src="dailyCoverUrls[index] || item.meta.picUrl" alt="" @load="handleCoverLoad">
+                  <svg-icon v-else name="music" />
+                  <i>▶</i>
+                </span>
+                <strong :title="item.name">{{ item.name }}</strong>
+                <small :title="item.singer">{{ item.singer }}</small>
               </button>
-            </dt>
-            <div v-if="isHotSearchLoading && !hotSearchList.length" :class="$style.chipSkeletons" aria-hidden="true">
-              <i v-for="index in 6" :key="index" />
-            </div>
-            <dd v-else-if="!hotSearchList.length" :class="$style.listEmpty">{{ $t('search__hot_search_empty') }}</dd>
-            <template v-else>
-              <dd v-for="(item, index) in hotSearchList" :key="index" :class="$style.noitemListItem" @click="handleSearch(item)">{{ item }}</dd>
-            </template>
-          </dl>
-          <dl v-if="appSetting['search.isShowHistorySearch'] && historyList.length" :class="$style.noitemList">
-            <dt :class="$style.noitemListTitle">
-              <span>{{ $t('history_search') }}</span><button type="button" :class="$style.historyClearBtn" :aria-label="$t('history_clear')" @click="clearHistoryList">
-              <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 512 512" space="preserve">
-                <use xlink:href="#icon-eraser" />
-              </svg></button>
-            </dt>
-            <dd v-for="(item, index) in historyList" :key="index + item" :class="$style.noitemListItem" :aria-label="$t('history_remove')" @contextmenu="removeHistoryWord(index)" @click="handleSearch(item)">{{ item }}</dd>
-          </dl>
-        </div>
-
-        <div :class="$style.featureGrid">
-          <section
-            :class="$style.dailyCard" role="button" tabindex="0"
-            :aria-label="$t('search__daily_open')" @click="openDailyDetail"
-            @keydown.enter="openDailyDetail" @keydown.space.prevent="openDailyDetail"
-          >
-            <div :class="$style.dailyCover" aria-hidden="true">
-              <div v-for="index in 4" :key="index" :class="$style.coverTile">
-                <img v-if="dailyCoverUrls[index - 1]" :class="$style.fadeImg" :src="dailyCoverUrls[index - 1]" alt="" @load="handleCoverLoad" @error="handleDailyCoverError(index - 1)">
-                <svg-icon v-else name="music" />
-              </div>
-              <div :class="$style.dateBadge">
-                <strong>{{ todayDay }}</strong>
-                <span>{{ todayMonth }}</span>
-              </div>
-            </div>
-            <div :class="$style.dailyContent">
-              <div :class="$style.dailySourceRow">
-                <span :class="$style.eyebrow">{{ $t('search__daily_eyebrow') }}</span>
-              </div>
-              <h3>{{ dailyTitle }}</h3>
-              <p>{{ $t('search__daily_recommend_subtitle') }}</p>
-              <p :class="[$style.sourceStatus, { [$style.personalized]: dailyRecommendMode == 'personalized' }]">
-                <source-icon :source="selectedDailyProvider" :size="15" />{{ dailySourceText }}
-              </p>
-              <ol v-if="dailyRecommendList.length" :class="$style.trackPreview">
-                <li v-for="item in dailyRecommendList.slice(0, 3)" :key="item.id"><strong>{{ item.name }}</strong><span>{{ item.singer }}</span></li>
-              </ol>
-              <ol v-else-if="isDailyLoading" :class="[$style.trackPreview, $style.trackPreviewSkeleton]" :aria-label="$t('search__daily_recommend_loading')">
-                <li v-for="index in 3" :key="index"><i /><i /></li>
-              </ol>
-              <div v-else :class="$style.dailyLoading">{{ $t('search__daily_recommend_empty') }}</div>
-              <div :class="$style.dailyActions">
-                <button type="button" :disabled="!dailyRecommendList.length" @click.stop="playDailyRecommend()">{{ $t('search__daily_recommend_play') }}</button>
-                <button type="button" :disabled="isDailyLoading" @click.stop="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</button>
-                <span :class="$style.openHint">{{ $t('search__daily_open') }} ›</span>
-              </div>
             </div>
           </section>
-        </div>
 
-        <section v-if="dailyRecommendList.length" :class="$style.playlistShelf">
-          <header>
-            <div>
-              <h3>{{ $t('search__today_discovery') }}</h3>
-              <p>{{ $t('search__today_discovery_desc') }}</p>
+          <section v-if="accountStatus[accountPlaylistsProvider]" :class="$style.playlistShelf">
+            <header>
+              <div>
+                <h3>{{ $t('search__provider_playlists', { name: $t(accountProviderOptions.find(item => item.id == accountPlaylistsProvider)?.nameKey || 'search__account_playlists') }) }}</h3>
+                <p>{{ $t('search__account_playlists_desc') }}</p>
+              </div>
+              <button type="button" :disabled="isPlaylistsLoading" @click="loadAccountPlaylists(true, accountPlaylistsProvider)">
+                {{ isPlaylistsLoading ? $t('search__account_playlists_loading') : $t('search__hot_search_refresh') }}
+              </button>
+            </header>
+            <button type="button" :class="$style.libraryImportButton" @click="openAccountImport(accountPlaylistsProvider)">{{ $t('search__account_import') }} ›</button>
+            <div v-if="accountPlaylists.length" :class="$style.playlistRail">
+              <button v-for="playlist in accountPlaylists" :key="playlist.id" type="button" @click="openAccountPlaylist(playlist)">
+                <span :class="$style.playlistCover">
+                  <img v-if="playlist.cover" :class="$style.fadeImg" :src="playlist.cover" alt="" @load="handleCoverLoad">
+                  <svg-icon v-else name="music" />
+                  <i>▶</i>
+                </span>
+                <strong :title="playlist.name">{{ playlist.name }}</strong>
+                <small>{{ $t('search__daily_count', { count: playlist.trackCount }) }}</small>
+              </button>
+            </div>
+            <div v-else-if="isPlaylistsLoading" :class="[$style.playlistRail, $style.playlistSkeleton]" :aria-label="$t('search__account_playlists_loading')">
+              <div v-for="index in 5" :key="index"><i /><b /><b /></div>
+            </div>
+            <p v-else :class="$style.playlistEmpty">{{ $t('search__account_playlists_empty') }}</p>
+          </section>
+
+        </div>
+        <div v-else :class="$style.dailyDetail">
+          <header :class="$style.detailHeader">
+            <button type="button" :class="$style.backButton" :aria-label="$t('back')" @click="closeDailyDetail">‹</button>
+            <div :class="$style.detailCover" aria-hidden="true">
+              <img v-if="detailCover" :class="$style.fadeImg" :src="detailCover" alt="" @load="handleCoverLoad">
+              <svg-icon v-else name="music" />
+            </div>
+            <div :class="$style.detailCopy">
+              <span :class="$style.eyebrow">{{ detailEyebrow }}</span>
+              <h2>{{ detailTitle }}</h2>
+              <p>{{ detailSubtitle }}</p>
+              <p :class="$style.detailSource">
+                <source-icon :source="detailProvider" :size="15" />
+                <span v-if="detailSourceText">{{ detailSourceText }}</span>
+              </p>
+            </div>
+            <div :class="$style.detailActions">
+              <base-btn min :disabled="!detailMusicList.length" @click="playDetailList()">{{ $t('search__daily_recommend_play') }}</base-btn>
+              <base-btn v-if="detailKind == 'daily'" min :disabled="isDailyLoading" @click="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
             </div>
           </header>
-          <div :class="[$style.playlistRail, $style.discoveryGrid]">
-            <button v-for="(item, index) in dailyRecommendList.slice(0, 9)" :key="`${item.source}_${item.id}`" type="button" @click="playDailyRecommend(index)">
-              <span :class="$style.playlistCover">
-                <img v-if="dailyCoverUrls[index] || item.meta.picUrl" :class="$style.fadeImg" :src="dailyCoverUrls[index] || item.meta.picUrl" alt="" @load="handleCoverLoad">
-                <svg-icon v-else name="music" />
-                <i>▶</i>
-              </span>
-              <strong :title="item.name">{{ item.name }}</strong>
-              <small :title="item.singer">{{ item.singer }}</small>
-            </button>
-          </div>
-        </section>
-
-        <section v-if="accountStatus[selectedDailyProvider]" :class="$style.playlistShelf">
-          <header>
-            <div>
-              <h3>{{ $t('search__account_playlists') }}</h3>
-              <p>{{ $t('search__account_playlists_desc') }}</p>
+          <div :class="$style.detailList">
+            <div :class="$style.detailTableHeader" aria-hidden="true">
+              <span>#</span><span>{{ $t('music_name') }}</span><span>{{ $t('music_singer') }}</span><span>{{ $t('music_album') }}</span><span>{{ $t('music_time') }}</span><span />
             </div>
-            <button type="button" :disabled="isPlaylistsLoading" @click="loadAccountPlaylists(true)">
-              {{ isPlaylistsLoading ? $t('search__account_playlists_loading') : $t('search__hot_search_refresh') }}
-            </button>
-          </header>
-          <div v-if="accountPlaylists.length" :class="$style.playlistRail">
-            <button v-for="playlist in accountPlaylists" :key="playlist.id" type="button" @click="openAccountPlaylist(playlist)">
-              <span :class="$style.playlistCover">
-                <img v-if="playlist.cover" :class="$style.fadeImg" :src="playlist.cover" alt="" @load="handleCoverLoad">
-                <svg-icon v-else name="music" />
-                <i>▶</i>
-              </span>
-              <strong :title="playlist.name">{{ playlist.name }}</strong>
-              <small>{{ $t('search__daily_count', { count: playlist.trackCount }) }}</small>
-            </button>
+            <ol v-if="detailMusicList.length" class="scroll" :class="$style.detailTracks">
+              <li v-for="(item, index) in detailMusicList" :key="`${item.source}_${item.id}`" :class="{ [$style.currentTrack]: isCurrentTrack(item) }" @dblclick="playDetailList(index)">
+                <span :class="$style.trackNumber">
+                  <span v-if="isCurrentTrack(item)" :class="[$style.playingBars, { [$style.playingBarsPaused]: !isPlay }]" aria-hidden="true"><i /><i /><i /></span>
+                  <template v-else>{{ String(index + 1).padStart(2, '0') }}</template>
+                </span>
+                <strong :title="item.name">{{ item.name }}</strong>
+                <span :title="item.singer">{{ item.singer }}</span>
+                <span :title="item.meta.albumName">{{ item.meta.albumName || '—' }}</span>
+                <span :class="$style.trackDuration">{{ item.interval || '—' }}</span>
+                <button type="button" :aria-label="isCurrentTrack(item) && isPlay ? $t('player__pause') : $t('list__play')" @click="playDetailList(index)">{{ isCurrentTrack(item) && isPlay ? '❚❚' : '▶' }}</button>
+              </li>
+            </ol>
+            <ol v-else-if="isDetailLoading" :class="$style.detailTracksSkeleton" :aria-label="detailEmptyText">
+              <li v-for="index in 8" :key="index"><i /><i /><i /><i /><i /></li>
+            </ol>
+            <p v-else :class="$style.detailEmpty">{{ detailEmptyText }}</p>
           </div>
-          <div v-else-if="isPlaylistsLoading" :class="[$style.playlistRail, $style.playlistSkeleton]" :aria-label="$t('search__account_playlists_loading')">
-            <div v-for="index in 5" :key="index"><i /><b /><b /></div>
-          </div>
-          <p v-else :class="$style.playlistEmpty">{{ $t('search__account_playlists_empty') }}</p>
-        </section>
-
-      </div>
-      <div v-else :class="$style.dailyDetail">
-        <header :class="$style.detailHeader">
-          <button type="button" :class="$style.backButton" :aria-label="$t('back')" @click="closeDailyDetail">‹</button>
-          <div :class="$style.detailCover" aria-hidden="true">
-            <img v-if="detailCover" :class="$style.fadeImg" :src="detailCover" alt="" @load="handleCoverLoad">
-            <svg-icon v-else name="music" />
-          </div>
-          <div :class="$style.detailCopy">
-            <span :class="$style.eyebrow">{{ detailEyebrow }}</span>
-            <h2>{{ detailTitle }}</h2>
-            <p>{{ detailSubtitle }}</p>
-            <p :class="$style.detailSource">
-              <source-icon :source="detailProvider" :size="15" />
-              <span v-if="detailSourceText">{{ detailSourceText }}</span>
-            </p>
-          </div>
-          <div :class="$style.detailActions">
-            <base-btn min :disabled="!detailMusicList.length" @click="playDetailList()">{{ $t('search__daily_recommend_play') }}</base-btn>
-            <base-btn v-if="detailKind == 'daily'" min :disabled="isDailyLoading" @click="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
-          </div>
-        </header>
-        <div :class="$style.detailList">
-          <div :class="$style.detailTableHeader" aria-hidden="true">
-            <span>#</span><span>{{ $t('music_name') }}</span><span>{{ $t('music_singer') }}</span><span>{{ $t('music_album') }}</span><span>{{ $t('music_time') }}</span><span />
-          </div>
-          <ol v-if="detailMusicList.length" class="scroll" :class="$style.detailTracks">
-            <li v-for="(item, index) in detailMusicList" :key="`${item.source}_${item.id}`" :class="{ [$style.currentTrack]: isCurrentTrack(item) }" @dblclick="playDetailList(index)">
-              <span :class="$style.trackNumber">
-                <span v-if="isCurrentTrack(item)" :class="[$style.playingBars, { [$style.playingBarsPaused]: !isPlay }]" aria-hidden="true"><i /><i /><i /></span>
-                <template v-else>{{ String(index + 1).padStart(2, '0') }}</template>
-              </span>
-              <strong :title="item.name">{{ item.name }}</strong>
-              <span :title="item.singer">{{ item.singer }}</span>
-              <span :title="item.meta.albumName">{{ item.meta.albumName || '—' }}</span>
-              <span :class="$style.trackDuration">{{ item.interval || '—' }}</span>
-              <button type="button" :aria-label="isCurrentTrack(item) && isPlay ? $t('player__pause') : $t('list__play')" @click="playDetailList(index)">{{ isCurrentTrack(item) && isPlay ? '❚❚' : '▶' }}</button>
-            </li>
-          </ol>
-          <ol v-else-if="isDetailLoading" :class="$style.detailTracksSkeleton" :aria-label="detailEmptyText">
-            <li v-for="index in 8" :key="index"><i /><i /><i /><i /><i /></li>
-          </ol>
-          <p v-else :class="$style.detailEmpty">{{ detailEmptyText }}</p>
         </div>
-      </div>
       </transition>
     </div>
   </transition>
   <material-modal :show="isShowAccountModal" :bg-close="!isAccountLoginPending" @close="closeAccountModal">
-    <main :class="$style.accountModal">
+    <main class="scroll" :class="$style.accountModal" tabindex="0" :aria-label="$t('search__account_title')">
       <div :class="$style.qrHeading">
         <div :class="$style.qrIcon" aria-hidden="true">
           <source-icon source="tx" :size="30" />
           <source-icon source="wy" :size="30" />
+          <source-icon source="kg" :size="30" />
         </div>
         <div>
           <h2>{{ $t('search__account_title') }}</h2>
@@ -205,66 +218,92 @@
           v-for="provider in accountProviderOptions" :key="provider.id"
           :class="[$style.providerCard, { [$style.activeProvider]: selectedDailyProvider == provider.id }]"
         >
-          <button
-            type="button" :class="$style.providerAction"
-            :disabled="isAccountLoginPending || isAccountStatusLoading || !!isAccountLogoutPending"
-            @click="handleProviderAction(provider.id)"
-          >
-            <img
-              v-if="accountStatus.accounts[provider.id].avatar" :class="$style.accountAvatar"
-              :src="accountStatus.accounts[provider.id].avatar" alt="" @error="handleAccountAvatarError(provider.id)"
+          <div :class="$style.providerHeader">
+            <button
+              type="button" :class="$style.providerAction"
+              :aria-expanded="expandedAccountProvider == provider.id"
+              :aria-controls="`account-details-${provider.id}`"
+              @click="handleProviderAction(provider.id)"
             >
-            <source-icon v-else :source="provider.id" :size="38" :label="$t(provider.nameKey)" />
-            <div>
-              <strong>{{ accountStatus.accounts[provider.id].displayName || $t(provider.nameKey) }}</strong>
-              <span v-if="accountStatus.accounts[provider.id].accountHint" :class="$style.accountIdentity">
-                {{ accountStatus.accounts[provider.id].accountHint }}
+              <img
+                v-if="accountStatus.accounts[provider.id].avatar" :class="$style.accountAvatar"
+                :src="accountStatus.accounts[provider.id].avatar" alt="" @error="handleAccountAvatarError(provider.id)"
+              >
+              <source-icon v-else :source="provider.id" :size="38" :label="$t(provider.nameKey)" />
+              <div>
+                <strong>{{ $t(provider.nameKey) }}</strong>
+                <span v-if="accountStatus.accounts[provider.id].displayName">{{ accountStatus.accounts[provider.id].displayName }}</span>
+                <span v-if="accountStatus.accounts[provider.id].accountHint" :class="$style.accountIdentity">
+                  {{ accountStatus.accounts[provider.id].accountHint }}
+                </span>
+                <span>{{ isAccountLoginPending && accountLoginProvider == provider.id ? $t('search__account_waiting') : accountProviderStatusText(provider.id) }}</span>
+              </div>
+              <span :class="$style.providerToggle">
+                {{ $t(expandedAccountProvider == provider.id ? 'search__account_collapse' : 'search__account_manage') }}
+                <i :class="{ [$style.chevronExpanded]: expandedAccountProvider == provider.id }" aria-hidden="true" />
               </span>
-              <span>{{ accountProviderStatusText(provider.id) }}</span>
-            </div>
-            <em v-if="!accountStatus.accounts[provider.id].hasSession">›</em>
-          </button>
-          <button
-            v-if="accountStatus.accounts[provider.id].hasSession" type="button" :class="$style.logoutButton"
-            :disabled="isAccountLoginPending || isAccountStatusLoading || !!isAccountLogoutPending"
-            @click.stop="disconnectMusicAccount(provider.id)"
+            </button>
+
+          </div>
+          <div
+            :id="`account-details-${provider.id}`" :class="[$style.providerReveal, { [$style.providerRevealed]: expandedAccountProvider == provider.id }]"
+            :inert="expandedAccountProvider == provider.id ? null : ''" :aria-hidden="expandedAccountProvider != provider.id"
           >
-            {{ isAccountLogoutPending == provider.id ? $t('search__account_logging_out') : $t('search__account_logout') }}
-          </button>
+            <div :class="$style.providerRevealInner">
+              <div :class="$style.providerDetails">
+                <p>{{ $t(provider.id == 'tx' ? 'search__recommend_qq_desc' : provider.id == 'wy' ? 'search__recommend_wy_desc' : 'search__recommend_kg_desc') }}</p>
+                <div :class="$style.providerTools">
+                  <button v-if="!accountStatus[provider.id]" type="button" :disabled="isAccountLoginPending || isAccountStatusLoading || !!isAccountLogoutPending" @click="connectMusicAccount(provider.id)">{{ $t('search__account_login') }}</button>
+                  <button type="button" :disabled="!accountStatus[provider.id] || isAccountLoginPending || !!isAccountLogoutPending" @click="openAccountImport(provider.id)">{{ $t('search__account_import') }}</button>
+                  <button type="button" :aria-pressed="selectedDailyProvider == provider.id" @click="useAccountRecommendation(provider.id)">{{ $t(selectedDailyProvider == provider.id ? 'search__recommend_current' : 'search__recommend_use') }}</button>
+                </div>
+                <details v-if="provider.id == 'tx'" :class="$style.officialDailySetup">
+                  <summary>
+                    <strong>{{ $t('search__qq_daily_title') }}</strong>
+                    <span :class="{ [$style.keyConnected]: qqDailyKeyStatus.configured }">{{ qqDailyKeyStatusText }}</span>
+                  </summary>
+                  <p>{{ $t('search__qq_daily_desc') }}</p>
+                  <button
+                    type="button" :class="$style.autoKeyButton"
+                    :disabled="isQQDailyKeySaving || !qqDailyKeyStatus.encryptionAvailable" @click="openOfficialDailyKeyPage"
+                  >
+                    {{ isQQDailyKeySaving ? $t('search__qq_daily_authorizing') : $t('search__qq_daily_authorize') }}
+                  </button>
+                  <details :class="$style.manualKeySetup">
+                    <summary>{{ $t('search__qq_daily_manual') }}</summary>
+                    <div :class="$style.keyInputRow">
+                      <input
+                        v-model.trim="qqDailyApiKeyInput" type="password" autocomplete="off" spellcheck="false"
+                        :disabled="isQQDailyKeySaving || !qqDailyKeyStatus.encryptionAvailable"
+                        :placeholder="$t('search__qq_daily_placeholder')" @keyup.enter="saveOfficialDailyKey"
+                      >
+                      <button type="button" :disabled="isQQDailyKeySaving || !qqDailyApiKeyInput" @click="saveOfficialDailyKey">
+                        {{ isQQDailyKeySaving ? $t('search__qq_daily_saving') : $t('search__qq_daily_save') }}
+                      </button>
+                    </div>
+                  </details>
+                </details>
+                <div :class="$style.providerFooter">
+                  <button
+                    v-if="accountStatus.accounts[provider.id].hasSession" type="button" :class="$style.logoutButton"
+                    :disabled="isAccountLoginPending || isAccountStatusLoading || !!isAccountLogoutPending"
+                    @click.stop="disconnectMusicAccount(provider.id)"
+                  >
+                    {{ isAccountLogoutPending == provider.id ? $t('search__account_logging_out') : $t('search__account_logout') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <section v-if="selectedDailyProvider == 'tx' || accountStatus.tx" :class="$style.officialDailySetup">
-        <div>
-          <strong>{{ $t('search__qq_daily_title') }}</strong>
-          <span :class="{ [$style.keyConnected]: qqDailyKeyStatus.configured }">{{ qqDailyKeyStatusText }}</span>
-        </div>
-        <p>{{ $t('search__qq_daily_desc') }}</p>
-        <button
-          type="button" :class="$style.autoKeyButton"
-          :disabled="isQQDailyKeySaving || !qqDailyKeyStatus.encryptionAvailable" @click="openOfficialDailyKeyPage"
-        >
-          {{ isQQDailyKeySaving ? $t('search__qq_daily_authorizing') : $t('search__qq_daily_authorize') }}
-        </button>
-        <details :class="$style.manualKeySetup">
-          <summary>{{ $t('search__qq_daily_manual') }}</summary>
-          <div :class="$style.keyInputRow">
-            <input
-              v-model.trim="qqDailyApiKeyInput" type="password" autocomplete="off" spellcheck="false"
-              :disabled="isQQDailyKeySaving || !qqDailyKeyStatus.encryptionAvailable"
-              :placeholder="$t('search__qq_daily_placeholder')" @keyup.enter="saveOfficialDailyKey"
-            >
-            <button type="button" :disabled="isQQDailyKeySaving || !qqDailyApiKeyInput" @click="saveOfficialDailyKey">
-              {{ isQQDailyKeySaving ? $t('search__qq_daily_saving') : $t('search__qq_daily_save') }}
-            </button>
-          </div>
-        </details>
-      </section>
-      <p :class="$style.accountTip">{{ isAccountLoginPending ? $t('search__account_waiting') : $t('search__account_tip') }}</p>
+      <p :class="$style.accountTip" role="status">{{ accountLoginError || (isAccountLoginPending ? $t('search__account_waiting') : $t('search__account_tip')) }}</p>
       <div :class="$style.loginFooter">
         <base-btn min :disabled="isAccountLoginPending" @click="closeAccountModal">{{ $t('btn_close') }}</base-btn>
       </div>
     </main>
   </material-modal>
+  <external-import-modal v-model:visible="isShowAccountImport" :list-id="LIST_IDS.DEFAULT" :initial-provider="importProvider" />
 </template>
 
 <script setup>
@@ -284,6 +323,7 @@ import { getMusicAccountDaily, getMusicAccountPlaylistDetail, getMusicAccountPla
 import wyMusicDetail from '@renderer/utils/musicSdk/wy/musicDetail'
 import txMusicInfo from '@renderer/utils/musicSdk/tx/musicInfo'
 import { toNewMusicInfo } from '@renderer/utils'
+import ExternalImportModal from '@renderer/views/List/MyList/components/ExternalImportModal.vue'
 import SourceIcon from '@renderer/components/common/SourceIcon.vue'
 
 const props = defineProps({
@@ -310,6 +350,8 @@ const isPlaylistsLoading = shallowRef(false)
 const isPlaylistDetailLoading = shallowRef(false)
 const isShowAccountModal = ref(false)
 const isAccountLoginPending = ref(false)
+const accountLoginProvider = ref('')
+const accountLoginError = ref('')
 const isAccountLogoutPending = ref('')
 const isAccountStatusLoading = ref(false)
 const qqDailyApiKeyInput = ref('')
@@ -317,14 +359,18 @@ const qqDailyKeyStatus = ref({ configured: false, encryptionAvailable: true })
 const qqDailyKeySaveState = ref('idle')
 const isQQDailyKeySaving = ref(false)
 const createEmptyAccountProfile = () => ({ state: 'disconnected', displayName: '', avatar: '', accountHint: '', hasSession: false })
-const createEmptyAccountStatus = () => ({ tx: false, wy: false, accounts: { tx: createEmptyAccountProfile(), wy: createEmptyAccountProfile() } })
+const createEmptyAccountStatus = () => ({ tx: false, wy: false, kg: false, accounts: { tx: createEmptyAccountProfile(), wy: createEmptyAccountProfile(), kg: createEmptyAccountProfile() } })
 const accountStatus = ref(createEmptyAccountStatus())
 const accountProviderOptions = [
   { id: 'tx', nameKey: 'search__account_qq' },
   { id: 'wy', nameKey: 'search__account_netease' },
+  { id: 'kg', nameKey: 'source_kg' },
 ]
 const storedDailyProvider = window.localStorage.getItem('qmusic.dailyRecommend.provider')
-const selectedDailyProvider = ref(storedDailyProvider == 'wy' ? 'wy' : 'tx')
+const selectedDailyProvider = ref(['tx', 'wy', 'kg'].includes(storedDailyProvider) ? storedDailyProvider : 'tx')
+const expandedAccountProvider = ref(selectedDailyProvider.value)
+const isShowAccountImport = ref(false)
+const importProvider = ref(selectedDailyProvider.value)
 const dailyRecommendMode = ref('loading')
 const dailyRecommendKind = ref('radar')
 let hotSearchRequestId = 0
@@ -336,12 +382,12 @@ const now = new Date()
 const todayDay = String(now.getDate()).padStart(2, '0')
 const todayMonth = new Intl.DateTimeFormat(window.i18n.locale || 'zh-CN', { month: 'short' }).format(now)
 const todayLabel = new Intl.DateTimeFormat(window.i18n.locale || 'zh-CN', { month: 'long', day: 'numeric' }).format(now)
-const hasMusicAccount = computed(() => accountStatus.value.tx || accountStatus.value.wy)
-const hasMusicAccountSession = computed(() => accountStatus.value.accounts.tx.hasSession || accountStatus.value.accounts.wy.hasSession)
+const hasMusicAccount = computed(() => accountStatus.value.tx || accountStatus.value.wy || accountStatus.value.kg)
+const hasMusicAccountSession = computed(() => Object.values(accountStatus.value.accounts).some(account => account.hasSession))
 const dailyTitle = computed(() => {
-  const title = selectedDailyProvider.value == 'tx'
+  const title = dailyRecommendMode.value == 'fallback' ? window.i18n.t('search__daily_local') : selectedDailyProvider.value == 'tx'
     ? window.i18n.t(dailyRecommendKind.value == 'official_daily' ? 'search__qq_daily_30' : 'search__qq_radar')
-    : window.i18n.t('search__netease_daily')
+    : window.i18n.t(selectedDailyProvider.value == 'kg' ? 'search__kugou_daily' : 'search__netease_daily')
   const count = dailyRecommendList.value.length || (isDailyLoading.value ? 30 : 0)
   return `${title} · ${window.i18n.t('search__daily_count', { count })}`
 })
@@ -362,6 +408,7 @@ const dailySourceText = computed(() => {
   return mode
 })
 const accountActionText = computed(() => {
+  if (accountStatus.value.kg) return '音乐账号已登录'
   if (accountStatus.value.tx && accountStatus.value.wy) return window.i18n.t('search__account_both_connected')
   if (accountStatus.value.tx) return window.i18n.t('search__account_qq_connected')
   if (accountStatus.value.wy) return window.i18n.t('search__account_netease_connected')
@@ -374,6 +421,7 @@ const accountProviderStatusText = provider => {
   if (account.state == 'connected') return window.i18n.t('search__account_valid')
   if (account.state == 'expired') return window.i18n.t('search__account_expired')
   if (account.state == 'unavailable') return window.i18n.t('search__account_unavailable')
+  if (provider == 'kg') return window.i18n.t('search__account_kugou_tip')
   return window.i18n.t(provider == 'tx' ? 'search__account_qq_tip' : 'search__account_netease_tip')
 }
 const dailyDetailEmptyText = computed(() => isDailyLoading.value
@@ -434,27 +482,36 @@ const loadDailyRecommend = async(force = false, sourceOverride = selectedDailyPr
   const requestId = ++dailyRequestId
   isDailyLoading.value = true
   dailyRecommendMode.value = 'loading'
+  dailyRecommendList.value = []
+  dailyCoverUrls.value = []
   try {
+    let mode = 'fallback'
+    let kind = sourceOverride == 'tx' ? 'radar' : sourceOverride == 'kg' ? 'kugou_daily' : 'netease_daily'
     let list = []
     if (accountStatus.value[sourceOverride]) {
       const result = await getMusicAccountDaily(sourceOverride).catch(() => null)
+      if (requestId != dailyRequestId) return
       if (result?.ids.length) {
-        if (sourceOverride == 'wy') {
+        if (sourceOverride == 'kg') {
+          const { loadKugouHashMusic } = await import('@renderer/views/List/MyList/importPlaylist')
+          list = await loadKugouHashMusic(result.ids, undefined, () => requestId != dailyRequestId).catch(() => [])
+        } else if (sourceOverride == 'wy') {
           list = await wyMusicDetail.getList(result.ids.slice(0, 30)).then(data => data.list.map(item => toNewMusicInfo(item))).catch(() => [])
         } else {
           const details = await Promise.all(result.ids.slice(0, 30).map(id => txMusicInfo(id).catch(() => null)))
           list = details.filter(Boolean).map(item => toNewMusicInfo(item))
         }
       }
-      if (list.length && result?.status == 'personalized') dailyRecommendMode.value = 'personalized'
-      if (result?.kind) dailyRecommendKind.value = result.kind
-    }
-    if (!list.length) {
-      list = await getDailyRecommend(sourceOverride, force)
-      dailyRecommendMode.value = 'fallback'
-      dailyRecommendKind.value = sourceOverride == 'tx' ? 'radar' : 'netease_daily'
+      if (list.length && result?.status == 'personalized') mode = 'personalized'
+      if (result?.kind) kind = result.kind
     }
     if (requestId != dailyRequestId) return
+    if (!list.length) {
+      list = await getDailyRecommend(sourceOverride, force)
+    }
+    if (requestId != dailyRequestId) return
+    dailyRecommendMode.value = mode
+    dailyRecommendKind.value = kind
     dailyRecommendList.value = list
     dailyCoverUrls.value = list.slice(0, 4).map(item => item.meta.picUrl ?? '')
     const coverUrls = await Promise.all(list.slice(0, 4).map(async item => {
@@ -546,7 +603,11 @@ const openAccountPlaylist = async(playlist) => {
     const result = await getMusicAccountPlaylistDetail(provider, playlist.id)
     if (requestId != playlistDetailRequestId) return
     if (Array.isArray(result?.ids) && result.ids.length) {
-      if (provider == 'wy') {
+      if (provider == 'kg') {
+        const { loadKugouHashMusic } = await import('@renderer/views/List/MyList/importPlaylist')
+        const list = await loadKugouHashMusic(result.ids, undefined, () => requestId != playlistDetailRequestId)
+        if (requestId == playlistDetailRequestId) playlistDetailList.value = list
+      } else if (provider == 'wy') {
         const list = await wyMusicDetail.getList(result.ids).then(data => data.list.map(item => toNewMusicInfo(item))).catch(() => [])
         if (requestId == playlistDetailRequestId) playlistDetailList.value = list
       } else {
@@ -586,25 +647,31 @@ const refreshAccountStatus = async() => {
   if (requestId != accountStatusRequestId) return
   accountStatus.value = status
   isAccountStatusLoading.value = false
-  if (!accountStatus.value[selectedDailyProvider.value]) {
-    if (accountStatus.value.tx) selectedDailyProvider.value = 'tx'
-    else if (accountStatus.value.wy) selectedDailyProvider.value = 'wy'
-    window.localStorage.setItem('qmusic.dailyRecommend.provider', selectedDailyProvider.value)
-  }
   if (accountPlaylistsProvider.value && !accountStatus.value[accountPlaylistsProvider.value]) {
     accountPlaylistsRequestId++
     accountPlaylistsProvider.value = ''
     accountPlaylists.value = []
   }
-  if (accountStatus.value[selectedDailyProvider.value]) void loadAccountPlaylists(false, selectedDailyProvider.value)
+  const playlistProvider = accountStatus.value[accountPlaylistsProvider.value]
+    ? accountPlaylistsProvider.value
+    : [selectedDailyProvider.value, 'tx', 'wy', 'kg'].find(provider => accountStatus.value[provider])
+  if (playlistProvider) void loadAccountPlaylists(false, playlistProvider)
 }
 
 const selectDailyProvider = (provider, force = false) => {
   if (!force && selectedDailyProvider.value == provider && dailyRecommendList.value.length) return
+  playlistDetailRequestId++
+  isShowDailyDetail.value = false
   selectedDailyProvider.value = provider
   window.localStorage.setItem('qmusic.dailyRecommend.provider', provider)
   void loadDailyRecommend(true, provider)
   if (accountStatus.value[provider]) void loadAccountPlaylists(false, provider)
+  else {
+    accountPlaylistsRequestId++
+    accountPlaylistsProvider.value = ''
+    accountPlaylists.value = []
+    isPlaylistsLoading.value = false
+  }
 }
 
 const openAccountModal = () => {
@@ -662,6 +729,8 @@ const handleAccountAvatarError = provider => {
 const connectMusicAccount = async(provider) => {
   if (isAccountLoginPending.value || isAccountLogoutPending.value) return
   isAccountLoginPending.value = true
+  accountLoginProvider.value = provider
+  accountLoginError.value = ''
   try {
     const result = await loginMusicAccount(provider)
     await refreshAccountStatus()
@@ -669,8 +738,11 @@ const connectMusicAccount = async(provider) => {
       if (selectedDailyProvider.value == provider) void loadDailyRecommend(true, provider)
       void loadAccountPlaylists(true, provider)
     }
+  } catch {
+    accountLoginError.value = t('search__account_login_failed')
   } finally {
     isAccountLoginPending.value = false
+    accountLoginProvider.value = ''
   }
 }
 
@@ -691,16 +763,17 @@ const disconnectMusicAccount = async(provider) => {
   }
 }
 
-const handleProviderAction = (provider) => {
-  if (accountStatus.value.accounts[provider].state == 'unavailable') {
-    void refreshAccountStatus()
-    return
-  }
-  if (!accountStatus.value[provider]) {
-    void connectMusicAccount(provider)
-    return
-  }
+const handleProviderAction = provider => {
+  expandedAccountProvider.value = expandedAccountProvider.value == provider ? '' : provider
+}
+const openAccountImport = provider => {
+  importProvider.value = provider
+  isShowAccountModal.value = false
+  isShowAccountImport.value = true
+}
+const useAccountRecommendation = provider => {
   selectDailyProvider(provider)
+  isShowAccountModal.value = false
 }
 
 void refreshAccountStatus().then(() => {
@@ -1278,7 +1351,12 @@ const handleSearch = (text) => {
   font-size: 12px;
 }
 .accountModal {
-  width: min(410px, 76vw);
+  width: min(520px, 82vw);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
   padding: 25px;
   box-sizing: border-box;
   color: var(--color-font);
@@ -1288,11 +1366,13 @@ const handleSearch = (text) => {
   align-items: center;
   gap: 13px;
 
+  > div:last-child { min-width: 0; }
+
   h2 { margin: 0 0 5px; font-size: 18px; }
   p { margin: 0; color: var(--color-font-label); font-size: 11px; line-height: 1.5; }
 }
 .qrIcon {
-  width: 56px;
+  width: 90px;
   height: 42px;
   flex: none;
   display: flex;
@@ -1316,31 +1396,123 @@ const handleSearch = (text) => {
   margin-top: 22px;
 }
 .providerCard {
-  position: relative;
+  border: 1px solid var(--color-primary-alpha-900);
+  border-radius: 17px;
+  overflow: hidden;
+  background: var(--color-content-background);
+}
+.providerHeader { position: relative; }
+.providerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--color-primary-alpha-900);
+  color: var(--color-font);
+  font-size: 11px;
+  white-space: nowrap;
+  i {
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform .24s ease;
+    &.chevronExpanded { transform: rotate(225deg) translate(-2px, -1px); }
+  }
+}
+.providerReveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+}
+.providerRevealed { grid-template-rows: 1fr; opacity: 1; }
+.providerRevealInner { min-height: 0; overflow: hidden; }
+.providerFooter { display: flex; justify-content: flex-end; margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .providerReveal, .providerToggle i { transition: none; }
+}
+.providerDetails {
+  padding: 8px 16px 12px;
+  > p { margin: 0 0 12px; font-size: 11px; color: var(--color-font-label); line-height: 1.65; }
+}
+.providerTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  button {
+    flex: 1;
+    min-height: 34px;
+    padding: 7px 12px;
+    border: 1px solid var(--color-primary-alpha-800);
+    border-radius: 10px;
+    color: var(--color-font);
+    background: transparent;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    &:hover { background: var(--color-primary-background-hover); }
+    &:disabled { opacity: .5; cursor: default; }
+    &[aria-pressed="true"] { color: var(--color-primary); font-weight: 650; }
+  }
+}
+.recommendProviders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0 16px;
+  > span { margin-right: 5px; color: var(--color-font-label); font-size: 11px; }
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 34px;
+    padding: 7px 13px;
+    border-radius: 18px;
+    border: 1px solid var(--color-primary-alpha-900);
+    background: var(--color-primary-background);
+    color: var(--color-font-label);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color @transition-fast, border-color @transition-fast;
+    &:hover { background: var(--color-primary-background-hover); }
+    &.providerSelected { background: var(--color-primary-alpha-900); border-color: var(--color-primary-alpha-500); color: var(--color-font); }
+  }
+}
+.libraryImportButton {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 0 12px;
+  cursor: pointer;
 }
 .providerAction {
   width: 100%;
   min-height: 82px;
-  padding: 13px 86px 13px 15px;
-  border: 1px solid rgba(54, 83, 70, .13);
-  border-radius: 17px;
+  padding: 15px 16px;
+  border: 0;
+  border-radius: 0;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   color: var(--color-font);
-  background: rgba(255, 255, 255, .62);
+  background: transparent;
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: transform @transition-fast, border-color @transition-fast, box-shadow @transition-fast;
+  transition: background-color @transition-fast;
 
   &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    border-color: var(--color-primary-alpha-700);
-    box-shadow: 0 12px 28px rgba(35, 54, 46, .11);
+    background: var(--color-primary-background-hover);
   }
-  &:disabled { cursor: wait; opacity: .65; }
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
   > div { min-width: 0; }
   strong { font-size: 14px; }
   strong, > div span { display: block; .mixin-ellipsis-1(); }
@@ -1352,11 +1524,7 @@ const handleSearch = (text) => {
     font-size: 22px;
   }
 }
-.activeProvider .providerAction {
-  border-color: var(--color-primary-alpha-500);
-  background: var(--color-primary-alpha-1000);
-  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-900);
-}
+.activeProvider { border-color: var(--color-primary-alpha-600); }
 .accountAvatar {
   width: 38px;
   height: 38px;
@@ -1366,28 +1534,16 @@ const handleSearch = (text) => {
   box-shadow: 0 5px 14px rgba(35, 54, 46, .12);
 }
 .logoutButton {
-  position: absolute;
-  top: 50%;
-  right: 13px;
-  z-index: 1;
-  min-width: 54px;
-  height: 30px;
-  padding: 0 9px;
-  transform: translateY(-50%);
-  border: 1px solid rgba(54, 83, 70, .13);
-  border-radius: 9px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
   color: var(--color-font-label);
-  background: rgba(255, 255, 255, .64);
-  cursor: pointer;
+  background: transparent;
   font: inherit;
   font-size: 10px;
-  transition: color @transition-fast, border-color @transition-fast, background-color @transition-fast;
-
-  &:hover:not(:disabled) {
-    border-color: var(--color-primary-alpha-600);
-    color: var(--color-primary);
-    background: var(--color-primary-background-hover);
-  }
+  cursor: pointer;
+  &:hover:not(:disabled) { color: var(--color-font); background: var(--color-primary-background-hover); }
   &:disabled { cursor: wait; opacity: .55; }
 }
 .officialDailySetup {
@@ -1397,16 +1553,29 @@ const handleSearch = (text) => {
   border-radius: 15px;
   background: var(--color-primary-alpha-1000);
 
-  > div:first-child {
+  > summary {
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    strong { color: var(--color-font); font-size: 12px; }
+    list-style: none;
+    &::-webkit-details-marker { display: none; }
+    &::after {
+      content: '';
+      flex: none;
+      width: 6px;
+      height: 6px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(45deg);
+    }
+    strong { color: var(--color-font); font-size: 12px; flex: 1; }
     span { color: var(--color-font-label); font-size: 10px; }
     .keyConnected { color: var(--color-primary); font-weight: 650; }
   }
-  > p { margin: 7px 0 11px; color: var(--color-font-label); font-size: 10px; line-height: 1.55; }
+  &[open] > summary::after { transform: rotate(225deg); }
+  > p { margin: 12px 0 11px; color: var(--color-font-label); font-size: 10px; line-height: 1.55; }
 }
 .keyInputRow {
   display: flex;
