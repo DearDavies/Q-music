@@ -182,6 +182,16 @@ Q-music 相关问题请在 [Q-music Issues](https://github.com/Nshpiter/Q-music/
 
 提交 PR 时请保持改动聚焦，说明变更目的与影响范围，并避免提交构建产物、私有配置、Token 或无关格式化改动。
 
+## Star 趋势
+
+<a href="https://star-history.com/#Nshpiter/Q-music&amp;Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Nshpiter/Q-music&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Nshpiter/Q-music&amp;type=Date" />
+    <img alt="Q-music GitHub Star 数量变化趋势" src="https://api.star-history.com/svg?repos=Nshpiter/Q-music&amp;type=Date" width="100%" />
+  </picture>
+</a>
+
 ## 许可与免责声明
 
 本项目基于 [Apache License 2.0](./LICENSE) 发行，并保留 LX Music 桌面版的上游归属声明、附加协议与免责声明。上游信息与二次修改记录见 [NOTICE](./NOTICE) 和 [MODIFICATIONS.md](./MODIFICATIONS.md)。
