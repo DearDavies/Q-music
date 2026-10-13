@@ -372,8 +372,9 @@ export const loadKugouHashMusic = async(ids: string[], onProgress?: (progress: E
   for (let index = 0; index < ids.length; index += 100) {
     assertNotCancelled(shouldCancel)
     const group = ids.slice(index, index + 100)
-    const songs = await musicSdk.kg.songList.getMusicInfos(group.map(hash => ({ hash })))
-    if (songs.length != group.length) throw new ExternalImportError('account_unavailable')
+    const songs = await musicSdk.kg.songList.getMusicInfos(group.map(hash => ({ hash })), { requireComplete: true, shouldCancel }).catch((error: Error) => {
+      throw new ExternalImportError(error.message == 'cancelled' ? 'cancelled' : 'account_unavailable')
+    })
     list.push(...songs.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
     onProgress?.({ stage: 'fetch', current: Math.min(index + group.length, ids.length), total: ids.length })
   }

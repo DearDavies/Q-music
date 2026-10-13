@@ -25,6 +25,109 @@ const qr = { key: 'test-code', mid: session.mid, expiresAt: Date.now() + 120000 
 const response = data => ({ ok: true, status: 200, json: async () => ({ status: 1, error_code: 0, data }) })
 const hash = n => n.toString(16).padStart(32, '0').toUpperCase()
 
+test('酷狗服务端缩小分页时继续读取，短页重复仍拒绝覆盖', async () => {
+  const requested = []
+  const api = kg.createKugouApi(async (_url, init) => {
+    const page = JSON.parse(init.body).page
+    requested.push(page)
+    return response({ count: 5, info: [1, 2, 3, 4, 5].slice((page - 1) * 2, page * 2).map(n => ({ hash: hash(n) })) })
+  }, md5)
+  assert.equal((await api.getPlaylistHashes(session, '7')).join(','), [1, 2, 3, 4, 5].map(hash).join(','))
+  assert.equal(requested.join(','), '1,2,3')
+  let calls = 0
+  const repeated = kg.createKugouApi(async () => {
+    calls++
+    return response({ count: 4, info: [{ hash: hash(1) }, { hash: hash(2) }] })
+  }, md5)
+  await assert.rejects(repeated.getPlaylistHashes(session, '7'), /incomplete/)
+  assert.equal(calls, 2)
+})
+
+const loadKugouSongs = fetchDetails => load(mobile ? 'src/utils/musicSdk/kg/songList.js' : 'src/renderer/utils/musicSdk/kg/songList.js', {
+  '../../request': { httpFetch: (_url, options) => ({ promise: Promise.resolve(fetchDetails(options.body.data)).then(data => ({ statusCode: 200, body: { error_code: 0, data } })) }) },
+  '../../index': { decodeName: value => value, formatPlayTime: value => String(value), sizeFormate: value => String(value) },
+  './vendors/infSign.min': {}, '@renderer/utils/musicSdk/kg/vendors/infSign.min': {}, './util': {},
+}).default
+const kugouDetail = (n, audioId = n, extras = {}) => ({
+  songname: 'song-' + n, author_name: 'artist', album_info: { album_id: '1', album_name: 'album' },
+  audio_info: { audio_id: String(audioId), hash: hash(n), filesize: '1024', timelength: '1000', filesize_320: '0', filesize_flac: '0', filesize_high: '0', ...extras },
+})
+
+test('酷狗同一歌曲的不同文件和音质不再按去重后的数量误报缺歌', async () => {
+  const rows = [kugouDetail(1, 99), kugouDetail(2, 99)]
+  const sdk = loadKugouSongs(() => rows.map(row => [row]))
+  const result = await sdk.getMusicInfos([1, 2].map(n => ({ hash: hash(n) })), { requireComplete: true })
+  assert.equal(result.map(row => row.hash).join(','), [1, 2].map(hash).join(','))
+  const qualities = loadKugouSongs(() => [[kugouDetail(1, 99, { hash_320: hash(2), filesize_320: '2048' })]])
+  const merged = await qualities.getMusicInfos([1, 2].map(n => ({ hash: hash(n) })), { requireComplete: true })
+  assert.equal(merged.length, 1)
+  assert.equal(merged[0]._types['320k'].hash, hash(2))
+})
+
+test('酷狗只补查缺失详情并按歌单顺序返回，真实缺失和取消仍拒绝', async () => {
+  const calls = []
+  const sdk = loadKugouSongs(rows => {
+    calls.push(rows.map(row => row.hash).join(','))
+    return calls.length === 1 ? [[kugouDetail(3)], [kugouDetail(1)]] : [[kugouDetail(2)]]
+  })
+  const input = [1, 2, 3].map(n => ({ hash: hash(n) }))
+  const result = await sdk.getMusicInfos(input, { requireComplete: true })
+  assert.equal(result.map(row => row.hash).join(','), input.map(row => row.hash).join(','))
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1], hash(2))
+  let tries = 0
+  const missing = loadKugouSongs(() => { tries++; return [[kugouDetail(1)]] })
+  await assert.rejects(missing.getMusicInfos(input, { requireComplete: true }), /incomplete/)
+  assert.equal(tries, 2)
+  const wrongSong = loadKugouSongs(() => [[kugouDetail(9)]])
+  await assert.rejects(wrongSong.getMusicInfos([{ hash: hash(1) }], { requireComplete: true }), /incomplete/)
+  let cancelled = false
+  const stopped = loadKugouSongs(() => { cancelled = true; return [[kugouDetail(1)]] })
+  await assert.rejects(stopped.getMusicInfos(input, { requireComplete: true, shouldCancel: () => cancelled }), /cancelled/)
+})
+
+
+
+test('账号导入和日推使用逐曲完整性校验，合法音质合并可导入，真实缺失仍失败', async () => {
+  let complete = true
+  const songList = loadKugouSongs(() => complete ? [[kugouDetail(1, 9, { hash_320: hash(2), filesize_320: '2048' })]] : [[kugouDetail(1)]])
+  let read
+  if (mobile) {
+    const playlists = load('src/core/musicAccount/playlists.ts', {
+      './cookies': {}, './requests': { fail: (code = 'unavailable') => { throw Error(code) } }, './types': {},
+      '@/utils/musicSdk/tx/songList': {}, '@/utils/musicSdk/wy/songList': {}, '@/utils/musicSdk/kg/songList': songList,
+      '@/utils': { toNewMusicInfo: row => row }, './kugou': {
+        assertKugouSession: async () => {},
+        kugouApi: { getPlaylistHashes: async () => [hash(1), hash(2)] },
+      },
+    })
+    read = () => playlists.getAccountPlaylistTracks({ provider: 'kg', kugou: session }, '7')
+    const daily = load('src/core/musicAccount/daily.ts', {
+      '@react-native-async-storage/async-storage': {}, 'react-native': { NativeModules: {} }, './cookies': {}, './types': {},
+      './requests': { fail: (code = 'unavailable') => { throw Error(code) } },
+      './kugou': { assertKugouSession: async () => {}, requireKugouSession: async () => session, kugouApi: { getDailyHashes: async () => [hash(1), hash(2)] } },
+      '@/utils/musicSdk/tx/songList': {}, '@/utils/musicSdk/wy/songList': {}, '@/utils/musicSdk/kg/songList': songList,
+      '@/utils': { toNewMusicInfo: row => row }, '@/core/dailyRecommend': { getDailyRecommend: async () => [] },
+    })
+    const recommendation = await daily.getAccountDaily('kg', true)
+    assert.equal(recommendation.kind, 'kugou_daily')
+    assert.equal(recommendation.list.length, 1)
+  } else {
+    const imported = load('src/renderer/views/List/MyList/importPlaylist.ts', {
+      '@common/constants': { LIST_IDS: {} },
+      '@renderer/utils': { toNewMusicInfo: row => row, filterMusicList: rows => rows },
+      '@renderer/utils/request': {}, '@renderer/utils/musicSdk': { kg: { songList } },
+      '@renderer/store/songList/action': {}, '@renderer/store/list/action': {}, '@renderer/store/list/state': {},
+      '@renderer/utils/ipc': {}, '@renderer/utils/musicSdk/wy/musicDetail': {}, '@renderer/utils/musicSdk/tx/musicInfo': {},
+    })
+    read = () => imported.loadKugouHashMusic([hash(1), hash(2)])
+    await assert.rejects(imported.loadKugouHashMusic([hash(1)], undefined, () => true), error => error.code === 'cancelled')
+  }
+  assert.equal((await read()).length, 1)
+  complete = false
+  await assert.rejects(read(), error => mobile ? error.message === 'incomplete' : error.code === 'account_unavailable')
+})
+
 test('微信凭证使用 wxuin 和微信音乐令牌，不混入残留的 QQ 身份', () => {
   const result = qq.getQQRequestComm({ login_type: '2', wxuin: '009876', uin: 'o1234', qqmusic_key: 'Q_H_L_old', qm_keyst: 'W_X_current' })
   assert.equal(result.uin, '9876')

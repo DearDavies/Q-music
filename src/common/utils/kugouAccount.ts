@@ -118,7 +118,7 @@ export const createKugouApi = (fetcher: Fetch, md5: (value: string) => string) =
       if (!Array.isArray(rows)) fail()
       // 接口忽略 page 或重复返回整页时，不能误将重复页计入总数后覆盖本地歌单。
       const pageKey = md5(JSON.stringify(rows.map(row => row.hash ?? row.filehash ?? row.file_hash)))
-      if (rows.length == 300 && pages.has(pageKey)) fail('incomplete')
+      if (rows.length && pages.has(pageKey)) fail('incomplete')
       pages.add(pageKey)
       const rawTotal = data.count ?? data.total
       if (rawTotal != null) {
@@ -137,7 +137,8 @@ export const createKugouApi = (fetcher: Fetch, md5: (value: string) => string) =
         if (hashes.length != expected) fail('incomplete')
         return [...seen]
       }
-      if (!rows.length || rows.length < 300) {
+      // 服务端可能限制每页数量；已知总数时不能把短页当成末页。
+      if (!rows.length || (expected == null && rows.length < 300)) {
         if (expected != null && hashes.length != expected) fail('incomplete')
         return [...seen]
       }

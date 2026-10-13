@@ -221,10 +221,8 @@ jobs:
             "$output_dir/SHA256SUMS-android.txt"
           )
 
+          # 手动启动也可能早于 Windows 创建 Release 草稿，保留相同的等待窗口。
           attempts=180
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            attempts=1
-          fi
 
           release_notes_are_human() {
             local body body_without_marker compact
@@ -254,9 +252,5 @@ jobs:
             sleep 10
           done
 
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "Release '$TAG_NAME' is missing or still has placeholder notes. Run the Windows release workflow first." >&2
-            exit 1
-          fi
           echo "Release '$TAG_NAME' was not prepared; refusing to create it without human-written notes." >&2
           exit 1
