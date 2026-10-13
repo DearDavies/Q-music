@@ -321,14 +321,43 @@ export default {
       },
     }).then(data => data.map(s => s[0])))
   },
-  async getMusicInfos(list) {
-    return this.filterData2(
-      await Promise.all(
-        this.createTask(
-          this.deDuplication(list)
-            .map(item => ({ hash: item.hash })),
-        ))
-        .then(([...datas]) => datas.flat()))
+  /**
+   * @param {Array<{ hash: string }>} list
+   * @param {{ requireComplete?: boolean, shouldCancel?: () => boolean }} [options]
+   */
+  async getMusicInfos(list, { requireComplete = false, shouldCancel = () => false } = {}) {
+    const checkCancelled = () => { if (shouldCancel()) throw new Error('cancelled') }
+    checkCancelled()
+    const requested = this.deDuplication(list.map(item => ({ hash: String(item.hash).toUpperCase() })))
+    const fetchDetails = async items => {
+      const rows = (await Promise.all(this.createTask(items))).flat()
+      checkCancelled()
+      return rows
+    }
+    const rows = await fetchDetails(requested)
+    if (!requireComplete) return this.filterData2(rows)
+
+    // 按文件 hash（包括不同音质）核对完整性，不能比较歌曲去重后的数量。
+    const byHash = new Map()
+    const remember = items => {
+      for (const item of items) {
+        if (!item?.audio_info || !item.album_info || !item.songname || item.audio_info.audio_id == null ||
+          !/^[a-f0-9]{32}$/i.test(item.audio_info.hash)) continue
+        for (const [key, value] of Object.entries(item.audio_info)) {
+          if (/^hash(?:_|$)/.test(key) && typeof value == 'string' && /^[a-f0-9]{32}$/i.test(value)) {
+            const hash = value.toUpperCase()
+            if (!byHash.has(hash)) byHash.set(hash, item)
+          }
+        }
+      }
+    }
+    remember(rows)
+    const missing = requested.filter(item => !byHash.has(item.hash))
+    // 大批详情偶发漏项时只补查一次缺失项；仍不完整时不允许覆盖原列表。
+    if (missing.length) remember(await fetchDetails(missing))
+    const ordered = requested.map(item => byHash.get(item.hash))
+    if (ordered.some(item => !item)) throw new Error('incomplete')
+    return this.filterData2(ordered)
   },
 
   async getUserListDetailByCode(id) {
@@ -818,8 +847,9 @@ export default {
     let list = []
     rawList.forEach(item => {
       if (!item) return
-      if (ids.has(item.audio_info.audio_id)) return
-      ids.add(item.audio_info.audio_id)
+      const id = String(item.audio_info.hash || item.audio_info.audio_id).toUpperCase()
+      if (ids.has(id)) return
+      ids.add(id)
       const types = []
       const _types = {}
       if (item.audio_info.filesize !== '0') {

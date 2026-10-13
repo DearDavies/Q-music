@@ -142,8 +142,7 @@ export const getAccountPlaylistTracks = async(session: PlaylistSession, id: stri
     for (let offset = 0; offset < hashes.length; offset += 100) {
       if (signal?.aborted) fail('cancelled')
       const group = hashes.slice(offset, offset + 100)
-      const details = await kgSongList.getMusicInfos(group.map(hash => ({ hash })))
-      if (details.length != group.length) fail('incomplete')
+      const details = await kgSongList.getMusicInfos(group.map(hash => ({ hash })), { requireComplete: true, shouldCancel: () => !!signal?.aborted })
       tracks.push(...details.map((item: unknown) => toNewMusicInfo(item) as LX.Music.MusicInfoOnline))
     }
     await assertPlaylistSession(session)

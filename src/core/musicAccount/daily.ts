@@ -157,8 +157,7 @@ export const getAccountDaily = async(provider: DailyProvider, force = false, sig
       const hashes = await kugouApi.getDailyHashes(account, signal)
       aborted(signal)
       if (hashes.length) {
-        const tracks = await kgSongList.getMusicInfos(hashes.map(hash => ({ hash })))
-        if (tracks.length != hashes.length) fail('incomplete')
+        const tracks = await kgSongList.getMusicInfos(hashes.map(hash => ({ hash })), { requireComplete: true, shouldCancel: () => !!signal?.aborted })
         result = { provider, kind: 'kugou_daily', reason: '', list: tracks.map((item: unknown) => toNewMusicInfo(item) as LX.Music.MusicInfoOnline) }
       }
       await assertKugouSession(account)
