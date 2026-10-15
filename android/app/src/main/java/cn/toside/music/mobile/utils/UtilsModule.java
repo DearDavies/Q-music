@@ -6,6 +6,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
@@ -34,6 +36,8 @@ import com.facebook.react.bridge.WritableNativeArray;
 import java.io.File;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Map;
+import java.util.HashMap;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
   private final ReactApplicationContext reactContext;
@@ -52,6 +56,15 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   @Override
   public String getName() {
     return "UtilsModule";
+  }
+
+  @Override
+  public Map<String, Object> getConstants() {
+    Map<String, Object> constants = new HashMap<>();
+    int uiMode = reactContext.getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK;
+    constants.put("isAutomotive", uiMode == Configuration.UI_MODE_TYPE_CAR
+        || reactContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE));
+    return constants;
   }
 
   @ReactMethod

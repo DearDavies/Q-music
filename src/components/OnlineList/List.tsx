@@ -2,7 +2,8 @@ import { useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'reac
 import { FlatList, type FlatListProps, RefreshControl, View } from 'react-native'
 
 // import { useMusicList } from '@/store/list/hook'
-import ListItem, { ITEM_HEIGHT } from './ListItem'
+import ListItem from './ListItem'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 import { createStyle, getRowInfo, type RowInfoType } from '@/utils/tools'
 import type { Position } from './ListMenu'
 import type { SelectMode } from './MultipleModeBar'
@@ -65,6 +66,7 @@ const List = forwardRef<ListType, ListProps>(({
   const theme = useTheme()
   const flatListRef = useRef<FlatList>(null)
   const dockInset = useDockInset()
+  const { songRowHeight } = useAdaptiveLayout()
   const [currentList, setList] = useState<LX.Music.MusicInfoOnline[]>([])
   const [showSource, setShowSource] = useState(false)
   const isMultiSelectModeRef = useRef(false)
@@ -202,7 +204,7 @@ const List = forwardRef<ListType, ListProps>(({
   )
   const getkey: FlatListType['keyExtractor'] = item => item.id
   const getItemLayout: FlatListType['getItemLayout'] = (data, index) => {
-    return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
+    return { length: songRowHeight, offset: songRowHeight * index, index }
   }
   const refreshControl = useMemo(() => (
     <RefreshControl
@@ -240,7 +242,7 @@ const List = forwardRef<ListType, ListProps>(({
     switch (status) {
       case 'loading':
       case 'refreshing':
-        return <ListSkeleton variant="song" itemHeight={ITEM_HEIGHT} />
+        return <ListSkeleton variant="song" itemHeight={songRowHeight} />
       case 'error':
         return <ContentState status="error" onRetry={onLoadMore} />
       case 'end':
@@ -248,10 +250,11 @@ const List = forwardRef<ListType, ListProps>(({
       default:
         return null
     }
-  }, [onLoadMore, status])
+  }, [onLoadMore, status, songRowHeight])
 
   return (
     <FlatList
+      key={songRowHeight}
       ref={flatListRef}
       style={styles.list}
       contentContainerStyle={{ paddingBottom: dockInset }}

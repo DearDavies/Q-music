@@ -9,6 +9,7 @@ import SettingPlaybackRate from './settings/SettingPlaybackRate'
 import SettingLrcFontSize from './settings/SettingLrcFontSize'
 import SettingLrcAlign from './settings/SettingLrcAlign'
 import SettingPlayQuality from './settings/SettingPlayQuality'
+import PlayerStyleSelector from '@/components/player/PlayerStyleSelector'
 
 export interface SettingPopupProps extends Omit<PopupProps, 'children'> {
   direction: 'vertical' | 'horizontal'
@@ -43,6 +44,7 @@ export default forwardRef<SettingPopupType, SettingPopupProps>(({ direction, ...
         <Popup ref={popupRef} title={t('play_detail_setting_title')} {...props}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <View>
+              <PlayerStyleSelector />
               <SettingLyricProgress />
               <SettingVolume />
               <SettingPlaybackRate />

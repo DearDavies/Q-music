@@ -14,6 +14,7 @@ import settingState from '@/store/setting/state'
 import { checkUpdate } from '@/core/version'
 import { bootLog } from '@/utils/bootLog'
 import { cheatTip } from '@/utils/tools'
+import { initPlaylistAutoSync } from '@/core/musicAccount/autoSync'
 
 let isFirstPush = true
 const handlePushedHomeScreen = async() => {
@@ -56,6 +57,7 @@ export default async() => {
   await initPlayer(setting)
   bootLog('Player inited.')
   await dataInit(setting)
+  initPlaylistAutoSync()
   bootLog('Data inited.')
   await initCommonState(setting)
   bootLog('Common State inited.')

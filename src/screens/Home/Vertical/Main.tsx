@@ -14,6 +14,7 @@ import settingState from '@/store/setting/state'
 import Header from './Header'
 import { useNavActiveId } from '@/store/common/hook'
 import { useTheme } from '@/store/theme/hook'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 const hideKeys = [
   'list.isShowAlbumName',
@@ -220,6 +221,7 @@ const indexMap = [
 ] as const
 
 const Main = () => {
+  const { isCar } = useAdaptiveLayout()
   const activeId = useNavActiveId()
   const theme = useTheme()
   const pagerViewRef = useRef<ComponentRef<typeof PagerView>>(null)
@@ -282,7 +284,7 @@ const Main = () => {
     }
     const handleConfigUpdate = (keys: Array<keyof LX.AppSetting>, setting: Partial<LX.AppSetting>) => {
       if (!keys.includes('common.homePageScroll')) return
-      pagerViewRef.current?.setScrollEnabled(setting['common.homePageScroll']!)
+      pagerViewRef.current?.setScrollEnabled(!isCar && setting['common.homePageScroll']!)
     }
     // window.requestAnimationFrame(() => pagerViewRef.current && pagerViewRef.current.setPage(activeIndexRef.current))
     global.state_event.on('navActiveIdUpdated', handleUpdate)
@@ -291,7 +293,7 @@ const Main = () => {
       global.state_event.off('navActiveIdUpdated', handleUpdate)
       global.state_event.off('configUpdated', handleConfigUpdate)
     }
-  }, [])
+  }, [isCar])
 
 
   const component = useMemo(() => (
@@ -301,7 +303,7 @@ const Main = () => {
       offscreenPageLimit={1}
       onPageSelected={onPageSelected}
       onPageScrollStateChanged={onPageScrollStateChanged}
-      scrollEnabled={settingState.setting['common.homePageScroll']}
+      scrollEnabled={!isCar && settingState.setting['common.homePageScroll']}
       style={styles.pagerView}
     >
       <View collapsable={false} key="nav_search" style={styles.pageStyle}>
@@ -335,7 +337,7 @@ const Main = () => {
         <Setting />
       </View> */}
     </PagerView>
-  ), [onPageScrollStateChanged, onPageSelected])
+  ), [onPageScrollStateChanged, onPageSelected, isCar])
 
   const secondary = activeId == 'download' || activeId == 'nav_setting'
   return <View style={styles.pageStyle}>

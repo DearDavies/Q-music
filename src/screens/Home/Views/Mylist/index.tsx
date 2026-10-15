@@ -8,12 +8,15 @@ import { COMPONENT_IDS } from '@/config/constant'
 import { scaleSizeW } from '@/utils/pixelRatio'
 import type { InitState as CommonState } from '@/store/common/state'
 import LibraryShortcuts from './LibraryShortcuts'
+import { View } from 'react-native'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 const MAX_WIDTH = scaleSizeW(400)
 
 export default () => {
   const drawer = useRef<DrawerLayoutFixedType>(null)
   const theme = useTheme()
+  const { splitLibrary, width, railWidth } = useAdaptiveLayout()
   // const [width, setWidth] = useState(0)
 
   useEffect(() => {
@@ -52,6 +55,13 @@ export default () => {
 
   const navigationView = () => <MyList />
   // console.log('render drawer content')
+
+  if (splitLibrary) {
+    return <View style={{ flex: 1, flexDirection: 'row' }}>
+      <View style={{ width: Math.min(280, (width - railWidth) * 0.3), borderRightWidth: 1, borderRightColor: theme['q-outline'] }}><MyList embedded /></View>
+      <View style={{ flex: 1, minWidth: 0 }}><LibraryShortcuts /><MusicList /></View>
+    </View>
+  }
 
   return (
     <DrawerLayoutFixed

@@ -15,6 +15,8 @@ import { NAV_SHEAR_NATIVE_IDS } from '@/config/constant'
 import { getStatusBarStyle } from './utils'
 import { windowSizeTools } from '@/utils/windowSizeTools'
 import { type ListInfoItem } from '@/store/songlist/state'
+import settingState from '@/store/setting/state'
+import { getPlayerTheme } from '@/theme/playerAppearance'
 
 // const store = getStore()
 // const getTheme = () => getter('common', 'theme')(store.getState())
@@ -120,7 +122,7 @@ export function pushPlayDetailScreen(componentId: string, skipAnimation = false)
     })
   */
   requestAnimationFrame(() => {
-    const theme = themeState.theme
+    const theme = getPlayerTheme(themeState.theme, settingState.setting['playDetail.style.layout'])
 
     void Navigation.push(componentId, {
       component: {

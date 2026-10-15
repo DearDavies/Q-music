@@ -8,11 +8,13 @@ import Text from '@/components/common/Text'
 import { LIST_IDS } from '@/config/constant'
 import Button from '@/components/common/Button'
 import { useTrackChangeAnimation } from '@/components/player/useTrackChangeAnimation'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 
 export default ({ isHome, onOpenDetail }: { isHome: boolean, onOpenDetail?: () => void }) => {
   const musicInfo = usePlayerMusicInfo()
   const colors = useGlassColors()
+  const { isCar, wide } = useAdaptiveLayout()
   const trackAnimation = useTrackChangeAnimation(musicInfo.id)
 
   const handlePress = () => {
@@ -38,14 +40,14 @@ export default ({ isHome, onOpenDetail }: { isHome: boolean, onOpenDetail?: () =
     <Button
       ripple={null}
       accessibilityLabel={musicInfo.id ? `${title} · ${singer}` : global.i18n.t('play_detail_setting_title')}
-      style={styles.container}
+      style={[styles.container, wide && { height: 56 }, isCar && { height: 64 }]}
       onLongPress={handleLongPress}
       onPress={handlePress}
       disabled={!musicInfo.id}
     >
       <Animated.View style={trackAnimation}>
-        <Text style={styles.title} size={13} color={colors.primary} numberOfLines={1}>{title}</Text>
-        <Text style={styles.singer} size={10} color={colors.secondary} numberOfLines={1}>{singer}</Text>
+        <Text style={styles.title} size={isCar ? 18 : wide ? 15 : 13} color={colors.primary} numberOfLines={1}>{title}</Text>
+        <Text style={styles.singer} size={isCar ? 13 : wide ? 12 : 10} color={colors.secondary} numberOfLines={1}>{singer}</Text>
       </Animated.View>
     </Button>
   )

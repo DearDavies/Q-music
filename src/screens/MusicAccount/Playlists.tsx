@@ -119,7 +119,7 @@ export default ({ provider, onLogin, onOpenLibrary, onBusyChange }: {
     <View style={styles.heading}>
       <View style={styles.copy}>
         <Text size={23} style={styles.title}>{t('account_lists_title')}</Text>
-        <Text size={12} color={theme['q-text-secondary']} style={styles.subtitle}>{t('account_lists_tip')}</Text>
+        <Text size={12} color={theme['q-text-secondary']} style={styles.subtitle}>{t(provider == 'tx' ? 'list_sync_import_tip' : 'account_lists_tip')}</Text>
       </View>
       <Button disabled={busy || loading} accessibilityLabel={t('account_lists_refresh')} onPress={() => { void load() }} style={styles.iconButton}>
         <Icon name="available_updates" size={20} color={theme['q-accent-text']} />

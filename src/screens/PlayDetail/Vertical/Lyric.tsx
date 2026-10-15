@@ -15,6 +15,7 @@ import { updateSetting } from '@/core/common'
 import { toggleTranslation } from '@/core/lyric'
 import Button from '@/components/common/Button'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 type FlatListType = FlatListProps<Line>
 interface LineProps {
@@ -22,15 +23,18 @@ interface LineProps {
   lineNum: number
   distance: number
   motion: boolean
+  immersive: boolean
   onLayout: (lineNum: number, height: number) => void
 }
 
-const LrcLine = memo(({ line, lineNum, distance, motion, onLayout }: LineProps) => {
+const getLyricSize = (fontSize: number, immersive: boolean) => immersive ? Math.max(28, Math.min(40, fontSize / 10 + 9)) : fontSize / 10 + 3
+
+const LrcLine = memo(({ line, lineNum, distance, motion, immersive, onLayout }: LineProps) => {
   const theme = useTheme()
   const fontSize = useSettingValue('playDetail.vertical.style.lrcFontSize')
   const textAlign = useSettingValue('playDetail.style.align')
-  const size = fontSize / 10 + 3
-  const opacity = distance == 0 ? 1 : distance == 1 ? 0.52 : 0.32
+  const size = getLyricSize(fontSize, immersive)
+  const opacity = distance == 0 ? 1 : distance == 1 ? (immersive ? 0.44 : 0.52) : (immersive ? 0.24 : 0.32)
   const emphasis = useRef(new Animated.Value(opacity)).current
   const scale = useRef(new Animated.Value(distance == 0 ? 1 : 0.98)).current
   useEffect(() => {
@@ -41,17 +45,18 @@ const LrcLine = memo(({ line, lineNum, distance, motion, onLayout }: LineProps) 
     animation.start()
     return () => { animation.stop() }
   }, [distance, emphasis, motion, opacity, scale])
-  return <View style={styles.line} onLayout={({ nativeEvent }) => { onLayout(lineNum, nativeEvent.layout.height) }}>
+  return <View style={[styles.line, immersive && { paddingVertical: 18 }]} onLayout={({ nativeEvent }) => { onLayout(lineNum, nativeEvent.layout.height) }}>
     <Animated.View style={{ opacity: emphasis, transform: [{ scale }] }}>
-      <Text style={[styles.lineText, { textAlign, lineHeight: setSpText(size) * 1.4 }]} textBreakStrategy="simple" color={theme['q-text-primary']} size={size}>{line.text}</Text>
-      {line.extendedLyrics.map((text, index) => <Text key={index} style={{ textAlign, marginTop: 7, lineHeight: setSpText(size * 0.72) * 1.45 }} color={theme['q-text-primary']} size={size * 0.72}>{text}</Text>)}
+      <Text style={[styles.lineText, { textAlign, lineHeight: setSpText(size) * (immersive ? 1.24 : 1.4) }, immersive && { fontWeight: '800', letterSpacing: -0.7 }]} textBreakStrategy="simple" color={theme['q-text-primary']} size={size}>{line.text}</Text>
+      {line.extendedLyrics.map((text, index) => <Text key={index} style={{ textAlign, marginTop: 7, lineHeight: setSpText(size * (immersive ? 0.6 : 0.72)) * 1.45 }} color={immersive ? theme['q-text-secondary'] : theme['q-text-primary']} size={size * (immersive ? 0.6 : 0.72)}>{text}</Text>)}
     </Animated.View>
   </View>
 })
 
-export default ({ active = true }: { active?: boolean }) => {
+export default ({ active = true, wide = false, immersive = false }: { active?: boolean, wide?: boolean, immersive?: boolean }) => {
   const theme = useTheme()
   const t = useI18n()
+  const { isCar } = useAdaptiveLayout()
   const musicInfo = usePlayerMusicInfo()
   const motion = useMotion()
   const lyricLines = useLrcSet()
@@ -71,7 +76,7 @@ export default ({ active = true }: { active?: boolean }) => {
   const layout = useRef<{ spaceHeight: number, lineHeights: number[] }>({ spaceHeight: 0, lineHeights: [] })
   const measured = useRef(new Set<number>())
   const spaceHeight = height * 0.4
-  const estimatedHeight = setSpText(fontSize / 10 + 3) * 1.4 + 28
+  const estimatedHeight = setSpText(getLyricSize(fontSize, immersive)) * (immersive ? 1.24 : 1.4) + (immersive ? 36 : 28)
 
   const clearTimers = useCallback(() => {
     if (followTimer.current) clearTimeout(followTimer.current)
@@ -169,20 +174,22 @@ export default ({ active = true }: { active?: boolean }) => {
   }
   const onLayout = ({ nativeEvent }: LayoutChangeEvent) => { setHeight(nativeEvent.layout.height) }
   const spacer = useMemo(() => <View style={{ height: spaceHeight }} />, [spaceHeight])
-  const renderItem: FlatListType['renderItem'] = ({ item, index }) => <LrcLine line={item} lineNum={index} distance={Math.min(2, Math.abs(index - Math.max(0, line)))} motion={motion && active} onLayout={handleLineLayout} />
+  const renderItem: FlatListType['renderItem'] = ({ item, index }) => <LrcLine line={item} lineNum={index} distance={Math.min(2, Math.abs(index - Math.max(0, line)))} motion={motion && active} immersive={immersive} onLayout={handleLineLayout} />
 
   return <View style={styles.page}>
-    <View style={styles.trackHeader}>
-      <Image url={musicInfo.pic} style={styles.cover} />
-      <View style={styles.trackText}>
-        <Text size={13} style={styles.trackTitle} color={theme['q-text-primary']} numberOfLines={1}>{musicInfo.name}</Text>
-        <Text size={11} color={theme['q-text-secondary']} numberOfLines={1}>{musicInfo.singer}</Text>
-      </View>
+    <View style={[styles.trackHeader, wide && { paddingBottom: 6, minHeight: isCar ? 64 : 56 }, immersive && wide && { paddingHorizontal: 0 }]}>
+      {wide ? <View style={{ flex: 1 }}>{!immersive && <Text size={13} color={theme['q-text-secondary']}>{t('play_detail_page_lyric')}</Text>}</View> : <>
+        <Image url={musicInfo.pic} style={styles.cover} />
+        <View style={styles.trackText}>
+          <Text size={13} style={styles.trackTitle} color={theme['q-text-primary']} numberOfLines={1}>{musicInfo.name}</Text>
+          <Text size={11} color={theme['q-text-secondary']} numberOfLines={1}>{musicInfo.singer}</Text>
+        </View>
+      </>}
       {musicInfo.tlrc ? <Button
         accessibilityLabel={t('setting_play_show_translation')}
         accessibilityRole="switch"
         accessibilityState={{ checked: showTranslation }}
-        style={[styles.translationButton, { backgroundColor: showTranslation ? theme['q-surface-tint'] : theme['q-surface-raised'], borderColor: showTranslation ? theme['q-accent'] : theme['q-outline'] }]}
+        style={[styles.translationButton, wide && { height: isCar ? 52 : 44, paddingHorizontal: 14, borderRadius: 22 }, { backgroundColor: showTranslation ? theme['q-surface-tint'] : theme['q-surface-raised'], borderColor: showTranslation && !wide ? theme['q-accent'] : theme['q-outline'] }]}
         onPress={() => {
           updateSetting({ 'player.isShowLyricTranslation': !showTranslation })
           void toggleTranslation(!showTranslation)
@@ -199,7 +206,7 @@ export default ({ active = true }: { active?: boolean }) => {
         extraData={line}
         renderItem={renderItem}
         keyExtractor={(item, index) => `${index}:${item.text}:${item.extendedLyrics.join('|')}`}
-        style={styles.container}
+        style={[styles.container, immersive && { paddingHorizontal: wide ? 0 : 30 }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={spacer}
         ListFooterComponent={<View style={{ height: height * 0.6 }} />}

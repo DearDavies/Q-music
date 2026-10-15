@@ -118,9 +118,17 @@ const saveListUpdateInfoThrottle = throttle(() => {
   void saveData(listUpdateInfoKey, listUpdateInfo)
 }, 1000)
 
+let listUpdateInfoInit: Promise<void> | undefined
 const initListUpdateInfo = async() => {
-  // eslint-disable-next-line require-atomic-updates
-  listUpdateInfo ??= await getData(listUpdateInfoKey) ?? {}
+  if (listUpdateInfo != null) return
+  listUpdateInfoInit ??= getData<LX.List.ListUpdateInfo>(listUpdateInfoKey).then(info => { listUpdateInfo = info ?? {} }).finally(() => { listUpdateInfoInit = undefined })
+  await listUpdateInfoInit
+}
+export const setListSourceAccount = async(id: string, accountId: string) => {
+  await initListUpdateInfo()
+  const info = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }
+  listUpdateInfo[id] = { ...info, sourceAccountId: accountId }
+  saveListUpdateInfoThrottle()
 }
 export const getListUpdateInfo = async() => {
   await initListUpdateInfo()

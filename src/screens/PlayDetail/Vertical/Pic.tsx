@@ -15,12 +15,12 @@ import { useTheme } from '@/store/theme/hook'
 import { useTrackChangeAnimation } from '@/components/player/useTrackChangeAnimation'
 import { useCoverPlayScale } from '@/components/player/useCoverPlayScale'
 
-export default ({ componentId }: { componentId: string }) => {
+export default ({ componentId, wide = false }: { componentId: string, wide?: boolean }) => {
   const musicInfo = usePlayerMusicInfo()
   const { width: winWidth, height: winHeight } = useWindowSize()
   const statusBarHeight = useStatusbarHeight()
   const theme = useTheme()
-  const { onLayout, height: availableHeight } = useLayout()
+  const { onLayout, height: availableHeight, width: availableWidth } = useLayout()
 
   const [animated, setAnimated] = useState(!!commonState.componentIds.playDetail)
   const [pic, setPic] = useState(musicInfo.pic)
@@ -39,20 +39,22 @@ export default ({ componentId }: { componentId: string }) => {
 
   const style = useMemo(() => {
     const imageSpace = availableHeight > 0 ? Math.max(72, availableHeight - Math.max(108, 100 * global.lx.fontSize)) : winHeight
-    const imgWidth = Math.min(winWidth * 0.76, (winHeight - statusBarHeight - HEADER_HEIGHT) * 0.43, imageSpace)
+    const imgWidth = wide
+      ? Math.max(0, Math.min(availableWidth * 0.78, availableHeight - 94, 360))
+      : Math.min(winWidth * 0.76, (winHeight - statusBarHeight - HEADER_HEIGHT) * 0.43, imageSpace)
     return {
       width: imgWidth,
       height: imgWidth,
       borderRadius: 18,
     }
-  }, [availableHeight, statusBarHeight, winHeight, winWidth])
+  }, [availableHeight, availableWidth, statusBarHeight, winHeight, winWidth, wide])
 
   return (
     <View style={styles.container} onLayout={onLayout}>
       <Animated.View style={[styles.content, { opacity: coverAnimation.opacity, transform: [{ scale: coverScale }] }]}>
         <Image url={pic} nativeID={NAV_SHEAR_NATIVE_IDS.playDetail_pic} style={style} />
       </Animated.View>
-      <Animated.View style={[styles.trackInfo, infoAnimation]}>
+      <Animated.View style={[styles.trackInfo, wide && { width: '84%', marginTop: 12 }, infoAnimation]}>
         <Text size={20} style={styles.title} color={theme['q-text-primary']} numberOfLines={1}>{musicInfo.name}</Text>
         <Text size={13} color={theme['q-text-secondary']} numberOfLines={1}>{musicInfo.singer}</Text>
         {musicInfo.album && musicInfo.album != musicInfo.name

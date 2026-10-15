@@ -14,6 +14,7 @@ const defaultSetting: LX.AppSetting = {
   'common.showExitBtn': true,
   'common.useSystemFileSelector': true,
   'common.alwaysKeepStatusbarHeight': false,
+  'common.displayMode': 'auto',
 
   'player.startupAutoPlay': false,
   'player.startupPushPlayDetailScreen': false,
@@ -38,6 +39,7 @@ const defaultSetting: LX.AppSetting = {
   // 'playDetail.isZoomActiveLrc': false,
   // 'playDetail.isShowLyricProgressSetting': false,
   'playDetail.style.align': 'left',
+  'playDetail.style.layout': 'classic',
   'playDetail.vertical.style.lrcFontSize': 210,
   'playDetail.horizontal.style.lrcFontSize': 220,
   'playDetail.isShowLyricProgressSetting': false,

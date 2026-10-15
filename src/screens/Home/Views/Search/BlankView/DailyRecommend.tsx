@@ -20,10 +20,12 @@ import { AppState, FlatList, InteractionManager, Modal, SafeAreaView, ScrollView
 import { Icon } from '@/components/common/Icon'
 import DailyArtwork from './DailyArtwork'
 import Skeleton from '@/components/common/Skeleton'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 export default () => {
   const t = useI18n()
   const theme = useTheme()
+  const { wide } = useAdaptiveLayout()
   const isPlay = useIsPlay()
   const playMusicInfo = usePlayMusicInfo()
   const sourceRef = useRef<DailyProvider>('tx')
@@ -168,7 +170,7 @@ export default () => {
         </View>
       </Button>
       {result?.reason ? <Button onPress={result.reason == 'login_required' ? openAccount : () => { setSettingsVisible(true) }} style={styles.sourceNotice}><Text size={11} color={theme['q-text-secondary']}>{t(result.reason == 'login_required' ? 'daily_fallback_login' : result.reason == 'official_unavailable' && result.kind == 'radar' ? 'daily_radar_fallback' : 'daily_fallback_unavailable')} ›</Text></Button> : null}
-      <View style={styles.actions}>
+      <View style={[styles.actions, wide && { width: '100%', maxWidth: 400 }]}>
         <Button accessibilityLabel={t('daily_refresh')} disabled={loading || startingPlayback} style={{ ...styles.action, backgroundColor: theme['q-surface-tint'] }} onPress={() => { void load(sourceRef.current, true) }}>
           <Text size={12} color={theme['q-accent-text']}>{t('daily_refresh')}</Text>
         </Button>

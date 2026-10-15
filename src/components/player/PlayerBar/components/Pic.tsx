@@ -11,6 +11,7 @@ import { useTheme } from '@/store/theme/hook'
 import { Q_UI } from '@/theme/ui'
 import Button from '@/components/common/Button'
 import { useTrackChangeAnimation } from '@/components/player/useTrackChangeAnimation'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 const PIC_HEIGHT = 34
 
@@ -35,6 +36,8 @@ const styles = StyleSheet.create({
 export default ({ isHome, onOpenDetail }: { isHome: boolean, onOpenDetail?: () => void }) => {
   const musicInfo = usePlayerMusicInfo()
   const theme = useTheme()
+  const { wide, isCar } = useAdaptiveLayout()
+  const size = wide ? (isCar ? 48 : 44) : PIC_HEIGHT
   const picAnimation = useTrackChangeAnimation(musicInfo.pic, 0)
   const handlePress = () => {
     // console.log('')
@@ -64,7 +67,7 @@ export default ({ isHome, onOpenDetail }: { isHome: boolean, onOpenDetail?: () =
     <Button
       ripple={null}
       accessibilityLabel={musicInfo.id ? `${musicInfo.name} · ${musicInfo.singer}` : global.i18n.t('play_detail_setting_title')}
-      style={styles.button}
+      style={[styles.button, { width: size, height: size }]}
       hitSlop={5}
       onLongPress={handleLongPress}
       onPress={handlePress}
@@ -74,7 +77,7 @@ export default ({ isHome, onOpenDetail }: { isHome: boolean, onOpenDetail?: () =
         <Image
           url={musicInfo.pic}
           nativeID={NAV_SHEAR_NATIVE_IDS.playDetail_pic}
-          style={{ ...styles.image, borderColor: theme['q-outline'] }}
+          style={{ ...styles.image, width: size, height: size, borderColor: theme['q-outline'] }}
           onError={handleError}
         />
       </Animated.View>

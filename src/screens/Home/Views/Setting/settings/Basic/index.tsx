@@ -15,6 +15,7 @@ import IsAllowProgressBarSeek from './IsAllowProgressBarSeek'
 import IsUseSystemFileSelector from './IsUseSystemFileSelector'
 import IsAlwaysKeepStatusbarHeight from './IsAlwaysKeepStatusbarHeight'
 import MusicAccountEntry from './MusicAccountEntry'
+import DisplayMode from './DisplayMode'
 import { useI18n } from '@/lang/i18n'
 
 export default memo(() => {
@@ -23,6 +24,7 @@ export default memo(() => {
 
   return (
     <Section title={t('setting_basic')}>
+      <DisplayMode />
       <IsStartupAutoPlay />
       <IsStartupPushPlayDetailScreen />
       <IsAutoHidePlayBar />

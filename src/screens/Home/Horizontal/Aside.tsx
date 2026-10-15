@@ -8,9 +8,10 @@ import { NAV_MENUS } from '@/config/constant'
 import type { InitState } from '@/store/common/state'
 import { exitApp, setNavActiveId } from '@/core/common'
 import { useSettingValue } from '@/store/setting/hook'
-import { Q_UI } from '@/theme/ui'
 import { useI18n } from '@/lang'
 import Button from '@/components/common/Button'
+import Text from '@/components/common/Text'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 const NAV_WIDTH = 64
 
@@ -36,18 +37,14 @@ const MenuItem = ({ id, icon, onPress }: {
   const theme = useTheme()
   const t = useI18n()
   const active = activeId == id
+  const { isCar } = useAdaptiveLayout()
   const iconContent = (
-    <View
-      style={{
-        ...styles.iconContent,
-        backgroundColor: active ? theme['c-primary-dark-100'] : 'transparent',
-      }}
-    >
+    <View style={styles.iconContent}>
       <Icon
         accessible={false}
         name={icon}
-        size={18}
-        color={active ? '#fff' : theme['q-text-secondary']}
+        size={isCar ? 25 : 22}
+        color={active ? theme['q-accent-text'] : theme['q-text-secondary']}
       />
     </View>
   )
@@ -56,21 +53,23 @@ const MenuItem = ({ id, icon, onPress }: {
     <Button
       accessibilityLabel={t(id)}
       accessibilityState={{ selected: active }}
-      style={styles.menuItem}
+      style={[styles.menuItem, { height: isCar ? 76 : 72 }]}
       onPress={() => { onPress(id) }}
     >
       <View
         style={[
           styles.activeItem,
+          { width: isCar ? 84 : 72, height: isCar ? 66 : 62 },
           active
             ? {
                 backgroundColor: theme['q-surface-tint'],
-                borderColor: theme['c-primary-alpha-700'],
+                borderColor: theme['q-outline'],
               }
             : { borderColor: 'transparent' },
         ]}
       >
         {iconContent}
+        <Text style={{ fontWeight: active ? '600' : '400' }} size={isCar ? 14 : 12} numberOfLines={1} color={active ? theme['q-accent-text'] : theme['q-text-secondary']}>{t(id)}</Text>
       </View>
     </Button>
   )
@@ -80,6 +79,8 @@ export default memo(() => {
   const theme = useTheme()
   const showBackBtn = useSettingValue('common.showBackBtn')
   const showExitBtn = useSettingValue('common.showExitBtn')
+  const { railWidth, isCar } = useAdaptiveLayout()
+  const statusBarHeight = useStatusbarHeight()
 
   const handlePress = (id: IdType) => {
     switch (id) {
@@ -105,12 +106,14 @@ export default memo(() => {
     <View
       style={{
         ...styles.container,
+        width: railWidth,
+        paddingTop: isCar ? statusBarHeight : 0,
         backgroundColor: theme['q-surface-base'],
         borderRightColor: theme['q-outline'],
       }}
     >
-      <Header />
-      <ScrollView style={styles.menus} contentContainerStyle={styles.list}>
+      {!isCar ? <Header /> : null}
+      <ScrollView style={styles.menus} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {NAV_MENUS.map(menu => (
           <MenuItem key={menu.id} id={menu.id} icon={menu.icon} onPress={handlePress} />
         ))}
@@ -155,15 +158,15 @@ const styles = createStyle({
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: Q_UI.radius.item,
   },
   activeItem: {
     width: 52,
     height: 42,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: Q_UI.radius.control,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
+    gap: 4,
   },
   footer: {
     paddingBottom: 8,

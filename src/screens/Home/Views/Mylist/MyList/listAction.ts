@@ -81,7 +81,7 @@ export const handleExport = (listInfo: LX.List.MyListInfo, path: string) => {
 export const handleSync = (listInfo: LX.List.UserListInfo) => {
   void confirmDialog({
     message: global.i18n.t('list_sync_confirm_tip', { name: listInfo.name }),
-    confirmButtonText: global.i18n.t('list_remove_tip_button'),
+    confirmButtonText: global.i18n.t('list_update_modal__update'),
   }).then(isSync => {
     if (!isSync) return
     void syncSourceList(listInfo).then(() => {

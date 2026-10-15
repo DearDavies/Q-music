@@ -4,7 +4,7 @@ import playerState from '@/store/player/state'
 import Btn from './Btn'
 
 
-export default () => {
+export default ({ iconOnly = false }: { iconOnly?: boolean }) => {
   const musicAddModalRef = useRef<MusicAddModalType>(null)
 
   const handleShowMusicAddModal = () => {
@@ -19,7 +19,7 @@ export default () => {
 
   return (
     <>
-      <Btn icon="add-music" label={global.i18n.t('mobile_collect')} accessibilityLabel={global.i18n.t('add_to')} onPress={handleShowMusicAddModal} />
+      <Btn icon="love" label={iconOnly ? undefined : global.i18n.t('mobile_collect')} accessibilityLabel={global.i18n.t('add_to')} onPress={handleShowMusicAddModal} />
       <MusicAddModal ref={musicAddModalRef} />
     </>
   )

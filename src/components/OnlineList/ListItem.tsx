@@ -10,7 +10,7 @@ import { usePlayMusicInfo } from '@/store/player/hook'
 import { createStyle, type RowInfo } from '@/utils/tools'
 import SourceLogo from '@/components/SourceLogo'
 
-export const ITEM_HEIGHT = 54
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 const useQualityTag = (musicInfo: LX.Music.MusicInfoOnline) => {
   const t = useI18n()
@@ -42,6 +42,7 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
   isShowInterval: boolean
 }) => {
   const theme = useTheme()
+  const { songRowHeight, isCar } = useAdaptiveLayout()
   const playMusicInfo = usePlayMusicInfo()
 
   const isSelected = selectedList.includes(item)
@@ -61,7 +62,7 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
   const singer = `${item.singer}${isShowAlbumName && item.meta.albumName ? ` · ${item.meta.albumName}` : ''}`
 
   return (
-    <View style={[styles.row, { width: rowInfo.rowWidth, height: ITEM_HEIGHT }]}>
+    <View style={[styles.row, { width: rowInfo.rowWidth, height: songRowHeight }]}>
       <View style={[
         styles.listItem,
         isPlaying
@@ -95,11 +96,11 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
               : <Text style={styles.sn} size={13} color={theme['q-text-secondary']}>{index + 1}</Text>
           }
           <View style={styles.itemInfo}>
-            <Text style={isPlaying ? styles.playingTitle : undefined} color={isPlaying ? theme['q-accent-text'] : theme['c-font']} numberOfLines={1}>{item.name}</Text>
+            <Text size={isCar ? 18 : 14} style={isPlaying ? styles.playingTitle : undefined} color={isPlaying ? theme['q-accent-text'] : theme['c-font']} numberOfLines={1}>{item.name}</Text>
             <View style={styles.listItemSingle}>
               { tagInfo.type ? <Badge type={tagInfo.type}>{tagInfo.text}</Badge> : null }
               { showSource ? <SourceLogo source={item.source} size={18} style={styles.sourceLogo} /> : null }
-              <Text style={styles.listItemSingleText} size={11} color={theme['q-text-secondary']} numberOfLines={1}>{singer}</Text>
+              <Text style={styles.listItemSingleText} size={isCar ? 13 : 11} color={theme['q-text-secondary']} numberOfLines={1}>{singer}</Text>
             </View>
           </View>
           {
@@ -108,7 +109,7 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
             ) : null
           }
         </Button>
-        <Button accessibilityLabel={`${item.name} · ${global.i18n.t('more_actions')}`} onPress={handleShowMenu} ref={moreButtonRef} style={styles.moreButton}>
+        <Button accessibilityLabel={`${item.name} · ${global.i18n.t('more_actions')}`} onPress={handleShowMenu} ref={moreButtonRef} style={[styles.moreButton, isCar && { width: 56, height: 64 }]}>
           <Icon accessible={false} name="dots-vertical" style={{ color: theme['q-text-secondary'] }} size={14} />
         </Button>
       </View>

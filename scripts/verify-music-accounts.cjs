@@ -305,7 +305,9 @@ if (mobile) {
     const sync = load(`${base}/playlistSync.ts`, {
       '@/store/list/state': state,
       '@/core/list': { setFetchingListStatus() {}, createList: async () => { writes++ }, overwriteListMusics: async (_id, tracks) => { writes++; saved = tracks } },
-      '@/utils/data': { setListUpdateTime: async () => {} },
+      '@/utils/data': { getListUpdateInfo: async () => ({}), setListUpdateTime: async () => {} },
+      './qqCredentials': qq,
+      './syncState': { setPlaylistSyncState() {} },
       './playlists': {
         assertPlaylistSession: async () => { if (changed) throw Error('account_changed') },
         getAccountPlaylistTracks: async () => { if (failure) throw Error(failure); return [{ id: 'song' }] },

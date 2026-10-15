@@ -1,6 +1,6 @@
 import { View } from 'react-native'
 import Button from '@/components/common/Button'
-import Text from '@/components/common/Text'
+import PlaylistIdentity, { getPlaylistLabel } from '@/components/PlaylistIdentity'
 import { Icon } from '@/components/common/Icon'
 import { createStyle } from '@/utils/tools'
 import { useTheme } from '@/store/theme/hook'
@@ -24,13 +24,12 @@ export default ({ listInfo, onPress, musicInfo, disabled = false }: {
   return (
     <View>
       <Button
-        accessibilityLabel={isExists ? `${listInfo.name}，${global.i18n.t('list_add_tip_exists')}` : listInfo.name}
+        accessibilityLabel={isExists ? `${getPlaylistLabel(listInfo)}，${global.i18n.t('list_add_tip_exists')}` : getPlaylistLabel(listInfo)}
         disabled={disabled || isExists}
         style={{ ...styles.button, backgroundColor: theme['q-surface-tint'] }}
         onPress={handlePress}
       >
-        <Icon accessible={false} name="album" rawSize={20} color={theme['q-accent-text']} />
-        <Text style={{ flex: 1 }} numberOfLines={1} size={14} color={theme['q-text-primary']}>{listInfo.name}</Text>
+        <PlaylistIdentity list={listInfo} subtitle />
         <Icon accessible={false} name={isExists ? 'check' : 'chevron-right'} rawSize={16} color={theme['q-text-secondary']} />
       </Button>
     </View>

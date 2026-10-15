@@ -11,6 +11,7 @@ import { Q_UI } from '@/theme/ui'
 import { usePlayerMusicInfo } from '@/store/player/hook'
 import GlassSurface from '@/components/common/GlassSurface'
 import { defaultHeaders } from '@/components/common/Image'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 
 export default memo(({ isHome = false, onOpenDetail }: { isHome?: boolean, onOpenDetail?: () => void }) => {
@@ -18,14 +19,15 @@ export default memo(({ isHome = false, onOpenDetail }: { isHome?: boolean, onOpe
   const { keyboardShown } = useKeyboard()
   const autoHidePlayBar = useSettingValue('common.autoHidePlayBar')
   const musicInfo = usePlayerMusicInfo()
+  const { isCar, wide } = useAdaptiveLayout()
   const [compact, setCompact] = useState(false)
   const artworkUri = musicInfo.pic?.startsWith('/') ? `file://${musicInfo.pic}` : musicInfo.pic
 
   const playerComponent = useMemo(() => (
     <GlassSurface
       radius={Q_UI.radius.miniPlayer}
-      onLayout={event => { setCompact(event.nativeEvent.layout.width < 330) }}
-      style={styles.container}
+      onLayout={event => { setCompact(event.nativeEvent.layout.width < (isCar ? 480 : wide ? 390 : 330)) }}
+      style={[styles.container, wide && styles.wideContainer]}
     >
       {artworkUri ? <Image source={{ uri: artworkUri, headers: defaultHeaders }} resizeMode="cover" blurRadius={24} style={styles.ambientArt} /> : null}
       <View style={styles.topRow}>
@@ -33,13 +35,13 @@ export default memo(({ isHome = false, onOpenDetail }: { isHome?: boolean, onOpe
         <View style={[styles.trackInfo, compact && styles.compactInfo]}>
           <Title isHome={isHome} onOpenDetail={onOpenDetail} />
         </View>
-        <View style={styles.controls}>
+        <View style={[styles.controls, wide && { width: 196 }, isCar && { width: 232 }]}>
           <ControlBtn />
         </View>
       </View>
       <PlayInfo isHome={isHome} />
     </GlassSurface>
-  ), [artworkUri, isHome, compact, onOpenDetail])
+  ), [artworkUri, isHome, compact, onOpenDetail, isCar, wide])
 
   // console.log('render pb')
 
@@ -48,6 +50,7 @@ export default memo(({ isHome = false, onOpenDetail }: { isHome?: boolean, onOpe
 
 
 const styles = StyleSheet.create({
+  wideContainer: { marginHorizontal: 20, marginBottom: 12, paddingHorizontal: 12, paddingTop: 4 },
   ambientArt: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.11,

@@ -147,6 +147,14 @@ jobs:
         working-directory: mobile
         run: npm run test:accounts
 
+      - name: Verify QQ favorites and playlist synchronization
+        working-directory: mobile
+        run: npm run test:qq-sync
+
+      - name: Verify adaptive layouts
+        working-directory: mobile
+        run: npm run test:adaptive
+
       - name: Verify background playback and lyrics
         working-directory: mobile
         run: npm run test:background

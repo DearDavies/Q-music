@@ -9,7 +9,7 @@ import { createStyle } from '@/utils/tools'
 import { LIST_SCROLL_POSITION_KEY } from '@/config/constant'
 import { getListPosition, saveListPosition } from '@/utils/data'
 import { setActiveList } from '@/core/list'
-import Text from '@/components/common/Text'
+import PlaylistIdentity, { getPlaylistLabel } from '@/components/PlaylistIdentity'
 import { type Position } from './ListMenu'
 import { scaleSizeH } from '@/utils/pixelRatio'
 import Loading from '@/components/common/Loading'
@@ -18,7 +18,7 @@ import { useDockInset } from '@/components/common/DockInset'
 
 type FlatListType = FlatListProps<LX.List.MyListInfo>
 
-const ITEM_HEIGHT = scaleSizeH(48)
+const ITEM_HEIGHT = scaleSizeH(62)
 
 const ListItem = memo(({ item, index, activeId, onPress, onShowMenu }: {
   onPress: (item: LX.List.MyListInfo) => void
@@ -47,23 +47,19 @@ const ListItem = memo(({ item, index, activeId, onPress, onShowMenu }: {
   }
 
   return (
-    <View style={{ ...styles.listItem, height: ITEM_HEIGHT }}>
-      {
-        active
-          ? <Icon style={styles.listActiveIcon} name="chevron-right" size={12} color={theme['c-primary-font']} />
-          : null
-      }
-      { fetching ? <Loading color={active ? theme['c-primary-font'] : theme['c-font']} style={styles.loading} /> : null }
+    <View style={{ ...styles.listItem, height: ITEM_HEIGHT, backgroundColor: active ? theme['q-surface-tint'] : 'transparent', borderRadius: 14, marginHorizontal: 8 }}>
+      {active ? <View style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 3, borderRadius: 2, backgroundColor: theme['q-accent'] }} /> : null}
       <Button
-        accessibilityLabel={item.name}
+        accessibilityLabel={getPlaylistLabel(item)}
         accessibilityState={{ selected: active }}
         style={styles.listName}
         onPress={handlePress}
       >
-        <Text numberOfLines={1} color={active ? theme['c-primary-font'] : theme['c-font']}>{item.name}</Text>
+        <PlaylistIdentity list={item} subtitle={'source' in item} active={active} />
       </Button>
+      {fetching ? <Loading color={theme['q-accent-text']} style={styles.loading} /> : null}
       <Button
-        accessibilityLabel={`${item.name} menu`}
+        accessibilityLabel={`${getPlaylistLabel(item)} menu`}
         accessibilityHint="Show list actions"
         onPress={handleShowMenu}
         ref={moreButtonRef}
@@ -152,8 +148,7 @@ export default ({ onShowMenu }: {
 
 const styles = createStyle({
   container: {
-    flexShrink: 1,
-    flexGrow: 0,
+    flex: 1,
   },
   // listContainer: {
   //   // borderBottomWidth: BorderWidths.normal2,
@@ -185,7 +180,7 @@ const styles = createStyle({
     justifyContent: 'center',
     flexGrow: 1,
     flexShrink: 1,
-    paddingLeft: 5,
+    paddingLeft: 10,
     // backgroundColor: 'rgba(0,0,0,0.1)',
   },
   // listNameText: {

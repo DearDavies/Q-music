@@ -7,7 +7,8 @@ import playerState from '@/store/player/state'
 import { getListPosition, getListPrevSelectId, saveListPosition } from '@/utils/data'
 // import { useMusicList } from '@/store/list/hook'
 import { getListMusics, setActiveList } from '@/core/list'
-import ListItem, { ITEM_HEIGHT } from './ListItem'
+import ListItem from './ListItem'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 import { createStyle, getRowInfo } from '@/utils/tools'
 import { usePlayInfo, usePlayMusicInfo } from '@/store/player/hook'
 import type { Position } from './ListMenu'
@@ -54,6 +55,7 @@ const usePlayIndex = () => {
 const List = forwardRef<ListType, ListProps>(({ onShowMenu, onMuiltSelectMode, onSelectAll }, ref) => {
   const t = useI18n()
   const dockInset = useDockInset()
+  const { songRowHeight } = useAdaptiveLayout()
   const theme = useTheme()
   const [loaded, setLoaded] = useState(false)
   const flatListRef = useRef<FlatList>(null)
@@ -284,11 +286,12 @@ const List = forwardRef<ListType, ListProps>(({ onShowMenu, onMuiltSelectMode, o
   )
   const getkey: FlatListType['keyExtractor'] = item => item.id
   const getItemLayout: FlatListType['getItemLayout'] = (data, index) => {
-    return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
+    return { length: songRowHeight, offset: songRowHeight * index, index }
   }
 
   return (
     <FlatList
+      key={songRowHeight}
       ref={flatListRef}
       onScroll={handleScroll}
       style={styles.list}

@@ -13,6 +13,7 @@ import DailyRecommend from './DailyRecommend'
 import { useDockInset } from '@/components/common/DockInset'
 import { pushMusicAccountScreen } from '@/navigation/navigation'
 import commonState from '@/store/common/state'
+import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 interface BlankViewProps {
   onSearch: (keyword: string) => void
@@ -31,6 +32,8 @@ export default forwardRef<BlankViewType, BlankViewProps>(({ onSearch }, ref) => 
   const t = useI18n()
   const theme = useTheme()
   const dockInset = useDockInset()
+  const { wide, width, railWidth } = useAdaptiveLayout()
+  const inlineWelcome = wide && width - railWidth >= 680
 
   const handleShow = useCallback(() => {
     hotSearchRef.current?.show(sourceRef.current)
@@ -53,10 +56,12 @@ export default forwardRef<BlankViewType, BlankViewProps>(({ onSearch }, ref) => 
   return (
     visible
       ? (
-          <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + dockInset }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[styles.scrollContent, wide && styles.wideContent, { paddingBottom: 32 + dockInset }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={inlineWelcome && styles.welcomeRow}>
             <View
               style={{
                 ...styles.welcomeCard,
+                ...(inlineWelcome ? { flex: 1, marginBottom: 0 } : {}),
               }}
             >
               <View style={styles.welcomeCopy}>
@@ -65,7 +70,7 @@ export default forwardRef<BlankViewType, BlankViewProps>(({ onSearch }, ref) => 
                 <Text style={styles.welcomeSubtitle} size={13} color={theme['q-text-secondary']}>{t('search_welcome_subtitle')}</Text>
               </View>
             </View>
-            <View style={styles.shortcuts}>
+            <View style={[styles.shortcuts, inlineWelcome && styles.inlineShortcuts]}>
               {([
                 { id: 'nav_love', icon: 'love' },
                 { id: 'nav_top', icon: 'leaderboard' },
@@ -81,6 +86,7 @@ export default forwardRef<BlankViewType, BlankViewProps>(({ onSearch }, ref) => 
                 <Text size={12} color={theme['q-text-primary']}>{t('account_lists_entry')}</Text>
               </Button>
             </View>
+            </View>
             <View style={styles.content}>
               { isShowHotSearch ? <HotSearch ref={hotSearchRef} onSearch={onSearch} /> : null }
               <DailyRecommend />
@@ -94,6 +100,9 @@ export default forwardRef<BlankViewType, BlankViewProps>(({ onSearch }, ref) => 
 
 
 const styles = createStyle({
+  wideContent: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 24 },
+  welcomeRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 18 },
+  inlineShortcuts: { width: '52%', maxWidth: 460, marginBottom: 0 },
   scrollContent: {
     paddingTop: 6,
     paddingBottom: 32,

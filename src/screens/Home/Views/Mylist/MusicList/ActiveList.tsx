@@ -9,6 +9,7 @@ import { createStyle } from '@/utils/tools'
 import { getListPrevSelectId } from '@/utils/data'
 import { setActiveList } from '@/core/list'
 import Text from '@/components/common/Text'
+import PlaylistIdentity from '@/components/PlaylistIdentity'
 import { LIST_IDS } from '@/config/constant'
 import Loading from '@/components/common/Loading'
 import { useSettingValue } from '@/store/setting/hook'
@@ -31,6 +32,7 @@ export default forwardRef<ActiveListType, ActiveListProps>(({ onShowImport, onSh
   const currentListId = useActiveListId()
   const lists = useMyList()
   const fetching = useListFetching(currentListId)
+  const currentList = lists.find(list => list.id == currentListId)
   const langId = useSettingValue('common.langId')
   const { width } = useWindowSize()
   const fontSize = useFontSize()
@@ -80,7 +82,7 @@ export default forwardRef<ActiveListType, ActiveListProps>(({ onShowImport, onSh
       >
         <Icon accessible={false} style={styles.currentListIcon} color={theme['q-text-secondary']} name="menu" size={17} />
         { fetching ? <Loading color={theme['q-accent-text']} style={styles.loading} /> : null }
-        <Text style={styles.currentListText} numberOfLines={1} color={theme['q-text-primary']}>{currentListName}</Text>
+        {currentList ? <PlaylistIdentity list={currentList} name={currentListName} /> : <Text style={styles.currentListText} numberOfLines={1} color={theme['q-text-primary']}>{currentListName}</Text>}
       </Button>
       <Button
         accessibilityLabel={global.i18n.t('playlist_import_modal__title')}

@@ -75,6 +75,7 @@ declare global {
        * 总是保留状态栏高度
        */
       'common.alwaysKeepStatusbarHeight': boolean
+      'common.displayMode': 'auto' | 'phone' | 'tablet' | 'car'
 
       /**
        * 主题id
@@ -225,6 +226,7 @@ declare global {
        * 播放详情页-歌词对齐方式
        */
       'playDetail.style.align': 'center' | 'left' | 'right'
+      'playDetail.style.layout': 'classic' | 'immersive'
 
       /**
        * 竖屏歌词字体大小

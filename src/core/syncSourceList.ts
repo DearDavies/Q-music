@@ -1,5 +1,5 @@
 // import { dateFormat } from '@/utils/common'
-import { setListUpdateTime } from '@/utils/data'
+import { getListUpdateInfo, setListUpdateTime } from '@/utils/data'
 import { overwriteListMusics, setFetchingListStatus } from './list'
 import { getListDetailAll } from '@/core/songlist'
 import { getListDetailAll as getBoardListAll } from '@/core/leaderboard'
@@ -21,14 +21,16 @@ const fetchList = async(id: string, source: LX.OnlineSource, sourceListId: strin
   })
 }
 
-export default async(targetListInfo: LX.List.UserListInfo) => {
+const performSync = async(targetListInfo: LX.List.UserListInfo, automatic = false) => {
   // console.log(targetListInfo)
   if (!targetListInfo.source || !targetListInfo.sourceListId) return
+  const settings = (await getListUpdateInfo())[targetListInfo.id]
+  if (automatic && (!settings?.isAutoUpdate || !settings.sourceAccountId)) return
   const account = parseAccountSourceId(targetListInfo.sourceListId)
   if (account && (targetListInfo.source == 'tx' || targetListInfo.source == 'wy' || targetListInfo.source == 'kg')) {
     const session = await openPlaylistSession(targetListInfo.source)
     if (session.owner != account.owner) throw new Error('account_changed')
-    await syncAccountPlaylist(session, { id: account.id, name: targetListInfo.name }, undefined, targetListInfo)
+    await syncAccountPlaylist(session, { id: account.id, name: targetListInfo.name }, undefined, targetListInfo, automatic)
     return
   }
   const list = await fetchList(targetListInfo.id, targetListInfo.source, targetListInfo.sourceListId)
@@ -38,4 +40,16 @@ export default async(targetListInfo: LX.List.UserListInfo) => {
   await setListUpdateTime(targetListInfo.id, now)
   // TODO
   // setUpdateTime(targetListInfo.id, dateFormat(now))
+}
+
+const pending = new Map<string, Promise<void>>()
+export const waitForSourceListSync = async(id: string) => {
+  await pending.get(id)?.catch(() => {})
+}
+export default async(target: LX.List.UserListInfo, automatic = false) => {
+  const running = pending.get(target.id)
+  if (running) return running
+  const task = performSync({ ...target }, automatic).finally(() => { pending.delete(target.id) })
+  pending.set(target.id, task)
+  return task
 }

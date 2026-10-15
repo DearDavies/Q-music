@@ -8,6 +8,7 @@ export const LOGIN_URLS = {
 } as const
 
 // 通过 QQ 音乐官方回调在当前 WebView 写入微信账号 Cookie，不跳到外部浏览器。
+// appid 是 QQ 音乐公开的微信 OAuth 应用标识，不是 App Secret，也不是用户的密钥。
 const wechatRedirect = 'https://y.qq.com/portal/wx_redirect.html?login_type=2&surl=https://y.qq.com/'
 export const QQ_WECHAT_LOGIN_URL = `https://open.weixin.qq.com/connect/qrconnect?appid=wx48db31d50e334801&redirect_uri=${encodeURIComponent(wechatRedirect)}&response_type=code&scope=snsapi_login&state=STATE`
 

@@ -133,7 +133,7 @@ export const getAccountPlaylists = async(session: PlaylistSession, signal?: Abor
   return fail('incomplete')
 }
 
-export const getAccountPlaylistTracks = async(session: PlaylistSession, id: string, signal?: AbortSignal): Promise<LX.Music.MusicInfoOnline[]> => {
+export const getAccountPlaylistTracks = async(session: PlaylistSession, id: string, signal?: AbortSignal, progress?: (current: number, total: number) => void): Promise<LX.Music.MusicInfoOnline[]> => {
   if (!/^(?:dir:)?\d+$/.test(id)) fail()
   const tracks: LX.Music.MusicInfoOnline[] = []
   if (session.provider == 'kg') {
@@ -144,6 +144,7 @@ export const getAccountPlaylistTracks = async(session: PlaylistSession, id: stri
       const group = hashes.slice(offset, offset + 100)
       const details = await kgSongList.getMusicInfos(group.map(hash => ({ hash })), { requireComplete: true, shouldCancel: () => !!signal?.aborted })
       tracks.push(...details.map((item: unknown) => toNewMusicInfo(item) as LX.Music.MusicInfoOnline))
+      progress?.(tracks.length, hashes.length)
     }
     await assertPlaylistSession(session)
     return tracks
@@ -164,6 +165,7 @@ export const getAccountPlaylistTracks = async(session: PlaylistSession, id: stri
       // 权限和歌曲必须按 ID 对齐，不能将缺失权限静默当成空歌单。
       const privileges = songs.map(song => detail.privileges.find((item: Row) => String(item.id) == String(song.id)) ?? fail('incomplete'))
       tracks.push(...wySongList.filterListDetail({ playlist: { tracks: songs }, privileges }).map((song: unknown) => toNewMusicInfo(song) as LX.Music.MusicInfoOnline))
+      progress?.(tracks.length, ids.length)
     }
     if (tracks.length != ids.length) fail('incomplete')
     return tracks
@@ -188,9 +190,11 @@ export const getAccountPlaylistTracks = async(session: PlaylistSession, id: stri
     }
     const formatted: unknown[] = qqSongList.filterListDetail(songs)
     tracks.push(...formatted.map(song => toNewMusicInfo(song) as LX.Music.MusicInfoOnline))
+    if (formatted.length != rows.length) fail('incomplete')
     offset += rows.length
+    progress?.(tracks.length, expected ?? 0)
     if (expected != null && offset >= expected) {
-      if (offset != expected) fail('incomplete')
+      if (offset != expected || more(data.hasmore)) fail('incomplete')
       return tracks
     }
     const ended = data.hasmore != null && !more(data.hasmore)

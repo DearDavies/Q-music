@@ -58,6 +58,7 @@ const outlineIcons: Record<string, string> = {
   'lyric-off': 'align-left',
   music_time: 'clock',
   add_folder: 'folder-plus',
+  add: 'plus',
   'thumbs-up': 'thumbs-up',
 }
 const solidIcons: Record<string, string> = {
