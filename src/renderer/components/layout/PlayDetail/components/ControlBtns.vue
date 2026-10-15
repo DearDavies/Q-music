@@ -44,17 +44,20 @@ div(:class="[$style.footerLeftControlBtns, { [$style.detail]: detail }]")
   common-toggle-play-mode-btn
   span(:class="$style.toolDivider" aria-hidden="true")
   button(
-    :class="[$style.footerLeftControlBtn, $style.loveBtn, { [$style.loved]: isLoveMusic, [$style.pending]: isTogglingLove }]"
-    :aria-label="isLoveMusic ? $t('setting__hot_key_player_music_unlove') : $t('setting__hot_key_player_music_love')"
+    :class="[$style.footerLeftControlBtn, $style.loveBtn, { [$style.loved]: isLoveMusic, [$style.active]: favoriteMenuVisible }]"
+    :aria-label="$t('player_favorite_title')"
+    :aria-expanded="favoriteMenuVisible"
+    aria-haspopup="dialog"
     :disabled="isLoveDisabled"
-    @click="toggleLoveMusic"
+    @click.stop="showFavoriteMenu"
     @contextmenu.prevent="showAddMusicTo"
   )
     svg(viewBox="0 0 24 24" aria-hidden="true")
       path(:class="$style.heartFill" d="M12 20s-7-4.2-7-9a4 4 0 0 1 7-2.7A4 4 0 0 1 19 11c0 4.8-7 9-7 9z")
       path(v-if="!isLoveMusic" d="M18 17v4")
       path(v-if="!isLoveMusic" d="M16 19h4")
-  common-list-add-modal(v-model:show="isShowAddMusicTo" :music-info="currentMusicInfo")
+  PlayerFavoriteMenu(v-if="favoriteMenuVisible" ref="favoriteMenu" :music-info="favoriteMusicInfo" :dark="detail" :anchor="favoriteMenuAnchor" @close="closeFavoriteMenu" @more="showFavoriteLists")
+  common-list-add-modal(v-model:show="isShowAddMusicTo" :music-info="listMusicInfo")
   PlayerAppearanceMenu(
     v-model="appearanceMenuVisible"
     :dark="detail"
@@ -97,13 +100,14 @@ import { dialog } from '@renderer/plugins/Dialog'
 import { getCurrentTime, onCanplay, setCurrentTime, setMediaDeviceId, setPause, setPlay } from '@renderer/plugins/player'
 import { setMusicUrl } from '@renderer/core/player/action'
 import { appSetting, saveMediaDeviceId, updateSetting } from '@renderer/store/setting'
-import { addListMusics, checkListExistMusic, removeListMusics } from '@renderer/store/list/action'
+import { checkListExistMusic } from '@renderer/store/list/action'
 import { loveList } from '@renderer/store/list/state'
 import PlayerAppearanceMenu from './PlayerAppearanceMenu.vue'
 import PlayerQualityMenu from './PlayerQualityMenu.vue'
+import PlayerFavoriteMenu from './PlayerFavoriteMenu.vue'
 
 export default {
-  components: { PlayerAppearanceMenu, PlayerQualityMenu },
+  components: { PlayerAppearanceMenu, PlayerQualityMenu, PlayerFavoriteMenu },
   props: {
     detail: Boolean,
   },
@@ -141,7 +145,12 @@ export default {
     const appearanceMenuAnchor = ref(null)
     const qualityMenuAnchor = ref(null)
     const isLoveMusic = ref(false)
-    const isTogglingLove = ref(false)
+    const favoriteMenu = ref(null)
+    const favoriteMenuVisible = ref(false)
+    const favoriteMenuAnchor = ref(null)
+    const favoriteMusicInfo = ref(null)
+    const listMusicInfo = ref(null)
+    let favoriteTrigger = null
     let loveCheckId = 0
     let cancelQualityResume = null
     let qualityResumeTimeout = null
@@ -151,7 +160,7 @@ export default {
       if (!info) return null
       return 'progress' in info ? info.metadata.musicInfo : info
     })
-    const isLoveDisabled = computed(() => !currentMusicInfo.value || isTogglingLove.value)
+    const isLoveDisabled = computed(() => !currentMusicInfo.value)
 
     const refreshLoveStatus = async() => {
       const musicInfo = currentMusicInfo.value
@@ -166,29 +175,32 @@ export default {
       isLoveMusic.value = status
     }
 
-    const toggleLoveMusic = async() => {
-      const musicInfo = currentMusicInfo.value
-      if (!musicInfo || isTogglingLove.value) return
-
-      const nextStatus = !isLoveMusic.value
-      isTogglingLove.value = true
-      isLoveMusic.value = nextStatus
-      try {
-        if (nextStatus) {
-          await addListMusics(loveList.id, [musicInfo])
-        } else {
-          await removeListMusics({ listId: loveList.id, ids: [musicInfo.id] })
-        }
-        await refreshLoveStatus()
-      } catch (_) {
-        isLoveMusic.value = !nextStatus
-      } finally {
-        isTogglingLove.value = false
-      }
+    const closeFavoriteMenu = (restoreFocus = true) => {
+      if (favoriteMenu.value?.busy) return
+      favoriteMenuVisible.value = false
+      if (restoreFocus) favoriteTrigger?.focus()
     }
-
-    const showAddMusicTo = () => {
+    const showFavoriteMenu = event => {
       if (!currentMusicInfo.value) return
+      if (favoriteMenuVisible.value) { closeFavoriteMenu(); return }
+      appearanceMenuVisible.value = false
+      qualityMenuVisible.value = false
+      favoriteTrigger = event.currentTarget
+      const rect = favoriteTrigger.getBoundingClientRect()
+      favoriteMenuAnchor.value = { x: rect.left + rect.width / 2, y: rect.top }
+      // 面板固定本次选择的歌曲，自动切歌时不会把收藏写到另一首。
+      favoriteMusicInfo.value = currentMusicInfo.value
+      favoriteMenuVisible.value = true
+    }
+    const showFavoriteLists = () => {
+      listMusicInfo.value = favoriteMusicInfo.value
+      closeFavoriteMenu()
+      isShowAddMusicTo.value = true
+    }
+    const showAddMusicTo = () => {
+      if (!currentMusicInfo.value || favoriteMenu.value?.busy) return
+      closeFavoriteMenu()
+      listMusicInfo.value = currentMusicInfo.value
       isShowAddMusicTo.value = true
     }
 
@@ -338,8 +350,14 @@ export default {
       currentMusicInfo,
       isLoveMusic,
       isLoveDisabled,
-      isTogglingLove,
-      toggleLoveMusic,
+      favoriteMenu,
+      favoriteMenuVisible,
+      favoriteMenuAnchor,
+      favoriteMusicInfo,
+      listMusicInfo,
+      showFavoriteMenu,
+      closeFavoriteMenu,
+      showFavoriteLists,
       showAddMusicTo,
     }
   },
@@ -460,9 +478,6 @@ export default {
       }
     }
 
-    &.pending {
-      pointer-events: none;
-    }
   }
 
   .lrcBtn {

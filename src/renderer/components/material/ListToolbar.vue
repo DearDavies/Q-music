@@ -1,5 +1,6 @@
 <template>
   <div :class="$style.toolbar">
+    <slot name="heading" />
     <span :class="[$style.count, { [$style.selected]: selectedCount }]" role="status">
       {{ $t(selectedCount ? 'list__selected_count' : pageOnly ? 'list__page_count' : 'list__count', { count: selectedCount || count }) }}
     </span>

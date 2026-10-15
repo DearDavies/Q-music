@@ -90,14 +90,16 @@ const saveListUpdateInfo = throttle(() => {
   saveListUpdateInfoFromData(listUpdateInfo)
 }, 1000)
 
+let listUpdateInfoInit: Promise<void> | undefined
 const initListUpdateInfo = async() => {
-  if (listUpdateInfo == null) {
-    // eslint-disable-next-line require-atomic-updates
-    listUpdateInfo = await getListUpdateInfoFromData() ?? {}
+  if (listUpdateInfo != null) return
+  listUpdateInfoInit ??= getListUpdateInfoFromData().then(info => {
+    listUpdateInfo = info ?? {}
     for (const [id, info] of Object.entries(listUpdateInfo)) {
       setUpdateTime(id, info.updateTime ? dateFormat(info.updateTime) : '')
     }
-  }
+  }).finally(() => { listUpdateInfoInit = undefined })
+  await listUpdateInfoInit
 }
 export const getListUpdateInfo = async() => {
   await initListUpdateInfo()
@@ -115,11 +117,19 @@ export const setListAutoUpdate = async(id: string, enable: boolean) => {
   listUpdateInfo[id] = targetInfo
   saveListUpdateInfo()
 }
+export const setListSourceAccount = async(id: string, accountId: string) => {
+  await initListUpdateInfo()
+  const targetInfo = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }
+  targetInfo.sourceAccountId = accountId
+  listUpdateInfo[id] = targetInfo
+  saveListUpdateInfo()
+}
 export const setListUpdateTime = async(id: string, time: number) => {
   await initListUpdateInfo()
   const targetInfo = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }
   targetInfo.updateTime = time
   listUpdateInfo[id] = targetInfo
+  setUpdateTime(id, dateFormat(time))
   saveListUpdateInfo()
 }
 // export const setListUpdateInfo = (id, { updateTime, isAutoUpdate }) => {

@@ -3,18 +3,24 @@
     <div :class="$style.header">
       <h2>{{ $t('list_update_modal__title') }}</h2>
     </div>
+    <div :class="$style.toolbar">
+      <base-btn :disabled="batchWorking || !qqLists.length" @click="syncQQLists">{{ $t(batchWorking ? 'list_sync_working' : 'list_sync_all_qq') }}</base-btn>
+      <span v-if="batchTotal" role="status">{{ $t(batchWorking ? 'list_sync_batch_progress' : 'list_sync_batch_done', { current: batchCurrent, total: batchTotal, failed: batchFailed }) }}</span>
+    </div>
     <main class="scroll" :class="$style.main">
       <ul v-if="lists.length" ref="dom_list" :class="$style.list">
         <li v-for="list in lists" :key="list.id" :class="[$style.listItem, {[$style.fetching]: fetchingListStatus[list.id]}]">
           <div :class="$style.listLeft">
-            <h3 :class="$style.text">{{ list.name }} <span :class="$style.label">{{ list.source }}</span></h3>
+            <h3 :class="$style.text"><SourceIcon :source="list.source" :size="18" /> {{ list.name }}</h3>
             <div>
               <base-checkbox
                 :id="`list_auto_update_${list.id}`" :model-value="updateInfo[list.id]?.isAutoUpdate == true"
                 :class="$style.checkbox" :label="$t('list_update_modal__auto_update')" @change="handleChangeAutoUpdate(list, $event)"
               />
-              <span :class="$style.label" style="vertical-align: text-top;">{{ listUpdateTimes[list.id] }}</span>
+              <span :class="$style.label" style="vertical-align: text-top;">{{ listUpdateTimes[list.id] || $t('list_sync_never') }}</span>
             </div>
+            <p v-if="listSyncStates[list.id]" role="status" :class="$style.status">{{ syncStatus(list.id) }}</p>
+            <p v-else-if="isQQSyncList(list) && !updateInfo[list.id]?.sourceAccountId" :class="$style.status">{{ $t('list_sync_binding_required') }}</p>
           </div>
           <div :class="$style.btns">
             <button :class="$style.btn" :disabled="fetchingListStatus[list.id]" outline="outline" :aria-label="$t('list_update_modal__update')" @click.stop="handleUpdate(list)">
@@ -36,57 +42,79 @@
 </template>
 
 <script>
-import { computed, ref } from '@common/utils/vueTools'
+import { computed, ref, watch } from '@common/utils/vueTools'
 import { userLists, fetchingListStatus, listUpdateTimes } from '@renderer/store/list/state'
-import handleSyncSourceList from '@renderer/store/list/syncSourceList'
+import handleSyncSourceList, { isQQSyncList, listSyncStates } from '@renderer/store/list/syncSourceList'
 import musicSdk from '@renderer/utils/musicSdk'
-// import { dateFormat } from '@common/utils/renderer'
 import { getListUpdateInfo, setListAutoUpdate } from '@renderer/utils/data'
+import SourceIcon from '@renderer/components/common/SourceIcon.vue'
+import { useI18n } from '@renderer/plugins/i18n'
+import { dialog } from '@renderer/plugins/Dialog'
 
 export default {
-  props: {
-    visible: {
-      type: Boolean,
-      default: false,
-    },
-  },
+  components: { SourceIcon },
+  props: { visible: { type: Boolean, default: false } },
   emits: ['update:visible'],
-  setup() {
+  setup(props) {
+    const t = useI18n()
     const lists = computed(() => userLists.filter(l => !!l.source && !!musicSdk[l.source]?.songList))
+    const qqLists = computed(() => lists.value.filter(isQQSyncList))
     const updateInfo = ref({})
-    // const updateTimes = ref({})
-
-    void getListUpdateInfo().then((listUpdateInfo) => {
-      updateInfo.value = listUpdateInfo
-      // if (listUpdateTimes._inited) {
-      //   for (const [id, value] of Object.entries(info)) {
-      //     autoUpdate[id] = value.isAutoUpdate == true
-      //   }
-      // } else {
-      //   for (const [id, value] of Object.entries(info)) {
-      //     autoUpdate[id] = value.isAutoUpdate == true
-      //     listUpdateTimes[id] = value.updateTime ? dateFormat(value.updateTime) : ''
-      //   }
-      // }
-      // listUpdateTimes._inited = true
-    })
-
-    const handleUpdate = (targetListInfo) => {
-      void handleSyncSourceList(targetListInfo)
-      // console.log(targetListInfo.list.length, list.length)
+    const refreshSettings = async() => { updateInfo.value = structuredClone(await getListUpdateInfo()) }
+    watch(() => props.visible, visible => {
+      if (visible) void refreshSettings().catch(() => { void dialog(t('list_sync_failed')) })
+    }, { immediate: true })
+    const batchWorking = ref(false)
+    const batchCurrent = ref(0)
+    const batchTotal = ref(0)
+    const batchFailed = ref(0)
+    const handleUpdate = async(targetListInfo) => {
+      try {
+        const updated = await handleSyncSourceList(targetListInfo)
+        await refreshSettings()
+        return updated
+      } catch { return false }
     }
-
-    const handleChangeAutoUpdate = (list, enable) => {
-      void setListAutoUpdate(list.id, enable)
+    const syncQQLists = async() => {
+      if (batchWorking.value) return
+      const targets = [...qqLists.value]
+      batchWorking.value = true
+      batchTotal.value = targets.length
+      batchCurrent.value = batchFailed.value = 0
+      try {
+        for (const list of targets) {
+          if (!await handleUpdate(list)) batchFailed.value++
+          batchCurrent.value++
+        }
+      } finally { batchWorking.value = false }
     }
-
+    const handleChangeAutoUpdate = async(list, enable) => {
+      try {
+        await setListAutoUpdate(list.id, enable)
+        await refreshSettings()
+      } catch { void dialog(t('list_sync_failed')) }
+    }
+    const syncStatus = id => {
+      const state = listSyncStates[id]
+      if (state.phase == 'fetch' && !state.total) return t('list_sync_working')
+      return t(state.phase == 'error' ? state.error : `list_sync_${state.phase}`, { current: state.current, total: state.total })
+    }
     return {
       lists,
       updateInfo,
       fetchingListStatus,
+      listUpdateTimes,
       handleUpdate,
       handleChangeAutoUpdate,
-      listUpdateTimes,
+      qqLists,
+      batchWorking,
+      batchCurrent,
+      batchTotal,
+      batchFailed,
+      syncQQLists,
+      listSyncStates,
+      syncStatus,
+      isQQSyncList,
     }
   },
 }
@@ -105,9 +133,11 @@ export default {
     word-break: break-all;
   }
 }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 0 15px 12px; font-size: 12px; }
+.status { font-size: 12px; line-height: 1.5; margin-top: 6px; color: var(--color-font-label); overflow-wrap: anywhere; }
 .main {
   min-height: 115px;
-  width: @width;
+  width: min(@width, 85vw);
 }
 
 .list {
@@ -152,6 +182,7 @@ export default {
   flex: auto;
   margin-bottom: 2px;
   .mixin-ellipsis-1();
+  > span { vertical-align: middle; margin-right: 4px; }
 }
 .checkbox {
   margin-top: 3px;
@@ -205,7 +236,7 @@ export default {
 }
 
 .footer {
-  width: @width;
+  width: min(@width, 85vw);
 }
 .tips {
   padding: 8px 15px;

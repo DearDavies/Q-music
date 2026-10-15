@@ -12,7 +12,9 @@
       :download-visible="appSetting['download.enable']" :download-enabled="canDownloadSelection"
       @play="handlePlayMusic(0)" @select-all="handleSelectAllData" @clear="removeAllSelect"
       @add="handleShowMusicAddModal(0)" @download="handleShowDownloadModal(0)"
-    />
+    >
+      <template #heading><span v-if="currentPlaylist" :class="$style.playlistHeading"><PlaylistIdentity :list="currentPlaylist" :name="['default', 'love'].includes(currentPlaylist.id) ? $t(currentPlaylist.name) : currentPlaylist.name" /></span></template>
+    </material-list-toolbar>
     <div class="thead">
       <table>
         <thead>
@@ -139,11 +141,14 @@ import useMusicToggle from './useMusicToggle'
 import { appSetting } from '@renderer/store/setting'
 import { useRoute, useRouter } from '@common/utils/vueRouter'
 import { computed } from '@common/utils/vueTools'
+import { userLists, defaultList, loveList } from '@renderer/store/list/state'
+import PlaylistIdentity from '@renderer/components/common/PlaylistIdentity.vue'
 import { isPlay, playMusicInfo } from '@renderer/store/player/state'
 import { togglePlay } from '@renderer/core/player'
 export default {
   name: 'MusicList',
   components: {
+    PlaylistIdentity,
     SourceIcon,
     SearchList,
     MusicSortModal,
@@ -157,6 +162,7 @@ export default {
   },
   emits: ['show-menu'],
   setup(props, { emit }) {
+    const currentPlaylist = computed(() => [...userLists, defaultList, loveList].find(list => list.id == props.listId))
     const route = useRoute()
     const router = useRouter()
     const returnToCloud = () => { void router.push({ path: '/setting', query: { name: 'SettingSync', section: 'cloud-library' } }) }
@@ -332,6 +338,7 @@ export default {
     }
 
     return {
+      currentPlaylist,
       route,
       returnToCloud,
       closeImportResult,
@@ -404,6 +411,7 @@ export default {
 
 
 <style lang="less" module>
+.playlistHeading { flex: 1; min-width: 100px; max-width: min(280px, 50%); font-size: 13px; font-weight: 600; }
 @import '@renderer/assets/styles/layout.less';
 @import '@renderer/assets/styles/listColumns.less';
 

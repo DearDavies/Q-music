@@ -3,7 +3,10 @@ import { getProxy } from '@main/utils'
 import { allowOfficialNavigation, setWindowNavigationPolicy } from '@main/utils/navigationPolicy'
 import getStore from '@main/utils/store'
 import { constants, createCipheriv, createHash, publicEncrypt, randomBytes } from 'node:crypto'
-import { getQQCredentials, getQQRequestComm } from '@common/utils/qqCredentials'
+import { getQQCredentials, getQQRequestComm, getQQWebRequestComm } from '@common/utils/qqCredentials'
+import { signQQRequest } from '@common/utils/qqSign'
+import { collectQQPlaylistIds } from '@common/utils/qqPlaylist'
+import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
 import { closeOfficialAccountLogin, openOfficialAccountLogin } from './officialAccountLogin'
 import { fitAccountLoginWindow, getAccountLoginBounds } from './accountLoginLayout'
 import { getKugouDailyHashes, getKugouPlaylistHashes, getKugouPlaylists, logoutKugou, openKugouLogin, readKugouSession } from './kugouAccount'
@@ -55,6 +58,7 @@ export interface QQDailyKeySaveResult extends QQDailyKeyStatus {
 }
 
 export interface MusicAccountPlaylist {
+  accountId?: string
   id: string
   name: string
   cover: string
@@ -70,6 +74,7 @@ export interface MusicAccountPlaylistsResult {
 }
 
 export interface MusicAccountPlaylistDetailResult {
+  accountId?: string
   provider: MusicAccountProvider
   id: string
   ids: string[]
@@ -273,7 +278,7 @@ class QQMusicURequestError extends Error {
 }
 
 const parseQQMusicCode = (value: unknown): number | undefined => {
-  if (value == null || value === '') return undefined
+  if ((typeof value != 'number' && typeof value != 'string') || (typeof value == 'string' && !value.trim())) return undefined
   const code = Number(value)
   return Number.isFinite(code) ? code : undefined
 }
@@ -288,19 +293,28 @@ const isQQMusicLoginRequiredError = (error: unknown) => {
   return error instanceof QQMusicURequestError && error.reason == 'login_required'
 }
 
-const requestQQMusicU = async<T extends object>(requests: Record<string, unknown>, signal?: AbortSignal): Promise<T> => {
+const requestQQMusicU = async<T extends object>(requests: Record<string, unknown>, signal?: AbortSignal, expectedAccount?: string, web = false): Promise<T> => {
   const { accountSession, cookies } = await getQQAccountCredentials()
-  const response = await accountSession.fetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
+  if (expectedAccount && qqAccountIdentity(cookies) != expectedAccount) throw new Error('account_changed')
+  const requestCookies = web
+    ? Object.fromEntries((await accountSession.cookies.get({ url: 'https://u.y.qq.com/' })).map(cookie => [cookie.name.toLowerCase(), cookie.value]))
+    : cookies
+  if (web && expectedAccount && qqAccountIdentity(requestCookies) != expectedAccount) throw new Error('account_changed')
+  const body = JSON.stringify({ comm: web ? getQQWebRequestComm(requestCookies) : getQQRequestComm(requestCookies), ...requests })
+  const url = new URL(`https://u.y.qq.com/cgi-bin/${web ? 'musics' : 'musicu'}.fcg`)
+  if (web) url.searchParams.set('sign', signQQRequest(body))
+  const response = await accountSession.fetch(url.toString(), {
     method: 'POST',
+    credentials: 'include',
+    ...(web ? { cache: 'no-store' as const } : {}),
     headers: {
-      'Content-Type': 'application/json;charset=UTF-8',
+      // musics 不允许 application/json 的跨域预检；沿用官网旧版签名 AJAX 的简单请求类型。
+      // 正文仍为参与签名的原始 JSON，不能改成 URLSearchParams 或再次序列化。
+      'Content-Type': web ? 'application/x-www-form-urlencoded;charset=UTF-8' : 'application/json;charset=UTF-8',
       Origin: 'https://y.qq.com',
       Referer: 'https://y.qq.com/',
     },
-    body: JSON.stringify({
-      comm: getQQRequestComm(cookies),
-      ...requests,
-    }),
+    body,
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000),
   })
   if (!response.ok) {
@@ -324,6 +338,113 @@ const requestQQMusicU = async<T extends object>(requests: Record<string, unknown
     if (moduleCode != 0) throw createQQMusicURequestError(moduleCode, `QQ Music module ${key} failed`)
   }
   return result
+}
+
+const qqAccountIdentity = (cookies: Record<string, string>) => {
+  const { uin, authst, tmeLoginType } = getQQCredentials(cookies)
+  return `${tmeLoginType}:${uin}:${authst}`
+}
+
+const qqAccountId = (cookies: Record<string, string>) => {
+  const { uin, tmeLoginType } = getQQCredentials(cookies)
+  return createHash('sha256').update(`qq:${tmeLoginType}:${uin}`).digest('hex')
+}
+
+// 使用官网的单曲收藏状态接口核对，不以写接口 code=0 作为到账证明。
+const checkQQFavoriteSong = async(songMid: string, account: string) => {
+  const result = await requestQQMusicU<{
+    verify: { data?: { m_fan?: Record<string, unknown> } }
+  }>({
+    verify: {
+      module: 'music.musicasset.SongFavRead',
+      method: 'IsSongFanByMid',
+      param: { v_songMid: [songMid] },
+    },
+  }, undefined, account)
+  if (qqAccountIdentity((await getQQAccountCredentials()).cookies) != account) throw new Error('account_changed')
+  const value = result.verify.data?.m_fan?.[songMid]
+  if (value === true || value === 1) return true
+  if (value === false || value === 0) return false
+  throw new Error('QQ favorite state missing')
+}
+
+// 只按 QQ songmid 查找确切歌曲，不用文件 ID 或其他平台的数字 ID 猜测收藏对象。
+export const addQQFavoriteSong = async(request: QQFavoriteRequest): Promise<QQFavoriteResult> => {
+  if (typeof request?.songMid != 'string' || !/^[a-zA-Z0-9]{1,64}$/.test(request.songMid) ||
+    (request.action != null && request.action != 'add' && request.action != 'check')) return { status: 'unsupported' }
+  let writing = false
+  const startedAt = Date.now()
+  let phase = 'preflight'
+  try {
+    const { uin, authst, cookies } = await getQQAccountCredentials()
+    if (!uin || !authst) return { status: 'login_required' }
+    const account = qqAccountIdentity(cookies)
+    await configureAccountSessionProxy('tx')
+    const alreadyLiked = await checkQQFavoriteSong(request.songMid, account)
+    if (alreadyLiked) return { status: 'added', accountId: qqAccountId(cookies) }
+    if (request.action == 'check') return { status: 'not_found' }
+
+    phase = 'detail'
+    const detail = await requestQQMusicU<{
+      detail: { data?: { track_info?: { id?: number, mid?: string, type?: number } } }
+    }>({
+      detail: {
+        module: 'music.pf_song_detail_svr',
+        method: 'get_song_detail_yqq',
+        param: { song_mid: request.songMid, song_type: 0 },
+      },
+    }, undefined, account)
+    const track = detail.detail.data?.track_info
+    if (!track || track.mid != request.songMid || !Number.isSafeInteger(track.id) || track.id! <= 0 || (track.type != null && track.type != 0)) {
+      return { status: 'unsupported' }
+    }
+
+    writing = true
+    phase = 'write-request'
+    // 对齐现行官网：201 为「我喜欢」，传真实数字歌曲 ID，只发送网页使用的歌单字段。
+    const result = await requestQQMusicU<{
+      favorite: { data?: { retCode?: unknown } }
+    }>({
+      favorite: {
+        module: 'music.musicasset.PlaylistDetailWrite',
+        method: 'AddSonglist',
+        param: { dirId: 201, v_songInfo: [{ songId: track.id, songType: 0 }] },
+      },
+    }, undefined, account, true)
+    if (qqAccountIdentity((await getQQAccountCredentials()).cookies) != account) return { status: 'account_changed' }
+    const retCode = result.favorite.data?.retCode
+    if (retCode != null && parseQQMusicCode(retCode) !== 0) {
+      const code = parseQQMusicCode(retCode)
+      if (code != null && qqMusicCredentialRejectionCodes.has(code)) {
+        accountValidationCache.delete('tx')
+        return { status: 'login_required', code }
+      }
+      return code == null ? { status: 'unknown' } : { status: 'rejected', code }
+    }
+
+    phase = 'verify'
+    // 只重查，不重写；给平台短暂同步时间，避免刚受理就显示成功。
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise<void>(resolve => { setTimeout(resolve, 800) })
+      if (await checkQQFavoriteSong(request.songMid, account)) {
+        console.info('[qq-favorite]', { phase, confirmed: true, elapsedMs: Date.now() - startedAt })
+        return { status: 'added', accountId: qqAccountId(cookies) }
+      }
+    }
+    console.info('[qq-favorite]', { phase, confirmed: false, elapsedMs: Date.now() - startedAt })
+    return { status: 'unconfirmed' }
+  } catch (error) {
+    const networkCode = error instanceof Error ? /\b(?:net::)?ERR_[A-Z_]+\b/.exec(error.message)?.[0] : undefined
+    const code = error instanceof QQMusicURequestError ? error.code : undefined
+    // 此错误类型的 message 仅含固定的响应层级、模块名和数字码，不含服务端正文或凭证。
+    const stage = error instanceof QQMusicURequestError ? error.message : undefined
+    console.warn('[qq-favorite]', { phase, kind: error instanceof Error ? error.name : 'unknown', stage, code, networkCode, elapsedMs: Date.now() - startedAt })
+    if (error instanceof Error && error.message == 'account_changed') return { status: 'account_changed' }
+    if (isQQMusicLoginRequiredError(error)) return { status: 'login_required', code }
+    if (phase == 'write-request' && code != null && (code < 500 || code > 599)) return { status: 'rejected', code }
+    // 结果不明时提供只读核对，绝不自动重发写请求。
+    return { status: writing ? 'unknown' : 'unavailable', ...(code != null ? { code } : {}) }
+  }
 }
 
 const getQualityFallbacks = (quality: LX.Quality): LX.Quality[] => {
@@ -1057,7 +1178,8 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
   try {
     if (provider == 'kg') return { provider, playlists: await getKugouPlaylists(), status: 'available' }
     if (provider == 'tx') {
-      const { uin } = await getQQAccountCredentials()
+      const { uin, cookies } = await getQQAccountCredentials()
+      const account = qqAccountIdentity(cookies)
       const encryptedUin = await getQQEncryptedUin()
       if (!encryptedUin) {
         return { provider, playlists: [], status: await resolveQQAccountFailureStatus() }
@@ -1169,7 +1291,8 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
         ...created.filter(item => item.id != 'dir:201'),
         ...favorite,
       ].map(item => [item.id, item]))
-      const playlists = [...playlistMap.values()]
+      if (qqAccountIdentity((await getQQAccountCredentials()).cookies) != account) throw new Error('account_changed')
+      const playlists = [...playlistMap.values()].map(item => ({ ...item, accountId: qqAccountId(cookies) }))
       return { provider, playlists, status: playlists.length ? 'available' : 'unavailable' }
     }
 
@@ -1214,55 +1337,25 @@ export const getMusicAccountPlaylistDetail = async(
       const dirMatch = /^dir:(\d+)$/.exec(id)
       const dirId = dirMatch ? Number(dirMatch[1]) : id == '0' ? 201 : 0
       const dissId = dirId ? 0 : Number(id)
-      const apiKey = dirId ? '' : readQQDailyApiKey()
-      if (apiKey && Number.isFinite(dissId)) {
-        const ids: string[] = []
-        for (let page = 0; page < 100; page++) {
-          const response = await session.fromPartition(providerConfig.tx.partition).fetch('https://a.y.qq.com/playlists/detail', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ params: { dissId, page }, comm: { skill_version: '0.0.3' } }),
-          })
-          if (!response.ok) break
-          const result = await response.json() as {
-            ret?: number
-            sub_ret?: number
-            trackList?: Array<{ songMid?: string }>
-            hasMore?: boolean
-          }
-          if ((result.ret != null && result.ret != 0) || (result.sub_ret != null && result.sub_ret != 0)) break
-          ids.push(...(result.trackList ?? []).map(item => item.songMid ?? '').filter(Boolean))
-          if (!result.hasMore || !result.trackList?.length) break
-        }
-        if (ids.length) return { provider, id, ids: [...new Set(ids)], status: 'available' }
-      }
+      const { cookies } = await getQQAccountCredentials()
+      const account = qqAccountIdentity(cookies)
 
       if (!dirId && !Number.isFinite(dissId)) return { provider, id, ids: [], status: 'unavailable' }
       const encryptedUin = dirId ? await getQQEncryptedUin() : ''
       if (dirId && !encryptedUin) {
         return { provider, id, ids: [], status: await resolveQQAccountFailureStatus() }
       }
-      const ids: string[] = []
-      const pageSize = 100
-      let offset = 0
-      let requestSucceeded = false
-      for (let page = 0; page < 1000 && offset < 100000; page++) {
+      const ids = await collectQQPlaylistIds(async offset => {
         const result = await requestQQMusicU<{
-          detail?: {
-            code?: number
-            data?: {
-              songlist?: Array<Record<string, unknown>>
-              songList?: Array<Record<string, unknown>>
-              track_list?: Array<Record<string, unknown>>
-              total_song_num?: number
-              songnum?: number
-              totalnum?: number
-              hasmore?: boolean | number
-            }
-          }
+          detail?: { data?: {
+            songlist?: Array<Record<string, unknown>>
+            songList?: Array<Record<string, unknown>>
+            track_list?: Array<Record<string, unknown>>
+            total_song_num?: number
+            songnum?: number
+            totalnum?: number
+            hasmore?: boolean | number
+          } }
         }>({
           detail: {
             module: 'music.srfDissInfo.DissInfo',
@@ -1272,29 +1365,28 @@ export const getMusicAccountPlaylistDetail = async(
               dirid: dirId,
               tag: true,
               song_begin: offset,
-              song_num: pageSize,
+              song_num: 100,
               userinfo: true,
               orderlist: true,
               ...(encryptedUin ? { enc_host_uin: encryptedUin } : {}),
             },
           },
-        })
+        }, undefined, account)
         const data = result.detail?.data
-        if (!data) throw new QQMusicURequestError('unavailable', undefined, 'QQ Music playlist detail response missing data')
-        requestSucceeded = true
-        const songs = data.songlist ?? data.songList ?? data.track_list ?? []
-        ids.push(...songs.map(item => {
-          const track = (item.track_info ?? item) as Record<string, unknown>
-          return String(track.mid ?? track.songmid ?? track.songMid ?? track.song_mid ?? '')
-        }).filter(Boolean))
-        if (!songs.length) break
-        const nextOffset = offset + songs.length
-        if (nextOffset <= offset) break
-        const total = Number(data.total_song_num ?? data.songnum ?? data.totalnum ?? 0)
-        if (data.hasmore === false || parseQQMusicCode(data.hasmore) == 0 || (total > 0 && nextOffset >= total)) break
-        offset = nextOffset
-      }
-      return { provider, id, ids: [...new Set(ids)], status: requestSucceeded ? 'available' : 'unavailable' }
+        const songs = data?.songlist ?? data?.songList ?? data?.track_list
+        if (!data || !Array.isArray(songs)) throw new Error('playlist_incomplete')
+        const total = data.total_song_num ?? data.songnum ?? data.totalnum
+        return {
+          ids: songs.map(item => {
+            const track = (item.track_info ?? item) as Record<string, unknown>
+            return String(track.mid ?? track.songmid ?? track.songMid ?? track.song_mid ?? '')
+          }),
+          total: total == null ? undefined : Number(total),
+          hasMore: data.hasmore == null ? undefined : data.hasmore === true || parseQQMusicCode(data.hasmore) == 1,
+        }
+      })
+      if (qqAccountIdentity((await getQQAccountCredentials()).cookies) != account) throw new Error('account_changed')
+      return { provider, id, ids, status: 'available', accountId: qqAccountId(cookies) }
     }
 
     const result = await requestNeteaseWeapi<{

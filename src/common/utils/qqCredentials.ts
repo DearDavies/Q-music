@@ -23,3 +23,35 @@ export const getQQRequestComm = (cookies: Record<string, string>, ct = 24) => {
   const { uin, authst, tmeLoginType } = getQQCredentials(cookies)
   return { uin, authst, ct, cv: 0, format: 'json', tmeAppID: 'qqmusic', tmeLoginType }
 }
+
+// 与 QQ 官网 cookie.getACSRFToken 的两种取值顺序保持一致。
+export const getQQWebCsrfTokens = (cookies: Record<string, string>) => {
+  const hash = (value: string) => {
+    let token = 5381
+    for (let index = 0; index < value.length; index++) token = (token + (token << 5) + value.charCodeAt(index)) | 0
+    return String(token & 0x7fffffff)
+  }
+  return {
+    g_tk: hash(cookies.skey || cookies.qqmusic_key || ''),
+    g_tk_new_20200303: hash(cookies.qqmusic_key || cookies.p_skey || cookies.skey || cookies.p_lskey || cookies.lskey || ''),
+  }
+}
+
+// 网页收藏通过 Cookie 和 CSRF 认证，不混入客户端的 authst / tmeLoginType。
+export const getQQWebRequestComm = (cookies: Record<string, string>) => {
+  const { uin } = getQQCredentials(cookies)
+  const tokens = getQQWebCsrfTokens(cookies)
+  return {
+    uin,
+    ct: 24,
+    cv: 4747474,
+    g_tk: Number(tokens.g_tk),
+    g_tk_new_20200303: Number(tokens.g_tk_new_20200303),
+    format: 'json',
+    inCharset: 'utf-8',
+    outCharset: 'utf-8',
+    notice: 0,
+    platform: 'yqq.json',
+    needNewCode: 1,
+  }
+}

@@ -35,6 +35,7 @@
             <div>
               <h3>{{ $t('playlist_import_modal__account_playlists') }}</h3>
               <p>{{ $t('playlist_import_modal__account_playlists_tip') }}</p>
+              <p v-if="accountProvider == 'tx'">{{ $t('list_sync_import_tip') }}</p>
             </div>
             <button type="button" :disabled="isAccountLoading || !accountStatus[accountProvider]" @click="loadAccountPlaylists(accountProvider)">
               {{ $t('playlist_import_modal__refresh') }}
@@ -223,6 +224,7 @@ export default {
       invalid_link: 'playlist_import_modal__error_invalid_link',
       no_match: 'playlist_import_modal__error_no_match',
       account_unavailable: 'playlist_import_modal__account_unavailable',
+      account_changed: 'list_sync_account_changed',
     }
 
     const currentListName = computed(() => {

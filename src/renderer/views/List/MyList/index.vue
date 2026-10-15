@@ -1,23 +1,26 @@
 <template>
   <div ref="dom_lists" :class="$style.lists">
     <div :class="$style.listHeader">
-      <h2 :class="$style.listsTitle">{{ $t('my_list') }}</h2>
-      <div :class="$style.headerBtns">
+      <div :class="$style.titleRow">
+        <h2 :class="$style.listsTitle">{{ $t('my_list') }}</h2>
         <button type="button" :class="$style.listsAdd" :aria-label="$t('lists__new_list_btn')" :title="$t('lists__new_list_btn')" @click="isShowNewList = true">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="70%" viewBox="0 0 24 24" space="preserve">
             <use xlink:href="#icon-list-add" />
           </svg>
         </button>
+      </div>
+      <div :class="$style.headerBtns">
         <button type="button" :class="[$style.listsAdd, $style.importBtn]" :aria-label="$t('playlist_import_modal__title')" :title="$t('playlist_import_modal__title')" @click="isShowExternalImportModal = true">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 425.2 425.2" space="preserve">
             <use xlink:href="#icon-download-2" />
           </svg>
           <span>{{ $t('playlist_import_modal__entry') }}</span>
         </button>
-        <button type="button" :class="$style.listsAdd" :aria-label="$t('list_update_modal__title')" :title="$t('list_update_modal__title')" @click="isShowListUpdateModal = true">
+        <button type="button" :class="[$style.listsAdd, $style.importBtn]" :aria-label="$t('list_update_modal__title')" :title="$t('list_update_modal__title')" @click="isShowListUpdateModal = true">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="transform: rotate(45deg);" height="70%" viewBox="0 0 24 24" space="preserve">
             <use xlink:href="#icon-refresh" />
           </svg>
+          <span>{{ $t('list_sync_entry') }}</span>
         </button>
       </div>
     </div>
@@ -28,16 +31,8 @@
         @contextmenu="handleListsItemRigthClick($event, -2)" @click="handleListToggle(defaultList.id)"
         @keydown.enter.self="handleListToggle(defaultList.id)" @keydown.space.self.prevent="handleListToggle(defaultList.id)"
       >
-        <!-- <div v-if="defaultList.id == listId" :class="$style.activeIcon">
-          <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="40%" viewBox="0 0 451.846 451.847" space="preserve">
-            <use xlink:href="#icon-right" />
-          </svg>
-        </div> -->
         <span :class="$style.listsLabel">
-          <transition name="list-active">
-            <svg-icon v-if="defaultList.id == listId" name="angle-right-solid" :class="$style.activeIcon" />
-          </transition>
-          {{ $t(defaultList.name) }}
+          <PlaylistIdentity :list="defaultList" :name="$t(defaultList.name)" />
         </span>
       </li>
       <li
@@ -47,24 +42,18 @@
         @keydown.enter.self="handleListToggle(loveList.id)" @keydown.space.self.prevent="handleListToggle(loveList.id)"
       >
         <span :class="$style.listsLabel">
-          <transition name="list-active">
-            <svg-icon v-if="loveList.id == listId" name="angle-right-solid" :class="$style.activeIcon" />
-          </transition>
-          {{ $t(loveList.name) }}
+          <PlaylistIdentity :list="loveList" :name="$t(loveList.name)" />
         </span>
       </li>
       <li
         v-for="(item, index) in userLists"
         :key="item.id" class="user-list"
         :class="[$style.listsItem, {[$style.active]: item.id == listId}, {[$style.clicked]: rightClickItemIndex == index}, {[$style.fetching]: fetchingListStatus[item.id]}]"
-        role="button" tabindex="0" :data-index="index" :aria-label="item.name" :aria-pressed="item.id == listId" @contextmenu="handleListsItemRigthClick($event, index)"
+        role="button" tabindex="0" :data-index="index" :aria-pressed="item.id == listId" @contextmenu="handleListsItemRigthClick($event, index)"
         @keydown.enter.self="handleListToggle(item.id)" @keydown.space.self.prevent="handleListToggle(item.id)"
       >
         <span :class="$style.listsLabel" :title="item.name" @click="handleListToggle(item.id, index + 2)">
-          <transition name="list-active">
-            <svg-icon v-if="item.id == listId" name="angle-right-solid" :class="$style.activeIcon" />
-          </transition>
-          {{ item.name }}
+          <PlaylistIdentity :list="item" subtitle />
         </span>
         <base-input
           :class="$style.listsInput" type="text" :value="item.name"
@@ -101,6 +90,7 @@ import DuplicateMusicModal from './components/DuplicateMusicModal.vue'
 import ExternalImportModal from './components/ExternalImportModal.vue'
 import ListSortModal from './components/ListSortModal.vue'
 import ListUpdateModal from './components/ListUpdateModal.vue'
+import PlaylistIdentity from '@renderer/components/common/PlaylistIdentity.vue'
 
 import { defaultList, loveList, userLists, fetchingListStatus } from '@renderer/store/list/state'
 import { removeUserList } from '@renderer/store/list/action'
@@ -128,6 +118,7 @@ import useDuplicate from './useDuplicate'
 export default {
   name: 'MyLists',
   components: {
+    PlaylistIdentity,
     DuplicateMusicModal,
     ExternalImportModal,
     ListSortModal,
@@ -335,6 +326,7 @@ export default {
     }
   }
 }
+.titleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .listsTitle {
   flex: none;
   min-width: 0;
@@ -349,7 +341,7 @@ export default {
   flex: none;
   min-width: 0;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 6px;
 }
@@ -392,7 +384,7 @@ export default {
   gap: 5px;
   width: auto;
   min-width: 0;
-  height: 28px;
+  height: 32px;
   margin: 0;
   padding: 0 8px;
   color: var(--color-primary);
@@ -416,10 +408,13 @@ export default {
     color: var(--color-primary-dark-300);
   }
 }
+.listsContent > :global(.default-list) .listsLabel { height: 42px; }
+.listsContent > :global(.default-list) + :global(.user-list) { margin-top: 10px; }
 .listsContent {
   flex: auto;
   min-width: 0;
-  overflow-y: scroll !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
   padding: 7px;
   box-sizing: border-box;
   // border-right: 1px solid rgba(0, 0, 0, 0.12);
@@ -444,7 +439,7 @@ export default {
 }
 .listsItem {
   position: relative;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   border-radius: 12px;
   transition: .3s ease;
   transition-property: color, background-color, opacity, box-shadow, transform;
@@ -459,13 +454,14 @@ export default {
       cursor: pointer;
     }
     &:not(.editing):hover {
-      transform: translateX(2px);
+      background-color: var(--color-primary-background-hover);
     }
   }
   &.active {
     color: var(--color-primary-dark-300);
     background-color: rgb(from var(--color-main-background) r g b / .76);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .78), 0 8px 20px rgba(72, 91, 112, .08);
+    box-shadow: inset 0 0 0 1px var(--color-primary-alpha-700);
+    &:before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; background: var(--color-primary); }
   }
   &.selected {
     background-color: var(--color-primary-font-active);
@@ -509,11 +505,13 @@ export default {
   vertical-align: -0.05em;
 }
 .listsLabel {
-  display: block;
-  height: @lists-item-height;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
   padding: 0 12px;
   font-size: 13px;
-  line-height: @lists-item-height;
+  line-height: 1.25;
   .mixin-ellipsis-1();
 }
 .listsInput {

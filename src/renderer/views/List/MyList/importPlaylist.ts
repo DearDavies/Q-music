@@ -3,7 +3,9 @@ import { filterMusicList, formatPlayTime, toNewMusicInfo } from '@renderer/utils
 import { httpFetch } from '@renderer/utils/request'
 import musicSdk from '@renderer/utils/musicSdk'
 import { getListDetail } from '@renderer/store/songList/action'
-import { addListMusics, createUserList, overwriteListMusics } from '@renderer/store/list/action'
+import { addListMusics, createUserList, overwriteListMusics, getListMusics } from '@renderer/store/list/action'
+import { getListUpdateInfo, setListSourceAccount, setListAutoUpdate, setListUpdateTime } from '@renderer/utils/data'
+import { resolveQQPlaylistTracks } from '@common/utils/qqPlaylist'
 import { userLists } from '@renderer/store/list/state'
 import { getMusicAccountPlaylistDetail, type MusicAccountPlaylist, type MusicAccountProvider } from '@renderer/utils/ipc'
 import wyMusicDetail from '@renderer/utils/musicSdk/wy/musicDetail'
@@ -12,7 +14,7 @@ import txMusicInfo from '@renderer/utils/musicSdk/tx/musicInfo'
 export type ExternalImportSource = 'tx' | 'wy' | 'kg' | 'spotify'
 export type ExternalImportTarget = 'new' | 'current' | 'love'
 
-export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'cancelled'
+export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled'
 
 export class ExternalImportError extends Error {
   code: ExternalImportErrorCode
@@ -341,23 +343,36 @@ export const loadAccountPlaylistMusic = async(
   playlistId: string,
   onProgress?: (progress: ExternalImportProgress) => void,
   shouldCancel?: ShouldCancel,
+  options: { existingMusic?: LX.Music.MusicInfo[], accountId?: string, onAccount?: (accountId: string) => void } = {},
 ) => {
   const result = await getMusicAccountPlaylistDetail(provider, playlistId)
-  if (result.status != 'available' || !result.ids.length) throw new ExternalImportError('account_unavailable')
+  if (result.status != 'available') throw new ExternalImportError('account_unavailable')
+  if (provider == 'tx') {
+    if (!result.accountId || (options.accountId && options.accountId != result.accountId)) throw new ExternalImportError('account_changed')
+    const cached = new Map<string, LX.Music.MusicInfo>()
+    for (const song of options.existingMusic ?? []) {
+      if (song.source == 'tx') cached.set(String(song.meta.songId), song)
+    }
+    const list = await resolveQQPlaylistTracks(result.ids, cached, async id => {
+      const item = await txMusicInfo(id)
+      if (!item) throw new ExternalImportError('account_unavailable')
+      const song = toNewMusicInfo(item)
+      if (song.source != 'tx' || String(song.meta.songId) != id) throw new ExternalImportError('account_unavailable')
+      return song
+    }, (current, total) => onProgress?.({ stage: 'fetch', current, total }), shouldCancel)
+    options.onAccount?.(result.accountId)
+    return list
+  }
+  if (!result.ids.length) throw new ExternalImportError('account_unavailable')
   if (provider == 'kg') return loadKugouHashMusic(result.ids, onProgress, shouldCancel)
 
   const list: LX.Music.MusicInfo[] = []
-  const chunkSize = provider == 'wy' ? 200 : 16
+  const chunkSize = 200
   for (let index = 0; index < result.ids.length; index += chunkSize) {
     assertNotCancelled(shouldCancel)
     const ids = result.ids.slice(index, index + chunkSize)
-    if (provider == 'wy') {
-      const data = await wyMusicDetail.getList(ids)
-      list.push(...data.list.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
-    } else {
-      const items = await Promise.all(ids.map(id => txMusicInfo(id).catch(() => null)))
-      list.push(...items.flatMap((item: LX.Music.MusicInfoOnline | null) => item == null ? [] : [toNewMusicInfo(item)]))
-    }
+    const data = await wyMusicDetail.getList(ids)
+    list.push(...data.list.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
     onProgress?.({
       stage: 'fetch',
       current: Math.min(index + ids.length, result.ids.length),
@@ -386,22 +401,35 @@ export const importAccountPlaylist = async(
   onProgress?: (progress: ExternalImportProgress) => void,
   shouldCancel?: ShouldCancel,
 ): Promise<ExternalImportResult> => {
-  const list = await loadAccountPlaylistMusic(params.provider, params.playlist.id, onProgress, shouldCancel)
-  if (!list.length) throw new ExternalImportError('no_match')
+  const existing = params.target == 'new' ? userLists.find(item => item.source == params.provider && item.sourceListId == params.playlist.id) : undefined
+  const updateInfo = existing ? (await getListUpdateInfo())[existing.id] : undefined
+  let accountId: string | undefined
+  const list = await loadAccountPlaylistMusic(params.provider, params.playlist.id, onProgress, shouldCancel, {
+    existingMusic: existing ? await getListMusics(existing.id) : [],
+    accountId: updateInfo?.sourceAccountId ?? params.playlist.accountId,
+    onAccount: value => { accountId = value },
+  })
+  if (!list.length && params.provider != 'tx') throw new ExternalImportError('no_match')
   assertNotCancelled(shouldCancel)
   onProgress?.({ stage: 'save', current: 0, total: list.length })
 
   if (params.target == 'new') {
-    const existing = userLists.find(item => item.source == params.provider && item.sourceListId == params.playlist.id)
+    const listId = existing?.id ?? `userlist_${Date.now()}`
     if (existing) {
       await overwriteListMusics({ listId: existing.id, musicInfos: list })
     } else {
       await createUserList({
+        id: listId,
         name: params.playlist.name,
         list,
         source: params.provider,
         sourceListId: params.playlist.id,
       })
+    }
+    if (params.provider == 'tx' && accountId) {
+      await setListSourceAccount(listId, accountId)
+      if (!existing || updateInfo == null) await setListAutoUpdate(listId, true)
+      await setListUpdateTime(listId, Date.now())
     }
   } else {
     await addListMusics(params.target == 'love' ? LIST_IDS.LOVE : params.currentListId, list)

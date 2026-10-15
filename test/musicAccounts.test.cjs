@@ -25,6 +25,174 @@ const qr = { key: 'test-code', mid: session.mid, expiresAt: Date.now() + 120000 
 const response = data => ({ ok: true, status: 200, json: async () => ({ status: 1, error_code: 0, data }) })
 const hash = n => n.toString(16).padStart(32, '0').toUpperCase()
 
+if (!mobile) {
+  const songMid = '003testSongMid0'
+  const signing = load('src/common/utils/qqSign.ts', { 'node:crypto': require('node:crypto') }, { Buffer })
+
+  test('QQ 签名固定向量覆盖空对象、收藏请求和非 ASCII 字符，与原搜索签名兼容', async () => {
+    const legacy = load('src/renderer/utils/musicSdk/tx/utils/crypto.js', { '@common/utils/qqPlaylist': load('src/common/utils/qqPlaylist.ts'), '@common/utils/qqSign': signing })
+    for (const [body, expected] of [
+      ['{}', 'zzcf8e26805gyafigxmxjehoe02mvsjjgtwzw6f1a05f9'],
+      ['{"comm":{"uin":"1234"},"favorite":{"param":{"dirId":201}}}', 'zzc36246e6gjtgucbu5pxbmgbyfaybru3ymxk6bcd66f5'],
+      ['{"text":"我喜欢/灼け落ちない翼"}', 'zzca732b8eqagzrmvg6iehetaxkrkqsf4rukeb87de9b0'],
+    ]) {
+      assert.equal(signing.signQQRequest(body), expected)
+      assert.equal(await legacy.zzcSign(body), expected)
+    }
+  })
+
+  const favoriteHarness = (options = {}) => {
+    let cookies = options.cookies ?? { login_type: '1', uin: 'o1234', qqmusic_key: 'Q_H_L_test', skey: 'csrf-test' }
+    const calls = []
+    let reads = 0
+    const accountSession = {
+      cookies: { get: async ({ url }) => Object.entries(url == 'https://u.y.qq.com/' ? options.targetCookies ?? cookies : cookies).map(([name, value]) => ({ name, value })) },
+      setProxy: async () => {},
+      fetch: async (url, init) => {
+        const body = JSON.parse(init.body)
+        if (body.favorite) {
+          assert.equal(new URL(url).pathname, '/cgi-bin/musics.fcg')
+          assert.equal(new URL(url).searchParams.get('sign'), signing.signQQRequest(init.body))
+          assert.equal('authst' in body.comm, false)
+          assert.equal('tmeLoginType' in body.comm, false)
+          assert.equal(init.headers['Content-Type'], 'application/x-www-form-urlencoded;charset=UTF-8')
+        } else {
+          assert.equal(new URL(url).pathname, '/cgi-bin/musicu.fcg')
+          assert.equal(new URL(url).searchParams.has('sign'), false)
+        }
+        calls.push({ url, body, method: init.method, credentials: init.credentials })
+        if (body.verify) {
+          const value = options.states?.[reads] ?? (options.states ? undefined : reads > 0)
+          reads++
+          if (options.verifyFails && reads > 1) throw new Error('timeout')
+          if (options.switchAfterRead) cookies = { login_type: '2', wxuin: '9876', qqmusic_key: 'W_X_other' }
+          return { ok: true, json: async () => ({ code: 0, verify: { code: 0, data: { m_fan: { [songMid]: value } } } }) }
+        }
+        if (body.detail) {
+          if (options.switchAccount) cookies = { login_type: '2', wxuin: '9876', qqmusic_key: 'W_X_other' }
+          return { ok: true, json: async () => options.detailResult ?? { code: 0, detail: { code: 0, data: { track_info: options.track ?? { mid: songMid, id: 456, type: 0 } } } } }
+        }
+        if (options.switchAfterWrite) cookies = { login_type: '2', wxuin: '9876', qqmusic_key: 'W_X_other' }
+        if (options.timeout) throw new Error('timeout')
+        return { ok: !options.httpStatus, status: options.httpStatus ?? 200, json: async () => options.result ?? { code: 0, favorite: { code: 0, data: { retCode: 0 } } } }
+      },
+    }
+    const api = load('src/main/modules/winMain/musicAccount.ts', {
+      electron: { session: { fromPartition: () => accountSession }, safeStorage: {}, shell: {} },
+      '@main/utils': { getProxy: () => null }, '@main/utils/store': () => ({}),
+      '@main/utils/navigationPolicy': {}, 'node:crypto': require('node:crypto'),
+      '@common/utils/qqCredentials': qq, '@common/utils/qqPlaylist': load('src/common/utils/qqPlaylist.ts'), '@common/utils/qqSign': signing, './kugouAccount': {}, './accountLoginLayout': {}, './officialAccountLogin': {},
+    }, { Buffer, setTimeout: callback => setTimeout(callback, 0) })
+    return { add: (value = songMid, action) => api.addQQFavoriteSong({ songMid: value, action }), calls, writes: () => calls.filter(x => x.body.favorite) }
+  }
+
+  test('QQ 网页 CSRF 按现行官网取值，长字符串不溢出', () => {
+    const hash = value => String([...value].reduce((sum, c) => (sum * 33n + BigInt(c.charCodeAt(0))) & 0x7fffffffn, 5381n))
+    for (const cookies of [{ skey: 'abc', qqmusic_key: 'def' }, { p_skey: 'test', qqmusic_key: 'music' }, { qqmusic_key: 'x'.repeat(1000) }, {}]) {
+      const tokens = qq.getQQWebCsrfTokens(cookies)
+      assert.equal(tokens.g_tk, hash(cookies.skey || cookies.qqmusic_key || ''))
+      assert.equal(tokens.g_tk_new_20200303, hash(cookies.qqmusic_key || cookies.p_skey || cookies.skey || ''))
+    }
+  })
+
+  test('QQ 收藏使用真实数字歌曲 ID 与官网认证参数，QQ／微信都在云端核实后才成功', async () => {
+    for (const cookies of [
+      { login_type: '1', uin: 'o1234', qqmusic_key: 'Q_H_L_test', skey: 'web-csrf' },
+      { login_type: '2', wxuin: '98765432101234567', qqmusic_key: 'W_X_test', uin: '1234' },
+    ]) {
+      const api = favoriteHarness({ cookies })
+      assert.equal((await api.add()).status, 'added')
+      assert.equal(api.calls.length, 4)
+      assert.equal(api.writes().length, 1)
+      const { body, credentials } = api.writes()[0]
+      assert.equal(credentials, 'include')
+      assert.equal(body.comm.uin, cookies.wxuin ?? '1234')
+      assert.equal('tmeLoginType' in body.comm, false)
+      assert.equal('authst' in body.comm, false)
+      assert.equal(body.comm.cv, 4747474)
+      const tokens = qq.getQQWebCsrfTokens(cookies)
+      for (const key of Object.keys(tokens)) assert.equal(body.comm[key], Number(tokens[key]))
+      assert.equal(body.favorite.module, 'music.musicasset.PlaylistDetailWrite')
+      assert.equal(body.favorite.method, 'AddSonglist')
+      assert.deepEqual(body.favorite.param, { dirId: 201, v_songInfo: [{ songId: 456, songType: 0 }] })
+    }
+  })
+
+  test('QQ 收藏拒绝无登录、错误歌曲和中途切换账号，不发送写请求', async () => {
+    for (const [options, expected] of [
+      [{ cookies: {} }, 'login_required'],
+      [{ track: { mid: 'wrong', id: 456 } }, 'unsupported'],
+      [{ track: { mid: songMid, id: 0 } }, 'unsupported'],
+      [{ track: { mid: songMid, id: 456, type: 1 } }, 'unsupported'],
+      [{ switchAccount: true }, 'account_changed'],
+      [{ switchAfterRead: true }, 'account_changed'],
+      [{ targetCookies: {} }, 'account_changed'],
+      [{ states: [] }, 'unavailable'],
+    ]) {
+      const api = favoriteHarness(options)
+      assert.equal((await api.add()).status, expected)
+      assert.equal(api.writes().length, 0)
+    }
+    const malformed = favoriteHarness()
+    assert.equal((await malformed.add('../bad')).status, 'unsupported')
+    assert.equal((await malformed.add(songMid, 'delete')).status, 'unsupported')
+    assert.equal(malformed.calls.length, 0)
+  })
+
+  test('QQ 返回 code=0 但云端无记录不报成功，只读核对不产生写入', async () => {
+    const absent = favoriteHarness({ states: [false, false, false] })
+    assert.equal((await absent.add()).status, 'unconfirmed')
+    assert.equal(absent.writes().length, 1)
+    const delayed = favoriteHarness({ states: [0, 0, 1] })
+    assert.equal((await delayed.add()).status, 'added')
+    assert.equal(delayed.writes().length, 1)
+    for (const state of [false, true]) {
+      const api = favoriteHarness({ states: [state] })
+      assert.equal((await api.add(songMid, 'check')).status, state ? 'added' : 'not_found')
+      assert.equal(api.writes().length, 0)
+    }
+    const existing = favoriteHarness({ states: [true] })
+    assert.equal((await existing.add()).status, 'added')
+    assert.equal(existing.writes().length, 0)
+    for (const options of [{ verifyFails: true }, { states: [false] }]) {
+      const api = favoriteHarness(options)
+      assert.equal((await api.add()).status, 'unknown')
+      assert.equal(api.writes().length, 1)
+    }
+  })
+
+  test('QQ 收藏检查外层、模块和业务错误码；写入超时不自动重发', async () => {
+    for (const [result, status, code] of [
+      [{ code: 31 }, 'rejected', 31],
+      [{ code: 0, favorite: { code: 32 } }, 'rejected', 32],
+      [{ code: 0, favorite: { code: 80105 } }, 'rejected', 80105],
+      [{ code: 0, favorite: { code: 0, data: { retCode: 41 } } }, 'rejected', 41],
+      [{ code: 0, favorite: { code: 0, data: { retCode: 1000 } } }, 'login_required', 1000],
+      [{ code: 1000 }, 'login_required', 1000],
+      [{ code: 0, favorite: { code: 403 } }, 'login_required', 403],
+      [{}, 'unknown'], [{ code: false }, 'unknown'], [{ code: '' }, 'unknown'],
+      [{ code: 0 }, 'unknown'],
+    ]) {
+      const api = favoriteHarness({ result })
+      const response = await api.add()
+      assert.equal(response.status, status)
+      assert.equal(response.code, code)
+      assert.equal(api.writes().length, 1)
+    }
+    const timeout = favoriteHarness({ timeout: true })
+    assert.equal((await timeout.add()).status, 'unknown')
+    assert.equal(timeout.writes().length, 1)
+    const serverError = favoriteHarness({ httpStatus: 500 })
+    assert.equal((await serverError.add()).status, 'unknown')
+    assert.equal(serverError.writes().length, 1)
+    const switched = favoriteHarness({ switchAfterWrite: true })
+    assert.equal((await switched.add()).status, 'account_changed')
+    const detailRejected = favoriteHarness({ detailResult: { code: 0, detail: { code: 1000 } } })
+    assert.equal((await detailRejected.add()).status, 'login_required')
+    assert.equal(detailRejected.writes().length, 0)
+  })
+}
+
 test('酷狗服务端缩小分页时继续读取，短页重复仍拒绝覆盖', async () => {
   const requested = []
   const api = kg.createKugouApi(async (_url, init) => {
@@ -114,6 +282,7 @@ test('账号导入和日推使用逐曲完整性校验，合法音质合并可�
     assert.equal(recommendation.list.length, 1)
   } else {
     const imported = load('src/renderer/views/List/MyList/importPlaylist.ts', {
+      '@renderer/utils/data': {}, '@common/utils/qqPlaylist': load('src/common/utils/qqPlaylist.ts'),
       '@common/constants': { LIST_IDS: {} },
       '@renderer/utils': { toNewMusicInfo: row => row, filterMusicList: rows => rows },
       '@renderer/utils/request': {}, '@renderer/utils/musicSdk': { kg: { songList } },
@@ -304,6 +473,7 @@ if (!mobile) {
       '@main/utils': { getProxy: () => null }, '@main/utils/store': () => ({}),
       '@main/utils/navigationPolicy': navigation,
       'node:crypto': require('node:crypto'), '@common/utils/qqCredentials': qq,
+      '@common/utils/qqPlaylist': load('src/common/utils/qqPlaylist.ts'), '@common/utils/qqSign': load('src/common/utils/qqSign.ts', { 'node:crypto': require('node:crypto') }, { Buffer }),
       './kugouAccount': { readKugouSession: () => null },
       './accountLoginLayout': {},
       './officialAccountLogin': { openOfficialAccountLogin: async (provider, options) => {

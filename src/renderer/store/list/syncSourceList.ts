@@ -1,33 +1,82 @@
-import { setListUpdateTime } from '@renderer/utils/data'
-import { setFetchingListStatus, overwriteListMusics, setUpdateTime } from './action'
+import { reactive } from '@common/utils/vueTools'
+import { getListUpdateInfo, setListSourceAccount, setListUpdateTime } from '@renderer/utils/data'
+import { setFetchingListStatus, overwriteListMusics, getListMusics } from './action'
+import { userLists } from './state'
 import { getListDetailAll } from '@renderer/store/songList/action'
 import { getListDetailAll as getBoardListAll } from '@renderer/store/leaderboard/action'
-import { dateFormat } from '@common/utils/common'
 
-const fetchList = async(id: string, source: LX.OnlineSource, sourceListId: string) => {
+export const listSyncStates = reactive<Record<string, { phase: 'fetch' | 'save' | 'success' | 'error', current: number, total: number, error?: string }>>({})
+const pending = new Map<string, Promise<boolean>>()
+export const isQQSyncList = (list: LX.List.UserListInfo) => list.source == 'tx' && !!list.sourceListId && !list.sourceListId.startsWith('board__')
+
+export const syncErrorKey = (error: unknown) => {
+  const code = error instanceof Error ? error.message : ''
+  return code == 'account_changed' ? 'list_sync_account_changed' : 'list_sync_failed'
+}
+
+const performSync = async(target: LX.List.UserListInfo, automatic: boolean) => {
+  const { id, source, sourceListId } = target
+  if (!source || !sourceListId) return false
+  const settings = (await getListUpdateInfo())[id]
+  if (automatic && !settings?.isAutoUpdate) return false
+  if (automatic && isQQSyncList(target) && !settings?.sourceAccountId) return false
+  const stillLinked = () => userLists.some(list => list.id == id && list.source == source && list.sourceListId == sourceListId)
+  if (!stillLinked()) return false
   setFetchingListStatus(id, true)
-
-  let promise
-  if (/^board__/.test(sourceListId)) {
-    const id = sourceListId.replace(/^board__/, '')
-    promise = id ? getBoardListAll(id, true) : Promise.reject(new Error('id not defined: ' + sourceListId))
-  } else {
-    promise = source == 'kg' && /^account:\d+:\d+$/.test(sourceListId)
-      ? import('@renderer/views/List/MyList/importPlaylist').then(async({ loadAccountPlaylistMusic }) => loadAccountPlaylistMusic('kg', sourceListId))
-      : getListDetailAll(sourceListId, source, true)
-  }
-  return promise.finally(() => {
+  listSyncStates[id] = { phase: 'fetch', current: 0, total: 0 }
+  try {
+    let list: LX.Music.MusicInfo[]
+    let accountId: string | undefined
+    if (sourceListId.startsWith('board__')) {
+      list = await getBoardListAll(sourceListId.replace(/^board__/, ''), true)
+    } else if (source == 'tx' || (source == 'kg' && /^account:\d+:\d+$/.test(sourceListId))) {
+      const { loadAccountPlaylistMusic } = await import('@renderer/views/List/MyList/importPlaylist')
+      list = await loadAccountPlaylistMusic(source, sourceListId, progress => {
+        listSyncStates[id] = { ...progress, phase: 'fetch' }
+      }, () => !stillLinked(), {
+        existingMusic: await getListMusics(id),
+        accountId: settings?.sourceAccountId,
+        onAccount: value => { accountId = value },
+      })
+    } else {
+      list = await getListDetailAll(sourceListId, source, true)
+    }
+    if (!stillLinked()) return false
+    // 自动更新在保存前再次检查开关，用户中途关闭后不再覆盖本地。
+    if (automatic && !(await getListUpdateInfo())[id]?.isAutoUpdate) return false
+    listSyncStates[id] = { phase: 'save', current: list.length, total: list.length }
+    await overwriteListMusics({ listId: id, musicInfos: list })
+    if (accountId) await setListSourceAccount(id, accountId)
+    await setListUpdateTime(id, Date.now())
+    listSyncStates[id] = { phase: 'success', current: list.length, total: list.length }
+    return true
+  } catch (error) {
+    listSyncStates[id] = { phase: 'error', current: 0, total: 0, error: syncErrorKey(error) }
+    throw error
+  } finally {
     setFetchingListStatus(id, false)
-  })
+    if (listSyncStates[id]?.phase == 'fetch' || listSyncStates[id]?.phase == 'save') Reflect.deleteProperty(listSyncStates, id)
+  }
 }
 
-export default async(targetListInfo: LX.List.UserListInfo) => {
-  // console.log(targetListInfo)
-  if (!targetListInfo.source || !targetListInfo.sourceListId) return
-  const list = await fetchList(targetListInfo.id, targetListInfo.source, targetListInfo.sourceListId)
-  // console.log(list)
-  void overwriteListMusics({ listId: targetListInfo.id, musicInfos: list })
-  const now = Date.now()
-  void setListUpdateTime(targetListInfo.id, now)
-  setUpdateTime(targetListInfo.id, dateFormat(now))
+// 抓取和保存共用同一把锁，多个入口同时刷新时只提交一次。
+const syncSourceList = async(target: LX.List.UserListInfo, automatic = false): Promise<boolean> => {
+  const running = pending.get(target.id)
+  if (running) return running
+  const task = performSync(target, automatic).finally(() => { pending.delete(target.id) })
+  pending.set(target.id, task)
+  return task
 }
+
+// 收藏可能发生在旧快照抓取期间，先等待旧任务，再读取收藏后的新快照。
+export const syncQQFavorites = async(accountId: string) => {
+  const info = await getListUpdateInfo()
+  const targets = userLists.filter(list => isQQSyncList(list) && ['dir:201', '0'].includes(list.sourceListId ?? '') && info[list.id]?.isAutoUpdate && info[list.id]?.sourceAccountId == accountId)
+  const results = await Promise.allSettled(targets.map(async list => {
+    await pending.get(list.id)?.catch(() => {})
+    return syncSourceList(list, true)
+  }))
+  return { total: results.filter(result => result.status == 'rejected' || result.value).length, failed: results.filter(result => result.status == 'rejected').length }
+}
+
+export default syncSourceList

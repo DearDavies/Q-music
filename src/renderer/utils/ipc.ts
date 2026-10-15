@@ -4,6 +4,7 @@ import { type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from '
 import { markRaw } from '@common/utils/vueTools'
 import * as hotKeys from '@common/hotKey'
 import { APP_EVENT_NAMES, DATA_KEYS, DEFAULT_SETTING } from '@common/constants'
+import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
 
 type RemoveListener = () => void
 
@@ -78,6 +79,7 @@ export interface QQDailyKeySaveResult extends QQDailyKeyStatus {
   songCount: number
 }
 export interface MusicAccountPlaylist {
+  accountId?: string
   id: string
   name: string
   cover: string
@@ -91,6 +93,7 @@ export interface MusicAccountPlaylistsResult {
   status: 'available' | 'login_required' | 'unavailable'
 }
 export interface MusicAccountPlaylistDetailResult {
+  accountId?: string
   provider: MusicAccountProvider
   id: string
   ids: string[]
@@ -117,6 +120,9 @@ export interface MusicAccountPlaybackReportResult {
 }
 export const getMusicAccountStatus = async() => {
   return rendererInvoke<MusicAccountStatus>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_status)
+}
+export const addQQFavoriteSong = async(songMid: string, action: QQFavoriteRequest['action'] = 'add') => {
+  return rendererInvoke<QQFavoriteRequest, QQFavoriteResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_qq_favorite_add, { songMid, action })
 }
 export const loginMusicAccount = async(provider: MusicAccountProvider) => {
   return rendererInvoke<MusicAccountProvider, MusicAccountLoginResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_login, provider)

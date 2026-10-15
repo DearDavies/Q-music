@@ -3,10 +3,9 @@
     <div class="scroll" :class="$style.grid">
       <base-btn
         v-for="item in lists" :key="item.id" type="button" :class="$style.target"
-        :aria-label="item.isExist ? `${item.name}，${$t('list_add__exists')}` : item.name"
         :disabled="disabled || saving || item.isExist" @click="$emit('select', item.id)"
       >
-        <span :class="$style.name">{{ item.name }}</span>
+        <PlaylistIdentity :list="item" subtitle />
         <span v-if="item.isExist" :class="$style.hint">{{ $t('list_add__exists') }}</span>
       </base-btn>
       <base-btn v-if="!editing" type="button" :class="[$style.target, $style.newList]" :disabled="disabled || saving" @click="startEditing">
@@ -36,8 +35,10 @@ import { userLists } from '@renderer/store/list/state'
 import { createUserList } from '@renderer/store/list/action'
 import { dialog } from '@renderer/plugins/Dialog'
 import { useI18n } from '@root/lang'
+import PlaylistIdentity from './PlaylistIdentity.vue'
 
 export default {
+  components: { PlaylistIdentity },
   props: {
     lists: { type: Array, required: true },
     disabled: { type: Boolean, default: false },

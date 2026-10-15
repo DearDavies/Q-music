@@ -49,6 +49,7 @@ declare namespace LX {
     type ListUpdateInfo = Record<string, {
       updateTime: number
       isAutoUpdate: boolean
+      sourceAccountId?: string
     }>
 
     type ListSaveType = 'myList' | 'downloadList'
