@@ -8,7 +8,6 @@ import { createHttpFetch } from './utils/index'
 
 export default {
   _requestObj_tags: null,
-  _requestObj_list: null,
   limit_list: 30,
   limit_song: 50,
   successCode: '000000',
@@ -155,9 +154,8 @@ export default {
 
   // 获取列表数据
   getList(sortId, tagId, page, tryNum = 0) {
-    if (this._requestObj_list) this._requestObj_list.cancelHttp()
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    this._requestObj_list = httpFetch(this.getSongListUrl(sortId, tagId, page), {
+    const requestObj_list = httpFetch(this.getSongListUrl(sortId, tagId, page), {
       headers: this.defaultHeaders,
       // headers: {
       //   sign: 'c3b7ae985e2206e97f1b2de8f88691e2',
@@ -170,7 +168,7 @@ export default {
       //   'User-Agent': 'okhttp/3.9.1',
       // },
     })
-    // return this._requestObj_list.promise.then(({ statusCode, body }) => {
+    // return requestObj_list.promise.then(({ statusCode, body }) => {
     //   if (statusCode !== 200) return this.getList(sortId, tagId, page)
     //   let list = body.replace(/[\r\n]/g, '').match(this.regExps.list)
     //   if (!list) return Promise.reject(new Error('获取列表失败'))
@@ -189,7 +187,7 @@ export default {
     //     }
     //   })
     // })
-    // return this._requestObj_list.promise.then(({ body }) => {
+    // return requestObj_list.promise.then(({ body }) => {
     //   console.log(body)
     //   if (body.retCode !== '100000' || body.retMsg.code !== this.successCode) return this.getList(sortId, tagId, page, ++tryNum)
     //   return {
@@ -200,7 +198,7 @@ export default {
     //     source: 'mg',
     //   }
     // })
-    return this._requestObj_list.promise.then(({ body }) => {
+    return requestObj_list.promise.then(({ body }) => {
       // console.log(body)
       // if (body.retCode !== '000000') return this.getList(sortId, tagId, page, ++tryNum)
       if (body.code !== '000000') return this.getList(sortId, tagId, page, ++tryNum)

@@ -46,6 +46,7 @@ const router = useRouter()
 const route = useRoute()
 const t = useI18n()
 
+const popupVisible = ref(false)
 const list = shallowReactive([])
 let requestId = 0
 const handleToggleTag = (id) => {
@@ -62,6 +63,8 @@ const handleToggleTag = (id) => {
 watch(() => props.source, async(source) => {
   if (!source) return
   const currentRequestId = ++requestId
+  list.splice(0, list.length)
+  popupVisible.value = false
   // const source = (await getLeaderboardSetting()).source as LX.OnlineSource
   let tagInfo = tags[source]
   // console.log(await getTags(source))
@@ -100,8 +103,7 @@ const setTagPopupWidth = () => {
   }, 50)
 }
 
-const dom_btn = ref<HTMLElement | null>(null)
-const popupVisible = ref(false)
+const dom_btn = ref(null)
 const handleShow = () => popupVisible.value = !popupVisible.value
 const handleHide = (evt) => {
   // if (e && e.target.parentNode != this.$refs.dom_popup && this.show) return this.show = false
@@ -118,6 +120,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  requestId++
   document.removeEventListener('click', handleHide)
   window.removeEventListener('resize', setTagPopupWidth)
 })

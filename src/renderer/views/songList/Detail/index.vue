@@ -11,6 +11,7 @@
         <h3 :title="listDetailInfo.info.name">{{ listDetailInfo.info.name }}</h3>
         <p :title="listDetailInfo.info.desc">{{ listDetailInfo.info.desc }}</p>
         <div :class="$style.songListHeaderRight">
+          <base-btn :class="$style.headerRightBtn" :disabled="listDetailInfo.noItemLabel == $t('list__loading')" @click="getListData(source, id, listDetailInfo.page, true)">{{ $t('playlist_import_modal__refresh') }}</base-btn>
           <base-btn
             :class="$style.headerRightBtn"
             :disabled="!listDetailInfo.list.length || !!listDetailInfo.noItemLabel"
@@ -163,6 +164,7 @@ export default {
       picUrl,
       listDetailInfo,
       listRef,
+      getListData,
       togglePage,
       addSongListDetail,
       playSongListDetail,

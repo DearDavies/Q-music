@@ -7,13 +7,15 @@ import { playSongListDetail } from './action'
 
 export default () => {
   const listRef = ref<any>(null)
+  let requestId = 0
 
   const getListData = async(source: LX.OnlineSource, id: string, page: number, refresh: boolean) => {
+    const currentRequest = ++requestId
     await getAndSetListDetail(id, source, page, refresh).then(() => {
       setTimeout(() => {
-        if (listRef.value) listRef.value.scrollToTop()
+        if (currentRequest == requestId && listRef.value) listRef.value.scrollToTop()
       })
-    })
+    }).catch(() => {})
   }
 
   const handlePlayList = (index: number) => {

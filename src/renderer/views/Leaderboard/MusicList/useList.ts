@@ -12,9 +12,12 @@ export default () => {
     void playSongListDetail(listDetailInfo.id, listDetailInfo.list, index)
   }
 
-  const getList = (id: string, page: number) => {
-    void getAndSetListDetail(id, page).then(() => {
+  let requestId = 0
+  const getList = (id: string, page: number, refresh = false) => {
+    const current = ++requestId
+    void getAndSetListDetail(id, page, refresh).then(() => {
       setTimeout(() => {
+        if (current != requestId) return
         listRef.value?.scrollToTop?.()
       })
     }).catch(() => {})

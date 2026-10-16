@@ -264,6 +264,27 @@ const getQQAccountProfile = async() => {
 
 const getQQEncryptedUin = async() => (await getQQAccountProfile()).encryptedUin
 
+// 仅转移音乐服务凭据，不把 QQ 通用登录 Cookie 或其他平台账号交给手机。
+export const getQQTransferPayload = async() => {
+  if (!await verifyMusicAccount('tx', true)) throw new Error('login_required')
+  const { uin, authst, isWeChat } = await getQQAccountCredentials()
+  if (!uin || !authst) throw new Error('login_required')
+  const profile = await getQQAccountProfile()
+  const current = await getQQAccountCredentials()
+  if (current.uin != uin || current.authst != authst) throw new Error('login_required')
+  return {
+    account: `${profile.displayName || 'QQ 音乐'} · ${isWeChat ? '微信' : 'QQ'} · ${maskAccountId(uin)}`,
+    cookies: {
+      qqmusic_key: authst,
+      musickey: authst,
+      qqmusic_uin: uin,
+      musicid: uin,
+      login_type: isWeChat ? '2' : '1',
+      ...(isWeChat ? { wxuin: uin } : { uin }),
+    },
+  }
+}
+
 const qqMusicCredentialRejectionCodes = new Set([401, 403, 1000, 104400, 104401])
 
 class QQMusicURequestError extends Error {

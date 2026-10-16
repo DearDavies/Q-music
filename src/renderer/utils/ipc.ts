@@ -5,6 +5,11 @@ import { markRaw } from '@common/utils/vueTools'
 import * as hotKeys from '@common/hotKey'
 import { APP_EVENT_NAMES, DATA_KEYS, DEFAULT_SETTING } from '@common/constants'
 import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
+import type { AccountTransferInfo, AccountTransferState } from '@common/types/accountTransfer'
+
+export const startAccountTransfer = async() => rendererInvoke<AccountTransferInfo>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_start)
+export const getAccountTransferState = async(id: string) => rendererInvoke<string, AccountTransferState>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_status, id)
+export const cancelAccountTransfer = async(id: string) => rendererInvoke<string, undefined>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_cancel, id)
 
 type RemoveListener = () => void
 

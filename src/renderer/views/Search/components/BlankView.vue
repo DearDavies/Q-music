@@ -284,6 +284,7 @@
                   </details>
                 </details>
                 <div :class="$style.providerFooter">
+                  <button v-if="provider.id == 'tx' && accountStatus.tx" type="button" :disabled="isAccountLoginPending || !!isAccountLogoutPending" @click="isShowAccountTransfer = true">连接手机</button>
                   <button
                     v-if="accountStatus.accounts[provider.id].hasSession" type="button" :class="$style.logoutButton"
                     :disabled="isAccountLoginPending || isAccountStatusLoading || !!isAccountLogoutPending"
@@ -304,9 +305,11 @@
     </main>
   </material-modal>
   <external-import-modal v-model:visible="isShowAccountImport" :list-id="LIST_IDS.DEFAULT" :initial-provider="importProvider" />
+  <account-transfer-modal v-model:visible="isShowAccountTransfer" />
 </template>
 
 <script setup>
+import AccountTransferModal from '@renderer/components/common/AccountTransferModal.vue'
 import { computed, watch, shallowRef, ref } from '@common/utils/vueTools'
 import { historyList } from '@renderer/store/search/state'
 import { getHistoryList, removeHistoryWord, clearHistoryList } from '@renderer/store/search/action'
@@ -349,6 +352,7 @@ const accountPlaylistsProvider = ref('')
 const isPlaylistsLoading = shallowRef(false)
 const isPlaylistDetailLoading = shallowRef(false)
 const isShowAccountModal = ref(false)
+const isShowAccountTransfer = ref(false)
 const isAccountLoginPending = ref(false)
 const accountLoginProvider = ref('')
 const accountLoginError = ref('')

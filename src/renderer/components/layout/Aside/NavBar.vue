@@ -1,10 +1,10 @@
 <template>
   <div ref="dom_menu" :class="$style.menu">
-    <ul :class="$style.list" role="toolbar">
+    <ul ref="dom_list" :class="$style.list" role="toolbar">
       <li
-        v-show="activeIndex > -1"
+        v-show="indicator.height > 0"
         :class="[$style.indicator, { [$style.indicatorReady]: indicatorReady }]"
-        :style="{ transform: `translateY(${activeIndex * 58}px)` }"
+        :style="{ transform: `translateY(${indicator.top}px)`, height: `${indicator.height}px` }"
         role="presentation"
         aria-hidden="true"
       />
@@ -23,7 +23,7 @@
 <script lang="ts">
 import { appSetting } from '@renderer/store/setting'
 import { useI18n } from '@root/lang'
-import { ref, computed, onMounted } from '@common/utils/vueTools'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from '@common/utils/vueTools'
 import { useRoute } from '@common/utils/vueRouter'
 import { useIconSize } from '@renderer/utils/compositions/useIconSize'
 
@@ -32,6 +32,7 @@ export default {
   setup() {
     const t = useI18n()
     const dom_menu = ref<HTMLElement>()
+    const dom_list = ref<HTMLElement>()
     const iconSize = useIconSize(dom_menu, 0.32)
 
     const menus = computed(() => {
@@ -95,20 +96,42 @@ export default {
     })
     const route = useRoute()
     const activeIndex = computed(() => menus.value.findIndex(m => m.name == route.meta.name))
+    const indicator = reactive({ top: 0, height: 0 })
+
+    // 样式会从 px 转为 rem；按实际布局定位，避免字号变化后逐项累积偏移。
+    const updateIndicator = () => {
+      const list = dom_list.value
+      const target = list?.querySelector<HTMLElement>('a[aria-selected="true"]')
+      if (!list || !target) { indicator.height = 0; return }
+      const bounds = target.getBoundingClientRect()
+      indicator.top = bounds.top - list.getBoundingClientRect().top
+      indicator.height = bounds.height
+    }
+    watch([activeIndex, menus], updateIndicator, { flush: 'post' })
 
     // 首次定位不播放滑动动画，避免启动时选中块从顶部滑下来
     const indicatorReady = ref(false)
+    let resizeObserver: ResizeObserver | undefined
+    let readyFrame = 0
     onMounted(() => {
-      requestAnimationFrame(() => {
+      updateIndicator()
+      readyFrame = requestAnimationFrame(() => {
         indicatorReady.value = true
       })
+      resizeObserver = new ResizeObserver(updateIndicator)
+      if (dom_list.value) resizeObserver.observe(dom_list.value)
+    })
+    onBeforeUnmount(() => {
+      resizeObserver?.disconnect()
+      cancelAnimationFrame(readyFrame)
     })
 
     return {
       appSetting,
       menus,
       dom_menu,
-      activeIndex,
+      dom_list,
+      indicator,
       indicatorReady,
     }
   },
@@ -151,13 +174,12 @@ export default {
 .navItem {
   position: relative;
 }
-// 选中底块独立于导航项，切换页面时在项之间滑动；58px = 导航项高度 50px + 间距 8px
+// 选中底块独立于导航项，位置和高度跟随实际菜单项。
 .indicator {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
-  height: 50px;
   border-radius: 14px;
   pointer-events: none;
   background: rgba(38, 40, 39, .1);

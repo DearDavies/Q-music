@@ -3,22 +3,27 @@ import { deduplicationList, toNewMusicInfo } from '@renderer/utils'
 import musicSdk from '@renderer/utils/musicSdk'
 import { markRaw, markRawList } from '@common/utils/vueTools'
 import { boards, type Board, listDetailInfo, type ListDetailInfo } from './state'
+import { withBrowseTimeout } from '../browseRequest'
 
 const cache = new Map<string, any>()
 const boardRequests = new Map<LX.OnlineSource, Promise<Board>>()
 const detailRequests = new Map<string, Promise<ListDetailInfo>>()
+let detailRevision = 0
 
 const wait = async(ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const requestWithRetry = async<T>(factory: () => Promise<T>, validate: (result: T) => boolean, retryCount = 2): Promise<T> => {
+  const deadline = Date.now() + 20_000
   let lastError: unknown
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     try {
-      const result = await factory()
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) throw new Error('Browse request timed out')
+      const result = await withBrowseTimeout(factory(), remaining)
       if (!validate(result)) throw new Error('Invalid leaderboard response')
       return result
     } catch (error) {
       lastError = error
-      if (attempt == retryCount) break
+      if (attempt == retryCount || Date.now() >= deadline) break
       await wait(250 * (attempt + 1))
     }
   }
@@ -42,6 +47,7 @@ export const setListDetail = (result: ListDetailInfo, id: string, page: number) 
   else if (page == 1) listDetailInfo.noItemLabel = window.i18n.t('no_item')
 }
 export const clearListDetail = () => {
+  detailRevision++
   listDetailInfo.list = []
   listDetailInfo.id = ''
   listDetailInfo.source = null
@@ -87,17 +93,17 @@ export const getListDetail = async(id: string, page: number, isRefresh = false):
   const [source, bangId] = id.split('__') as [LX.OnlineSource, string]
 
   const pendingRequest = detailRequests.get(key)
-  if (pendingRequest) return pendingRequest
+  if (!isRefresh && pendingRequest) return pendingRequest
 
   const leaderboard = musicSdk[source]?.leaderboard
   if (!leaderboard) throw new Error(`Leaderboard source not found: ${source}`)
 
-  const request = requestWithRetry(
+  const request = withBrowseTimeout(requestWithRetry(
     async() => leaderboard.getList(bangId, page) as Promise<ListDetailInfo>,
     result => Array.isArray(result?.list) && Number.isFinite(result?.limit),
-  ).then((result: ListDetailInfo) => {
+  )).then((result: ListDetailInfo) => {
     result.list = markRawList(deduplicationList(result.list.map(m => toNewMusicInfo(m)) as LX.Music.MusicInfoOnline[]))
-    cache.set(key, result)
+    if (detailRequests.get(key) === request) cache.set(key, result)
     return result
   })
   detailRequests.set(key, request)
@@ -162,17 +168,22 @@ export const getAndSetListDetail = async(id: string, page: number, isRefresh = f
   // if (!bangId) return
   let key = `${id}__${page}`
 
-  if (!isRefresh && listDetailInfo.key == key && listDetailInfo.list.length) return
-
+  if (!isRefresh && listDetailInfo.key == key && listDetailInfo.list.length && !listDetailInfo.noItemLabel) return
+  const revision = ++detailRevision
+  listDetailInfo.list = []
+  listDetailInfo.id = id
+  listDetailInfo.source = id.split('__')[0] as LX.OnlineSource
+  listDetailInfo.total = 0
+  listDetailInfo.page = page
   listDetailInfo.key = key
   listDetailInfo.noItemLabel = window.i18n.t('list__loading')
 
-  return getListDetail(id, page, isRefresh).then((result: ListDetailInfo) => {
-    if (key != listDetailInfo.key) return
+  return withBrowseTimeout(getListDetail(id, page, isRefresh)).then((result: ListDetailInfo) => {
+    if (revision != detailRevision) return
     setListDetail(result, id, page)
   }).catch((error: any) => {
-    if (key != listDetailInfo.key) return
-    clearListDetail()
+    if (revision != detailRevision) return
+    detailRevision++
     listDetailInfo.noItemLabel = window.i18n.t('list__load_failed')
     console.log(error)
     throw error

@@ -1,12 +1,20 @@
 <template>
   <div :class="$style.leaderboard">
     <div :class="$style.lists">
+      <div :class="$style.listsHeading">{{ $t('leaderboard') }}</div>
       <div :class="$style.listsSelect">
         <base-selection :model-value="source" :class="$style.select" :list="sourceList" item-key="id" item-name="name" @update:model-value="handleToggleSource" />
       </div>
       <BoardList ref="boardListRef" :board-id="boardId" :source="source" @show-menu="$refs.musicListRef?.hideMenu()" />
     </div>
     <div :class="$style.list">
+      <header :class="$style.boardHeader">
+        <SourceIcon v-if="source" :source="source" :size="34" />
+        <div :class="$style.boardTitle">
+          <span>{{ sourceNames[source] }}</span>
+          <h2>{{ boardName || $t('leaderboard') }}</h2>
+        </div>
+      </header>
       <MusicList ref="musicListRef" :source="source" :board-id="boardId" @show-menu="$refs.boardListRef?.hideMenu()" />
     </div>
   </div>
@@ -18,8 +26,8 @@ import { getLeaderboardSetting, setLeaderboardSetting } from '@renderer/utils/da
 import BoardList from './BoardList/index.vue'
 import MusicList from './MusicList/index.vue'
 import { sources, boards } from '@renderer/store/leaderboard/state'
-import { getBoardsList, setBoard } from '@renderer/store/leaderboard/action'
 import { sourceNames } from '@renderer/store'
+import SourceIcon from '@renderer/components/common/SourceIcon.vue'
 import { useRoute, useRouter } from '@common/utils/vueRouter'
 
 
@@ -60,6 +68,7 @@ export default {
   components: {
     BoardList,
     MusicList,
+    SourceIcon,
   },
   beforeRouteEnter: verifyQueryParams,
   beforeRouteUpdate: verifyQueryParams,
@@ -71,19 +80,14 @@ export default {
     })
     const router = useRouter()
     const route = useRoute()
-    const handleToggleSource = async(id) => {
+    const boardName = computed(() => boards[source.value]?.list.find(item => item.id == boardId.value)?.name ?? '')
+    const handleToggleSource = (id) => {
       if (id == source.value) return
-      let boardList = boards[id]
-      try {
-        if (boardList == null) setBoard(boardList = await getBoardsList(id), id)
-      } catch (error) {
-        console.warn(`Failed to prepare leaderboard source: ${id}`, error)
-      }
       void router.replace({
         path: route.path,
         query: {
           source: id,
-          boardId: boardList?.list[0]?.id,
+          boardId: boards[id]?.list[0]?.id,
         },
       })
     }
@@ -91,6 +95,8 @@ export default {
     return {
       source,
       boardId,
+      boardName,
+      sourceNames,
       sourceList,
       handleToggleSource,
       musicListRef,
@@ -110,9 +116,21 @@ export default {
   gap: 16px;
   padding: 16px 18px calc(@height-player + 18px);
   box-sizing: border-box;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, .18), rgba(255, 255, 248, .42)),
-    radial-gradient(circle at 16% 14%, var(--color-primary-alpha-900), transparent 34%);
+  min-height: 0;
+}
+.listsHeading { padding: 18px 16px 6px; font-size: 17px; font-weight: 650; }
+.boardHeader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--color-primary-alpha-900);
+}
+.boardTitle {
+  min-width: 0;
+  span { font-size: 11px; color: var(--color-font-label); }
+  h2 { margin-top: 5px; font-size: 23px; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
 }
 .header {
   flex: none;
@@ -137,7 +155,7 @@ export default {
 
 .lists {
   flex: none;
-  width: clamp(190px, 18%, 230px);
+  width: clamp(160px, 22%, 220px);
   display: flex;
   flex-flow: column nowrap;
   overflow: hidden;
@@ -218,6 +236,12 @@ export default {
   // .noItem {
 
   // }
+}
+@media (max-width: 900px) {
+  .leaderboard { gap: 10px; padding: 10px 10px calc(@height-player + 12px); }
+  .lists { width: 150px; }
+  .boardHeader { padding: 14px; }
+  .boardTitle h2 { font-size: 20px; }
 }
 
 </style>

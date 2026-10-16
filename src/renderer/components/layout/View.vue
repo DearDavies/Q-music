@@ -2,7 +2,8 @@
   <div :class="$style.view">
     <router-view v-slot="{ Component, route }">
       <transition name="q-route">
-        <component :is="Component" :key="route.name == 'Search' ? route.path : route.fullPath" class="view-container" />
+        <!-- 筛选和翻页复用页面，避免新旧实例同时请求、取消请求和修改路由。 -->
+        <component :is="Component" :key="['Search', 'Leaderboard', 'SongList', 'SongListDetail'].includes(route.name) ? route.path : route.fullPath" class="view-container" />
       </transition>
     </router-view>
   </div>

@@ -2,6 +2,7 @@
 import { deduplicationList, toNewMusicInfo } from '@renderer/utils'
 import musicSdk from '@renderer/utils/musicSdk'
 import { markRaw, markRawList } from '@common/utils/vueTools'
+import { withBrowseTimeout } from '../browseRequest'
 import {
   tags,
   listInfo,
@@ -19,18 +20,25 @@ import type {
 
 const cache = new Map<string, any>()
 const tagRequests = new Map<LX.OnlineSource, Promise<TagInfo>>()
+const detailRequests = new Map<string, Promise<ListDetailInfo>>()
+let listRevision = 0
+let detailRevision = 0
 
 const wait = async(ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-const requestWithRetry = async<T>(factory: () => Promise<T>, validate: (result: T) => boolean, retryCount = 2): Promise<T> => {
+const requestWithRetry = async<T>(factory: () => Promise<T>, validate: (result: T) => boolean, retryCount = 2, isCurrent = () => true): Promise<T> => {
+  const deadline = Date.now() + 20_000
   let lastError: unknown
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     try {
-      const result = await factory()
+      if (!isCurrent()) throw new Error('Browse request superseded')
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) throw new Error('Browse request timed out')
+      const result = await withBrowseTimeout(factory(), remaining)
       if (!validate(result)) throw new Error('Invalid song list response')
       return result
     } catch (error) {
       lastError = error
-      if (attempt == retryCount) break
+      if (!isCurrent() || attempt == retryCount || Date.now() >= deadline) break
       await wait(250 * (attempt + 1))
     }
   }
@@ -51,6 +59,7 @@ export const setTags = (tagInfo: TagInfo, source: LX.OnlineSource) => {
 }
 
 export const clearList = () => {
+  listRevision++
   listInfo.list = []
   listInfo.total = 0
   listInfo.noItemLabel = ''
@@ -93,6 +102,7 @@ export const setSelectListInfo = (info: ListInfoItem) => {
   selectListInfo.source = info.source
 }
 export const clearListDetail = () => {
+  detailRevision++
   listDetailInfo.list = []
   listDetailInfo.id = ''
   listDetailInfo.source = 'kw'
@@ -108,8 +118,9 @@ export const getTags = async<T extends LX.OnlineSource>(source: T) => {
   const pendingRequest = tagRequests.get(source)
   if (pendingRequest) return pendingRequest as Promise<TagInfo<T>>
 
-  const request = musicSdk[source]?.songList.getTags() as Promise<TagInfo<T>> | undefined
-  if (!request) throw new Error(`Song list source not found: ${source}`)
+  const pending = musicSdk[source]?.songList.getTags() as Promise<TagInfo<T>> | undefined
+  if (!pending) throw new Error(`Song list source not found: ${source}`)
+  const request = withBrowseTimeout(pending)
 
   tagRequests.set(source, request)
   try {
@@ -130,6 +141,7 @@ export const getTags = async<T extends LX.OnlineSource>(source: T) => {
  * @returns
  */
 export const getAndSetList = async(source: LX.OnlineSource, tabId: string, sortId: string, page: number, isRefresh = false) => {
+  const revision = ++listRevision
   // let source = rootState.setting.songList.source
   // let tabId = rootState.setting.songList.tagInfo.id
   // let sortId = rootState.setting.songList.sortId
@@ -137,7 +149,7 @@ export const getAndSetList = async(source: LX.OnlineSource, tabId: string, sortI
   let key = `slist__${source}__${sortId}__${tabId}__${page}`
   // if (state.list.list.length && state.list.key == key) return
   if (!isRefresh) {
-    if (listInfo.key == key && listInfo.list.length) return
+    if (listInfo.key == key && listInfo.list.length && !listInfo.noItemLabel) return
     if (cache.has(key)) {
       listInfo.key = key
       setList(cache.get(key), tabId, sortId, page)
@@ -145,18 +157,26 @@ export const getAndSetList = async(source: LX.OnlineSource, tabId: string, sortI
     }
   }
   listInfo.noItemLabel = window.i18n.t('list__loading')
+  listInfo.list = []
+  listInfo.total = 0
+  listInfo.source = source
+  listInfo.tagId = tabId
+  listInfo.sortId = sortId
+  listInfo.page = page
   listInfo.key = key
   // clearList()
-  return requestWithRetry(
+  return withBrowseTimeout(requestWithRetry(
     async() => musicSdk[source]?.songList.getList(sortId, tabId, page) as Promise<ListInfo>,
     isListResponse,
-  ).then((result: ListInfo) => {
+    2,
+    () => revision == listRevision,
+  )).then((result: ListInfo) => {
+    if (revision != listRevision) return
     cache.set(key, result)
-    if (key != listInfo.key) return
     setList(result, tabId, sortId, page)
   }).catch((error: any) => {
-    if (key != listInfo.key) return
-    clearList()
+    if (revision != listRevision) return
+    listRevision++
     listInfo.noItemLabel = window.i18n.t('list__load_failed')
     console.log(error)
     throw error
@@ -173,15 +193,23 @@ export const getAndSetList = async(source: LX.OnlineSource, tabId: string, sortI
 export const getListDetail = async(id: string, source: LX.OnlineSource, page: number, isRefresh = false): Promise<ListDetailInfo> => {
   let key = `sdetail__${source}__${id}__${page}`
   if (!isRefresh && cache.has(key)) return cache.get(key)
+  const pending = detailRequests.get(key)
+  if (!isRefresh && pending) return pending
 
-  return requestWithRetry(
+  const request = withBrowseTimeout(requestWithRetry(
     async() => musicSdk[source]?.songList.getListDetail(id, page) as Promise<ListDetailInfo>,
     isListDetailResponse,
-  ).then((result: ListDetailInfo) => {
+  )).then((result: ListDetailInfo) => {
     result.list = markRawList(deduplicationList(result.list.map(m => toNewMusicInfo(m)) as LX.Music.MusicInfoOnline[]))
-    cache.set(key, result)
+    if (detailRequests.get(key) === request) cache.set(key, result)
     return result
   })
+  detailRequests.set(key, request)
+  try {
+    return await request
+  } finally {
+    if (detailRequests.get(key) === request) detailRequests.delete(key)
+  }
 }
 
 /**
@@ -235,17 +263,24 @@ export const getListDetailAll = async(id: string, source: LX.OnlineSource, isRef
 export const getAndSetListDetail = async(id: string, source: LX.OnlineSource, page: number, isRefresh = false) => {
   let key = `sdetail__${source}__${id}__${page}`
 
-  if (!isRefresh && listDetailInfo.key == key && listDetailInfo.list.length) return
+  if (!isRefresh && listDetailInfo.key == key && listDetailInfo.list.length && !listDetailInfo.noItemLabel) return
+  const revision = ++detailRevision
+  if (listDetailInfo.id != id || listDetailInfo.source != source) listDetailInfo.info = {}
+  listDetailInfo.list = []
+  listDetailInfo.total = 0
+  listDetailInfo.id = id
+  listDetailInfo.source = source
+  listDetailInfo.page = page
 
   listDetailInfo.key = key
   listDetailInfo.noItemLabel = window.i18n.t('list__loading')
 
-  return getListDetail(id, source, page, isRefresh).then((result: ListDetailInfo) => {
-    if (key != listDetailInfo.key) return
+  return withBrowseTimeout(getListDetail(id, source, page, isRefresh)).then((result: ListDetailInfo) => {
+    if (revision != detailRevision) return
     setListDetail(result, id, page)
   }).catch((error: any) => {
-    if (key != listDetailInfo.key) return
-    clearListDetail()
+    if (revision != detailRevision) return
+    detailRevision++
     listDetailInfo.noItemLabel = window.i18n.t('list__load_failed')
     console.log(error)
     throw error

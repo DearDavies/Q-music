@@ -27,9 +27,14 @@ import { getAllThemes, removeTheme, saveTheme, setPowerSaveBlocker } from '@main
 import { openDirInExplorer } from '@common/utils/electron'
 import { addQQFavoriteSong, getMusicAccountDailySongIds, getMusicAccountMusicUrl, getMusicAccountPlaylistDetail, getMusicAccountPlaylists, getMusicAccountStatus, getQQDailyKeyStatus, logoutMusicAccount, openMusicAccountLogin, openQQDailyKeyPage, reportMusicAccountPlayback, saveQQDailyApiKey, type MusicAccountDailyResult, type MusicAccountLoginResult, type MusicAccountLogoutResult, type MusicAccountMusicUrlRequest, type MusicAccountMusicUrlResult, type MusicAccountPlaybackReportRequest, type MusicAccountPlaybackReportResult, type MusicAccountPlaylistDetailResult, type MusicAccountPlaylistsResult, type MusicAccountProvider, type QQDailyKeySaveResult } from '../musicAccount'
 import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
+import { startAccountTransfer, getAccountTransferState, cancelAccountTransfer } from '../accountTransfer'
+import type { AccountTransferInfo, AccountTransferState } from '@common/types/accountTransfer'
 import { getCloudConfig, getSavedCloudPassword, importCloudTracks, listCloudTracks, saveCloudConfig, saveCloudPassword, selectCloudProvider, uploadCloudTrack, type CloudConfig, type CloudTrack } from '../cloudLibrary'
 
 export default () => {
+  mainHandle<AccountTransferInfo>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_start, startAccountTransfer)
+  mainHandle<string, AccountTransferState>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_status, async({ params }) => getAccountTransferState(params))
+  mainHandle<string, undefined>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_transfer_cancel, async({ params }) => { cancelAccountTransfer(params); return undefined })
   mainHandle<ReturnType<typeof getCloudConfig>>(WIN_MAIN_RENDERER_EVENT_NAME.cloud_config_get, async() => getCloudConfig())
   mainHandle<CloudConfig, ReturnType<typeof getCloudConfig>>(WIN_MAIN_RENDERER_EVENT_NAME.cloud_config_save, async({ params }) => saveCloudConfig(params))
   mainHandle<CloudConfig['provider'], ReturnType<typeof getCloudConfig>>(WIN_MAIN_RENDERER_EVENT_NAME.cloud_config_select, async({ params }) => selectCloudProvider(params))
@@ -150,9 +155,11 @@ export default () => {
   })
   mainHandle<QQFavoriteRequest, QQFavoriteResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_qq_favorite_add, async({ params }) => addQQFavoriteSong(params))
   mainHandle<MusicAccountProvider, MusicAccountLoginResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_login, async({ params: provider }) => {
+    if (provider == 'tx') cancelAccountTransfer()
     return openMusicAccountLogin(provider)
   })
   mainHandle<MusicAccountProvider, MusicAccountLogoutResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_logout, async({ params: provider }) => {
+    if (provider == 'tx') cancelAccountTransfer()
     return logoutMusicAccount(provider)
   })
   mainHandle<MusicAccountProvider, MusicAccountDailyResult>(WIN_MAIN_RENDERER_EVENT_NAME.music_account_daily, async({ params: provider }) => {

@@ -44,6 +44,7 @@
       </div>
       <div v-else-if="props.listInfo.noItemLabel" :class="$style.noitem">
         <p v-text="props.listInfo.noItemLabel" />
+        <base-btn v-if="retryable" @click="$emit('retry')">{{ $t('play_queue__retry') }}</base-btn>
       </div>
     </transition>
   </div>
@@ -58,8 +59,10 @@ import { useRoute, useRouter } from '@common/utils/vueRouter'
 const props = withDefaults(defineProps<{
   listInfo: ListInfo
   visibleSource?: boolean
+  retryable?: boolean
 }>(), {
   visibleSource: false,
+  retryable: false,
 })
 
 const router = useRouter()
@@ -67,7 +70,7 @@ const route = useRoute()
 
 const dom_list_ref = ref<HTMLElement | null>(null)
 
-const emit = defineEmits(['toggle-page'])
+const emit = defineEmits(['toggle-page', 'retry'])
 
 const isLoading = computed(() => props.listInfo.noItemLabel == window.i18n.t('list__loading'))
 

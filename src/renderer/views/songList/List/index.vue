@@ -2,12 +2,14 @@
   <div :class="$style.container">
     <div :class="$style.header">
       <div :class="$style.left">
+        <base-selection :model-value="source" :class="$style.sourceSelect" :list="sourceList" item-key="id" item-name="name" @update:model-value="handleToggleSource" />
         <tag-list :source="source" :tag-id="tagId" :sort-id="sortId" />
         <sort-tab :source="source" :tag-id="tagId" :sort-id="sortId" />
       </div>
+      <base-btn :class="$style.btn" :disabled="listInfo.noItemLabel == $t('list__loading')" @click="$refs.listViewRef?.refresh()">{{ $t('playlist_import_modal__refresh') }}</base-btn>
       <base-btn :class="$style.btn" outline min @click="visibleOpenSongListModal = true">{{ $t('songlist__import_input_show_btn') }}</base-btn>
     </div>
-    <list-view :source="source" :tag-id="tagId" :sort-id="sortId" :page="page" />
+    <list-view ref="listViewRef" :source="source" :tag-id="tagId" :sort-id="sortId" :page="page" />
     <open-list-modal v-model="visibleOpenSongListModal" :source-list="sourceList" />
   </div>
 </template>
@@ -74,6 +76,13 @@ const verifyQueryParams = async function(this: any, to: { query: Query, path: st
     return
   }
   const normalizedPage = normalizePage(_page)
+  const normalizedSource = sources.includes(_source as LX.OnlineSource) ? _source as LX.OnlineSource : sources[0]
+  const availableSorts = sortList[normalizedSource] ?? []
+  const normalizedSort = availableSorts.some(item => item.id == _sortId) ? _sortId : availableSorts[0]?.id ?? ''
+  if (_source != normalizedSource || _sortId != normalizedSort) {
+    next({ path: to.path, query: { ...to.query, source: normalizedSource, sortId: normalizedSort, tagId: _source == normalizedSource ? _tagId : '', page: '1' } })
+    return
+  }
   if (_page != null && _page != String(normalizedPage)) {
     next({ path: to.path, query: { ...to.query, page: String(normalizedPage) } })
     return
@@ -130,6 +139,7 @@ export default {
       tagId,
       sortId,
       page,
+      listInfo,
       sourceList,
       handleToggleSource,
       visibleOpenSongListModal,
@@ -146,21 +156,34 @@ export default {
   display: flex;
   flex-flow: column nowrap;
   position: relative;
+  box-sizing: border-box;
+  padding: 12px 14px calc(@height-player + 12px);
+  min-height: 0;
 }
 .header {
   flex: none;
   width: 100%;
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 8px;
   // padding-right: 5px;
   // box-sizing: border-box;
-  padding-bottom: 5px;
+  padding: 8px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: rgb(from var(--color-main-background) r g b / .7);
+  border: 1px solid var(--color-primary-alpha-900);
 }
 .left {
   flex: auto;
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 6px;
 }
+.sourceSelect { width: 120px; font-size: 12px; }
 
 .btn {
   color: var(--color-font);

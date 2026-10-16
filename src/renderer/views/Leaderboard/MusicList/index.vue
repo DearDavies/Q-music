@@ -1,5 +1,10 @@
 <template>
   <div :class="$style.container">
+    <div :class="$style.actions">
+      <base-btn :disabled="!listDetailInfo.list.length || !!listDetailInfo.noItemLabel" @click="handlePlayList(0)">{{ $t('list__play_all') }}</base-btn>
+      <base-btn :disabled="loading || !boardId" @click="getList(boardId, listDetailInfo.page, true)">{{ $t(failed ? 'play_queue__retry' : 'playlist_import_modal__refresh') }}</base-btn>
+    </div>
+    <div :class="$style.songs" :aria-busy="loading">
     <material-online-list
       ref="listRef"
       :page="listDetailInfo.page"
@@ -12,11 +17,13 @@
       @play-list="handlePlayList"
       @toggle-page="togglePage"
     />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch } from '@common/utils/vueTools'
+import { computed, watch } from '@common/utils/vueTools'
+import { clearListDetail } from '@renderer/store/leaderboard/action'
 import useList from './useList'
 
 
@@ -34,8 +41,10 @@ const {
   handlePlayList,
 } = useList()
 
-watch(() => props.boardId, (boardId) => {
-  if (!boardId) return
+const loading = computed(() => listDetailInfo.noItemLabel == window.i18n.t('list__loading'))
+const failed = computed(() => listDetailInfo.noItemLabel == window.i18n.t('list__load_failed'))
+watch(() => [props.source, props.boardId], ([source, boardId]) => {
+  if (!boardId || !boardId.startsWith(`${source}__`)) { clearListDetail(); return }
   getList(boardId, 1)
 }, {
   immediate: true,
@@ -63,12 +72,13 @@ defineExpose({ hideMenu })
 
 <style lang="less" module>
 .container {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
+  display: flex;
+  flex-flow: column nowrap;
+  flex: 1;
+  min-height: 0;
 }
+.actions { display: flex; gap: 8px; padding: 12px 18px 4px; }
+.songs { position: relative; flex: 1; min-height: 0; }
 
 .list {
   overflow: hidden;

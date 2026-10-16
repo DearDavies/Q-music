@@ -1,9 +1,9 @@
 <template>
-  <SongList ref="list_ref" :list-info="listInfo" @toggle-page="togglePage" />
+  <SongList ref="list_ref" :list-info="listInfo" retryable @retry="refresh" @toggle-page="togglePage" />
 </template>
 
 <script setup lang="ts">
-import { watch, ref, nextTick } from '@common/utils/vueTools'
+import { watch, ref, nextTick, onBeforeUnmount } from '@common/utils/vueTools'
 import { listInfo } from '@renderer/store/songList/state'
 import { getAndSetList } from '@renderer/store/songList/action'
 import { useRouter, useRoute, onBeforeRouteLeave } from '@common/utils/vueRouter'
@@ -23,9 +23,13 @@ const list_ref = ref<any>(null)
 const router = useRouter()
 const route = useRoute()
 
-const getListData = async(source: LX.OnlineSource, tabId: string, sortId: string, page: number) => {
+let requestId = 0
+onBeforeUnmount(() => { requestId++ })
+const getListData = async(source: LX.OnlineSource, tabId: string, sortId: string, page: number, force = false) => {
+  const current = ++requestId
   // console.log(source, tabId, sortId, page)
-  await getAndSetList(source, tabId, sortId, page).then(() => {
+  await getAndSetList(source, tabId, sortId, page, force).then(() => {
+    if (current != requestId) return
     if (listInfo.key == window.lx.songListInfo.songlistKey && window.lx.songListInfo.songlistPosition) {
       void nextTick(() => {
         list_ref.value?.scrollTo(window.lx.songListInfo.songlistPosition)
@@ -33,11 +37,13 @@ const getListData = async(source: LX.OnlineSource, tabId: string, sortId: string
     } else if (list_ref.value) {
       window.lx.songListInfo.songlistKey = null
       void nextTick(() => {
-        list_ref.value.scrollTo(0)
+        list_ref.value?.scrollTo(0)
       })
     }
   }).catch(() => {})
 }
+const refresh = () => { void getListData(props.source, props.tagId, props.sortId ?? '', props.page, true) }
+defineExpose({ refresh })
 
 const togglePage = (page: number) => {
   void router.replace({
