@@ -677,6 +677,7 @@
   "version_btn_unknown": "項目首頁",
   "version_btn_update": "安裝",
   "version_label_change_log": "更新說明：",
+  "version_link_open_failed": "無法開啟連結，請稍後再試",
   "version_label_current_ver": "目前版本：",
   "version_label_history": "歷史版本：",
   "version_label_latest_ver": "最新版本：",

@@ -11,13 +11,14 @@ import Text from '@/components/common/Text'
 import { useI18n } from '@/lang'
 import { useVersionDownloadProgressUpdated, useVersionInfo, useVersionInfoIgnoreVersionUpdated } from '@/store/version/hook'
 import ModalContent from './ModalContent'
+import ReleaseNotes from './ReleaseNotes'
 import { checkUpdate, downloadUpdate, hideModal, installUpdate, setIgnoreVersion } from '@/core/version'
 
 const VersionItem = ({ version, desc }: VersionInfo) => {
   return (
     <View style={styles.versionItem}>
       <Text style={styles.label}>v{version}</Text>
-      <Text selectable style={styles.desc}>{desc}</Text>
+      <ReleaseNotes>{desc}</ReleaseNotes>
     </View>
   )
 }
@@ -48,8 +49,8 @@ const Content = memo(({ title, newVersionInfo }: {
             ? (
                 <View>
                   <Text style={styles.label}>{t('version_label_change_log')}</Text>
-                  <View style={{ paddingLeft: 10, marginTop: 5 }}>
-                    <Text selectable style={styles.desc}>{newVersionInfo.desc}</Text>
+                  <View style={{ marginTop: 5 }}>
+                    <ReleaseNotes>{newVersionInfo.desc}</ReleaseNotes>
                   </View>
                 </View>
               )
@@ -60,7 +61,7 @@ const Content = memo(({ title, newVersionInfo }: {
             ? (
                 <View style={styles.history}>
                   <Text style={styles.label}>{t('version_label_history')}</Text>
-                  <View style={{ paddingLeft: 10, marginTop: 5 }}>
+                  <View style={{ marginTop: 5 }}>
                     {history.map((item, index) => <VersionItem key={index} version={item.version} desc={item.desc} />)}
                   </View>
                 </View>
@@ -229,10 +230,6 @@ const styles = createStyle({
   label: {
     fontSize: 14,
     marginBottom: 2,
-  },
-  desc: {
-    fontSize: 13,
-    lineHeight: 18,
   },
   tip: {
     paddingLeft: 15,

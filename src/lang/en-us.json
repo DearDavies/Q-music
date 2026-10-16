@@ -677,6 +677,7 @@
   "version_btn_unknown": "Project Homepage",
   "version_btn_update": "Install",
   "version_label_change_log": "Changelog: ",
+  "version_link_open_failed": "Unable to open the link. Please try again later.",
   "version_label_current_ver": "Current: ",
   "version_label_history": "History: ",
   "version_label_latest_ver": "Latest: ",
