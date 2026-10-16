@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import OnlineList, { type OnlineListType, type OnlineListProps } from '@/components/OnlineList'
-import { clearListDetail, getListDetail, setListDetail, setListDetailInfo } from '@/core/leaderboard'
+import { getListDetail, setListDetail, setListDetailInfo } from '@/core/leaderboard'
 import boardState from '@/store/leaderboard/state'
 import { handlePlay } from './listAction'
 
@@ -45,7 +45,6 @@ export default forwardRef<MusicListType, {}>((props, ref) => {
           })
         }).catch(() => {
           if (isUnmountedRef.current || requestId != requestIdRef.current) return
-          if (boardState.listDetailInfo.list.length && page == 1) clearListDetail()
           listRef.current?.setStatus('error')
         })
       }
@@ -87,7 +86,6 @@ export default forwardRef<MusicListType, {}>((props, ref) => {
       listRef.current?.setStatus(boardState.listDetailInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
       if (isUnmountedRef.current || requestId != requestIdRef.current) return
-      if (boardState.listDetailInfo.list.length && page == 1) clearListDetail()
       listRef.current?.setStatus('error')
     })
   }
@@ -103,7 +101,6 @@ export default forwardRef<MusicListType, {}>((props, ref) => {
       listRef.current?.setStatus(boardState.listDetailInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
       if (isUnmountedRef.current || requestId != requestIdRef.current) return
-      if (boardState.listDetailInfo.list.length && page == 1) clearListDetail()
       listRef.current?.setStatus('error')
     })
   }

@@ -1,6 +1,7 @@
 import { NativeModules } from 'react-native'
 import type { MusicAccountProvider } from './types'
 import { getQQCredentials } from './qqCredentials'
+import { getQQImportedCookies, clearQQImportedCookies } from './qqImportedSession'
 export { getQQCredentials } from './qqCredentials'
 
 const { UtilsModule } = NativeModules
@@ -26,6 +27,10 @@ const parseCookieString = (raw: string | null | undefined): Record<string, strin
 }
 
 export const getProviderCookies = async(provider: MusicAccountProvider): Promise<Record<string, string>> => {
+  if (provider == 'tx') {
+    const imported = await getQQImportedCookies()
+    if (imported) return imported
+  }
   const cookies: Record<string, string> = {}
   for (const url of COOKIE_URLS[provider]) {
     // Android WebView CookieManager 为全局存储，原生层读取，多个 URL 合并去重
@@ -51,6 +56,7 @@ export const isNeteaseLoginCookieValid = (cookies: Record<string, string>): bool
 }
 
 export const clearProviderCookies = async(provider: MusicAccountProvider) => {
+  if (provider == 'tx') await clearQQImportedCookies()
   for (const url of COOKIE_URLS[provider]) {
     await UtilsModule.clearWebCookie(url)
   }

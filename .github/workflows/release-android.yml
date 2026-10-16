@@ -147,6 +147,12 @@ jobs:
         working-directory: mobile
         run: npm run test:accounts
 
+      - name: Verify account pairing and browsing transitions
+        working-directory: mobile
+        run: |
+          npm run test:account-transfer
+          npm run test:browse
+
       - name: Verify QQ favorites and playlist synchronization
         working-directory: mobile
         run: npm run test:qq-sync

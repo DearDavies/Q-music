@@ -17,31 +17,40 @@ interface SonglistInfo {
 export default () => {
   const headerBarRef = useRef<HeaderBarType>(null)
   const listRef = useRef<ListType>(null)
-  const songlistInfo = useRef<SonglistInfo>({ source: 'kw', sortId: '5', tagId: '' })
+  const songlistInfo = useRef<SonglistInfo>({ source: 'kw', sortId: songlistState.sortList.kw![0].id, tagId: '' })
+  const interacted = useRef(false)
 
   useEffect(() => {
-    void getSongListSetting().then(info => {
-      songlistInfo.current.source = info.source
-      songlistInfo.current.sortId = info.sortId
-      songlistInfo.current.tagId = info.tagId
-      headerBarRef.current?.setSource(info.source, info.sortId, info.tagName, info.tagId)
-      listRef.current?.loadList(info.source, info.sortId, info.tagId)
+    let cancelled = false
+    void getSongListSetting().catch(() => ({ ...songlistInfo.current, tagName: '' })).then(info => {
+      if (cancelled || interacted.current) return
+      const source = songlistState.sources.includes(info.source) ? info.source : 'kw'
+      const sorts = songlistState.sortList[source]!
+      const sortId = sorts.some(sort => sort.id == info.sortId) ? info.sortId : sorts[0].id
+      const tagId = source == info.source ? info.tagId : ''
+      songlistInfo.current = { source, sortId, tagId }
+      headerBarRef.current?.setSource(source, sortId, tagId ? info.tagName : '', tagId)
+      listRef.current?.loadList(source, sortId, tagId)
     })
+    return () => { cancelled = true }
   }, [])
 
   const handleSortChange: HeaderBarProps['onSortChange'] = (id) => {
+    interacted.current = true
     songlistInfo.current.sortId = id
     void saveSongListSetting({ sortId: id })
     listRef.current?.loadList(songlistInfo.current.source, id, songlistInfo.current.tagId)
   }
 
   const handleTagChange: HeaderBarProps['onTagChange'] = (name, id) => {
+    interacted.current = true
     songlistInfo.current.tagId = id
     void saveSongListSetting({ tagName: name, tagId: id })
     listRef.current?.loadList(songlistInfo.current.source, songlistInfo.current.sortId, id)
   }
 
   const handleSourceChange: HeaderBarProps['onSourceChange'] = (source) => {
+    interacted.current = true
     songlistInfo.current.source = source
     songlistInfo.current.tagId = ''
     songlistInfo.current.sortId = songlistState.sortList[source]![0].id

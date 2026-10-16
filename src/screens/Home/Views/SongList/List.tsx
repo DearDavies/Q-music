@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import Songlist, { type SonglistProps, type SonglistType } from './components/Songlist'
-import { clearList, getList, setList, setListInfo } from '@/core/songlist'
+import { getList, setList, setListInfo } from '@/core/songlist'
 import songlistState from '@/store/songlist/state'
 import { type Source } from '@/store/songlist/state'
 
@@ -38,7 +38,6 @@ export default forwardRef<ListType, {}>((props, ref) => {
           })
         }).catch(() => {
           if (isUnmountedRef.current || requestId != requestIdRef.current) return
-          if (songlistState.listInfo.list.length && page == 1) clearList()
           listRef.current?.setStatus('error')
         })
       }
@@ -65,7 +64,6 @@ export default forwardRef<ListType, {}>((props, ref) => {
       listRef.current?.setStatus(songlistState.listInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
       if (isUnmountedRef.current || requestId != requestIdRef.current) return
-      if (songlistState.listInfo.list.length && page == 1) clearList()
       listRef.current?.setStatus('error')
     })
   }
@@ -81,7 +79,6 @@ export default forwardRef<ListType, {}>((props, ref) => {
       listRef.current?.setStatus(songlistState.listInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
       if (isUnmountedRef.current || requestId != requestIdRef.current) return
-      if (songlistState.listInfo.list.length && page == 1) clearList()
       listRef.current?.setStatus('error')
     })
   }

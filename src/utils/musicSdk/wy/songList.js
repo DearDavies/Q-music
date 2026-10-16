@@ -13,7 +13,6 @@ import { formatSingerName } from '../utils'
 export default {
   _requestObj_tags: null,
   _requestObj_hotTags: null,
-  _requestObj_list: null,
   limit_list: 30,
   limit_song: 100000,
   successCode: 200,
@@ -208,8 +207,7 @@ export default {
   // 获取列表数据
   getList(sortId, tagId, page, tryNum = 0) {
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    if (this._requestObj_list) this._requestObj_list.cancelHttp()
-    this._requestObj_list = httpFetch('https://music.163.com/weapi/playlist/list', {
+    const requestObj_list = httpFetch('https://music.163.com/weapi/playlist/list', {
       method: 'post',
       form: weapi({
         cat: tagId || '全部', // 全部,华语,欧美,日语,韩语,粤语,小语种,流行,摇滚,民谣,电子,舞曲,说唱,轻音乐,爵士,乡村,R&B/Soul,古典,民族,英伦,金属,朋克,蓝调,雷鬼,世界音乐,拉丁,另类/独立,New Age,古风,后摇,Bossa Nova,清晨,夜晚,学习,工作,午休,下午茶,地铁,驾车,运动,旅行,散步,酒吧,怀旧,清新,浪漫,性感,伤感,治愈,放松,孤独,感动,兴奋,快乐,安静,思念,影视原声,ACG,儿童,校园,游戏,70后,80后,90后,网络歌曲,KTV,经典,翻唱,吉他,钢琴,器乐,榜单,00后
@@ -219,7 +217,7 @@ export default {
         total: true,
       }),
     })
-    return this._requestObj_list.promise.then(({ body }) => {
+    return requestObj_list.promise.then(({ body }) => {
       // console.log(body)
       if (body.code !== this.successCode) return this.getList(sortId, tagId, page, ++tryNum)
       return {

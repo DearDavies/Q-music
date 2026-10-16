@@ -2,6 +2,7 @@ import leaderboardState, { type Board, type ListDetailInfo } from '@/store/leade
 import leaderboardActions from '@/store/leaderboard/action'
 import { deduplicationList, toNewMusicInfo } from '@/utils'
 import musicSdk from '@/utils/musicSdk'
+import { withBrowseTimeout } from './browseRequest'
 
 /**
  * 获取排行榜内单页歌曲
@@ -34,14 +35,18 @@ const LIST_LOAD_LIMIT = 30
 const RETRY_DELAYS = [250, 500]
 
 const requestWithRetry = async<T>(request: () => Promise<T>, validate: (result: T) => boolean): Promise<T> => {
+  const deadline = Date.now() + 20_000
   let lastError: unknown
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
     try {
-      const result = await request()
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) throw new Error('Browse request timed out')
+      const result = await withBrowseTimeout(request(), remaining)
       if (!validate(result)) throw new Error('invalid leaderboard response')
       return result
     } catch (error) {
       lastError = error
+      if (Date.now() >= deadline) break
       if (attempt < RETRY_DELAYS.length) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]))
       }

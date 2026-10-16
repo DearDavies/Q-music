@@ -282,6 +282,7 @@ if (mobile) {
     let current = { login_type: '2', wxuin: '9876', qm_keyst: 'W_X_key', uin: '1234' }
     const cookies = load(`${base}/cookies.ts`, {
       './qqCredentials': qq,
+      './qqImportedSession': { getQQImportedCookies: async () => null },
       'react-native': { NativeModules: { UtilsModule: { getWebCookie: async () => Object.entries(current).map(([k, v]) => `${k}=${v}`).join('; ') } } },
     })
     let comm

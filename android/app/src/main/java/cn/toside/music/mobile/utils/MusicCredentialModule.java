@@ -24,14 +24,36 @@ public class MusicCredentialModule extends ReactContextBaseJavaModule {
   private final AtomicFile storage;
   private static final String KUGOU_ALIAS = "qmusic.kugou.account.v1";
   private final AtomicFile kugouStorage;
+  private static final String QQ_ACCOUNT_ALIAS = "qmusic.qq.account.v1";
+  private final AtomicFile qqAccountStorage;
 
   MusicCredentialModule(ReactApplicationContext context) {
     super(context);
     storage = new AtomicFile(new File(context.getNoBackupFilesDir(), "qq-daily.enc"));
     kugouStorage = new AtomicFile(new File(context.getNoBackupFilesDir(), "kugou-account.enc"));
+    qqAccountStorage = new AtomicFile(new File(context.getNoBackupFilesDir(), "qq-account.enc"));
   }
 
   @Override public String getName() { return "MusicCredentialModule"; }
+
+  @ReactMethod public synchronized void getQQAccount(Promise promise) {
+    try { JSONObject data = readProtected(qqAccountStorage, QQ_ACCOUNT_ALIAS); promise.resolve(data == null ? null : data.toString()); }
+    catch (Exception error) { promise.reject("credential_storage", "Unable to read protected account credentials"); }
+  }
+  @ReactMethod public synchronized void setQQAccount(String value, Promise promise) {
+    try {
+      if (value.length() > 16384) throw new IllegalArgumentException();
+      JSONObject data = new JSONObject(value);
+      if (!data.getString("qqmusic_uin").matches("[1-9][0-9]*") || data.getString("qqmusic_key").isEmpty()) throw new IllegalArgumentException();
+      writeProtected(qqAccountStorage, QQ_ACCOUNT_ALIAS, data);
+      promise.resolve(null);
+    } catch (Exception error) { promise.reject("credential_storage", "Unable to save protected account credentials"); }
+  }
+  @ReactMethod public synchronized void clearQQAccount(Promise promise) {
+    qqAccountStorage.delete();
+    if (qqAccountStorage.getBaseFile().exists()) promise.reject("credential_storage", "Unable to clear account credentials");
+    else promise.resolve(null);
+  }
 
   private SecretKey key(String alias) throws Exception {
     KeyStore store = KeyStore.getInstance("AndroidKeyStore");

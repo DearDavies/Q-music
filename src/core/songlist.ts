@@ -2,6 +2,7 @@ import songlistState, { type TagInfo, type ListDetailInfo, type ListInfo } from 
 import songlistActions from '@/store/songlist/action'
 import { deduplicationList, toNewMusicInfo } from '@/utils'
 import musicSdk from '@/utils/musicSdk'
+import { withBrowseTimeout } from './browseRequest'
 
 
 interface DetailPageCache { data: ListDetailInfo, sourcePage: number }
@@ -9,6 +10,7 @@ type LimitDetailCache = Map<string, DetailPageCache | ListDetailInfo['list']>
 type CacheValue = LimitDetailCache | ListInfo
 
 const cache = new Map<string, CacheValue>()
+const listRequests = new Map<string, Promise<ListInfo>>()
 const LIST_LOAD_LIMIT = 30
 
 
@@ -28,7 +30,7 @@ export const getSortList = (source: LX.OnlineSource) => {
  */
 export const getTags = async<T extends LX.OnlineSource>(source: T) => {
   if (songlistState.tags[source]) return songlistState.tags[source] as TagInfo<T>
-  const info = await (musicSdk[source]?.songList.getTags() as Promise<TagInfo<T>>)
+  const info = await withBrowseTimeout(musicSdk[source]?.songList.getTags() as Promise<TagInfo<T>>)
   songlistActions.setTags(info, source)
   return info
 }
@@ -77,12 +79,19 @@ export const getList = async(source: LX.OnlineSource, tabId: string, sortId: str
     else return listCache
   }
 
-  return musicSdk[source]?.songList.getList(sortId, tabId, page).then((result: ListInfo) => {
-    cache.set(pageKey, result)
+  const request = withBrowseTimeout(musicSdk[source]?.songList.getList(sortId, tabId, page) as Promise<ListInfo>).then((result: ListInfo) => {
+    if (!Array.isArray(result?.list) || !Number.isFinite(result.limit) || result.limit <= 0) throw new Error('Invalid song list response')
+    if (listRequests.get(pageKey) === request) cache.set(pageKey, result)
     return result
     // if (pageKey != listInfo.key) return
     // setList(result, tabId, sortId, page)
   })
+  listRequests.set(pageKey, request)
+  try {
+    return await request
+  } finally {
+    if (listRequests.get(pageKey) === request) listRequests.delete(pageKey)
+  }
 }
 
 
@@ -106,8 +115,8 @@ const getListDetailLimit = async(source: LX.OnlineSource, id: string, page: numb
     if (prevPageData) sourcePage = prevPageData.sourcePage
   }
 
-  return musicSdk[source]?.songList.getListDetail(id, sourcePage + 1).then((result: ListDetailInfo) => {
-    if (listCache !== cache.get(listKey)) return
+  return withBrowseTimeout(musicSdk[source]?.songList.getListDetail(id, sourcePage + 1) as Promise<ListDetailInfo>).then((result: ListDetailInfo) => {
+    if (listCache !== cache.get(listKey)) throw new Error('Song list request superseded')
     result.list = deduplicationList(result.list.map(m => toNewMusicInfo(m)) as LX.Music.MusicInfoOnline[])
     let p = page
     const tempList = listCache.get(tempListKey) as ListDetailInfo['list']

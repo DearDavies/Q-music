@@ -102,6 +102,8 @@ const runLinkAction = async(link: string) => {
 
 export const initDeeplink = async() => {
   Linking.addEventListener('url', ({ url }) => {
+    // 配对码含短时密钥，只由账号页扫码/粘贴处理，禁止进入通用日志。
+    if (url.startsWith('qmusic://account-transfer')) return
     // 授权回跳由账号页接收，不能把临时凭证写入通用深链日志。
     if (isQQCallback(url)) return
     void runLinkAction(url)
@@ -109,6 +111,7 @@ export const initDeeplink = async() => {
   })
   const initialUrl = await Linking.getInitialURL()
   if (initialUrl == null) return
+  if (initialUrl.startsWith('qmusic://account-transfer')) return
   if (isQQCallback(initialUrl)) return
   console.log('deeplink', initialUrl)
   void runLinkAction(initialUrl)

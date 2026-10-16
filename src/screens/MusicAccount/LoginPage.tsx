@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, AppState, Linking, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, AppState, Linking, NativeModules, PermissionsAndroid, Platform, StyleSheet, View } from 'react-native'
 import { WebView, type WebViewProps } from 'react-native-webview'
 
 import Text from '@/components/common/Text'
@@ -11,6 +11,7 @@ import type { MusicAccountProvider } from '@/core/musicAccount'
 import { getLoginAppUrl, getQQCallbackUrl, isQQCallback, LOGIN_URLS } from '@/core/musicAccount/login'
 import { isQQLoginPage, QQ_AUTH_BRIDGE, QQ_RESUME_AUTH, QQ_START_AUTH, QQ_STOP_AUTH } from '@/core/musicAccount/qqAuthorization'
 import { isQQDailyOrigin, QQ_DAILY_BRIDGE, QQ_DAILY_USER_AGENT } from '@/core/musicAccount/dailyAuthorization'
+import { isWechatLoginPage, getWechatAppUrl, getWechatQrScript } from '@/core/musicAccount/wechatAuthorization'
 
 
 // 独立挂载每个平台，避免切换账号页时遗留网页历史、加载状态或回跳计时器。
@@ -28,6 +29,57 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
   const awaitingQQ = useRef(false)
   const lastLaunch = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout>>()
+  const wechatLogin = provider == 'tx' && isWechatLoginPage(initialUrl)
+  const [wechatBusy, setWechatBusy] = useState(false)
+  const [wechatNotice, setWechatNotice] = useState('')
+  const exportingQR = useRef(false)
+  const qrRevision = useRef(0)
+  const qrTimer = useRef<ReturnType<typeof setTimeout>>()
+  const pageUrl = useRef(initialUrl)
+  const invalidateWechatQR = useCallback(() => { qrRevision.current++ }, [])
+
+  const exportWechatQR = async() => {
+    if (exportingQR.current || wechatBusy) return
+    const revision = ++qrRevision.current
+    exportingQR.current = true
+    setWechatBusy(true)
+    setWechatNotice('')
+    try {
+      if (Platform.OS == 'android' && Number(Platform.Version) < 29) {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+        if (!active.current || revision != qrRevision.current) return
+        if (granted != PermissionsAndroid.RESULTS.GRANTED) throw new Error('permission')
+      }
+    } catch {
+      if (active.current && revision == qrRevision.current) {
+        exportingQR.current = false
+        setWechatBusy(false)
+        setWechatNotice('未获得图片保存权限。可截屏后在电脑或另一台设备展示，再用当前手机的微信摄像头扫码。')
+      }
+      return
+    }
+    if (!active.current || revision != qrRevision.current) return
+    qrTimer.current = setTimeout(() => {
+      if (!active.current || revision != qrRevision.current) return
+      exportingQR.current = false
+      setWechatBusy(false)
+      setWechatNotice('二维码尚未就绪，请等待网页加载或刷新后重试。')
+    }, 5000)
+    webview.current?.injectJavaScript(getWechatQrScript(revision))
+  }
+
+  const saveWechatQR = async(image: string) => {
+    const revision = qrRevision.current
+    try {
+      await NativeModules.UtilsModule.saveWechatLoginQr(image)
+      if (!active.current || revision != qrRevision.current) return
+      setWechatNotice('二维码已保存到 Pictures/Q-music。请在电脑或另一台设备展示这张图片，用当前手机的微信摄像头扫码，确认后返回 Q-music。期间不要刷新本页；过期后需重新保存。')
+    } catch {
+      if (active.current && revision == qrRevision.current) setWechatNotice('无法保存二维码。可截屏后在另一台设备展示，用当前手机的微信摄像头扫码。')
+    } finally {
+      if (active.current && revision == qrRevision.current) setWechatBusy(false)
+    }
+  }
 
   const refreshConnection = useCallback(() => {
     clearTimeout(timer.current)
@@ -51,11 +103,14 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
     })
     return () => {
       active.current = false
+      invalidateWechatQR()
       appState.remove()
       link.remove()
       clearTimeout(timer.current)
+      clearTimeout(qrTimer.current)
+      exportingQR.current = false
     }
-  }, [provider, refreshConnection])
+  }, [provider, refreshConnection, invalidateWechatQR])
 
   useEffect(() => {
     if (connected) {
@@ -83,6 +138,14 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
   }, [authorization, onConnected])
 
   const openApp = (target: string) => {
+    const wechatUrl = wechatLogin ? getWechatAppUrl(target, pageUrl.current) : null
+    if (wechatUrl) {
+      setLoading(false)
+      if (Date.now() - lastLaunch.current < 1200) return
+      lastLaunch.current = Date.now()
+      void Linking.openURL(wechatUrl).catch(() => { if (active.current) setWechatNotice('无法打开微信，请使用下面的扫码方式。') })
+      return
+    }
     const appUrl = getLoginAppUrl(target, provider)
     if (!appUrl) return
     if (provider == 'tx' && /^wtloginmqq:/i.test(appUrl) && !/[?&]qrcode=/.test(appUrl)) {
@@ -105,6 +168,12 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
   }
 
   const retry = () => {
+    invalidateWechatQR()
+    clearTimeout(qrTimer.current)
+    exportingQR.current = false
+    setWechatBusy(false)
+    setWechatNotice('')
+    pageUrl.current = initialUrl
     awaitingQQ.current = false
     lastLaunch.current = 0
     setFailed(false)
@@ -115,6 +184,13 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
   }
 
   return <View style={styles.loginPage}>
+    {wechatLogin ? <View style={[styles.wechatActions, { backgroundColor: theme['q-surface-raised'] }]}>
+      <Button disabled={wechatBusy || loading || failed} style={[styles.wechatButton, { backgroundColor: theme['q-surface-tint'] }]} onPress={() => { void exportWechatQR().catch(() => { setWechatBusy(false) }) }}>
+        {wechatBusy ? <ActivityIndicator size="small" color={theme['q-accent']} /> : null}
+        <Text size={13} color={theme['q-accent-text']}>{wechatBusy ? '正在准备二维码…' : '保存二维码，在另一台设备展示'}</Text>
+      </Button>
+      <Text accessibilityLiveRegion="polite" size={11} color={theme['q-text-secondary']} style={styles.wechatTip}>{wechatNotice || '请用微信摄像头扫描另一块屏幕上的本页二维码，不要在微信相册内识别。确认后返回 Q-music，本页会继续接收登录结果。'}</Text>
+    </View> : null}
     {appError ? <Text accessibilityLiveRegion="polite" size={12} color={theme['q-text-secondary']} style={styles.notice}>{t('music_account_app_unavailable')}</Text> : null}
     {authorization != 'idle' && !connected ? <View style={styles.authNotice}>
       {authorization == 'pending' ? <ActivityIndicator size="small" color={theme['q-accent']} /> : null}
@@ -147,6 +223,19 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
         }}
         setSupportMultipleWindows
         onMessage={event => {
+          if (wechatLogin && exportingQR.current && isWechatLoginPage(event.nativeEvent.url)) {
+            try {
+              const message = JSON.parse(event.nativeEvent.data) as { type?: string, image?: string, requestId?: number }
+              if (message.requestId != qrRevision.current) return
+              if (message.type == 'wechat-qr-image' || message.type == 'wechat-qr-unavailable') {
+                exportingQR.current = false
+                clearTimeout(qrTimer.current)
+                if (typeof message.image == 'string' && message.image.length <= 600_000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(message.image)) void saveWechatQR(message.image)
+                else { setWechatBusy(false); setWechatNotice('二维码尚未就绪，请刷新后重试。') }
+                return
+              }
+            } catch {}
+          }
           if (onDailyKey && isQQDailyOrigin(event.nativeEvent.url)) {
             try {
               const message = JSON.parse(event.nativeEvent.data) as { type?: string, key?: string }
@@ -165,6 +254,7 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
           } catch {}
         }}
         onLoadStart={() => { setLoading(true) }}
+        onNavigationStateChange={state => { pageUrl.current = state.url }}
         onLoadEnd={() => {
           if (provider == 'tx') webview.current?.injectJavaScript(QQ_AUTH_BRIDGE)
           if (onDailyKey) webview.current?.injectJavaScript(QQ_DAILY_BRIDGE)
@@ -197,6 +287,9 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
 export default LoginPage
 
 const styles = StyleSheet.create({
+  wechatActions: { marginHorizontal: 12, marginBottom: 10, padding: 12, borderRadius: 16, gap: 8 },
+  wechatButton: { minHeight: 44, borderRadius: 12, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
+  wechatTip: { lineHeight: 17 },
   loginPage: { flex: 1 },
   webWrap: { flex: 1, overflow: 'hidden', marginHorizontal: 12, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth },
   webview: { flex: 1 },

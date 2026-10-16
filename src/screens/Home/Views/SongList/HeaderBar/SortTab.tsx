@@ -5,7 +5,6 @@ import { useI18n } from '@/lang'
 import { useTheme } from '@/store/theme/hook'
 import Text from '@/components/common/Text'
 import { createStyle } from '@/utils/tools'
-import { BorderWidths } from '@/theme'
 import Button from '@/components/common/Button'
 import { Q_UI } from '@/theme/ui'
 
@@ -38,23 +37,24 @@ export default forwardRef<SortTabType, SortTabProps>(({ onSortChange }, ref) => 
   }, [sortList, t])
 
   const handleSortChange = (id: string) => {
+    if (id == activeId) return
     onSortChange(id)
     setActiveId(id)
   }
 
   return (
-    <ScrollView ref={scrollViewRef} style={styles.container} keyboardShouldPersistTaps={'always'} horizontal>
+    <ScrollView ref={scrollViewRef} style={styles.container} showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps={'always'} horizontal>
       {
         sorts.map(s => (
           <Button
             accessibilityRole="tab"
             accessibilityLabel={s.label}
             accessibilityState={{ selected: activeId == s.id }}
-            style={styles.button}
+            style={[styles.button, { backgroundColor: activeId == s.id ? theme['q-surface-tint'] : 'transparent' }]}
             onPress={() => { handleSortChange(s.id) }}
             key={s.id}
           >
-            <Text style={{ ...styles.buttonText, borderBottomColor: activeId == s.id ? theme['c-primary-background-active'] : 'transparent' }} color={activeId == s.id ? theme['c-primary-font-active'] : theme['c-font']}>{s.label}</Text>
+            <Text style={styles.buttonText} color={activeId == s.id ? theme['q-accent-text'] : theme['q-text-secondary']}>{s.label}</Text>
           </Button>
         ))
       }
@@ -71,6 +71,8 @@ const styles = createStyle({
     // paddingRight: 5,
   },
   button: {
+    borderRadius: 12,
+    marginRight: 4,
     minHeight: Q_UI.touchSize,
     // height: 38,
     // lineHeight: 38,
@@ -86,6 +88,5 @@ const styles = createStyle({
     textAlign: 'center',
     paddingHorizontal: 2,
     paddingVertical: 3,
-    borderBottomWidth: BorderWidths.normal3,
   },
 })

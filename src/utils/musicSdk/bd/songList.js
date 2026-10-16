@@ -4,7 +4,6 @@ import CryptoJS from 'crypto-js'
 
 export default {
   _requestObj_tags: null,
-  _requestObj_list: null,
   _requestObj_listRecommend: null,
   limit_list: 30,
   limit_song: 10000,
@@ -148,10 +147,9 @@ export default {
 
   // 获取列表数据
   getList(sortId, tagId, page, tryNum = 0) {
-    if (this._requestObj_list) this._requestObj_list.cancelHttp()
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    this._requestObj_list = httpFetch(this.getListUrl(sortId, tagId, page))
-    return this._requestObj_list.promise.then(({ body }) => {
+    const requestObj_list = httpFetch(this.getListUrl(sortId, tagId, page))
+    return requestObj_list.promise.then(({ body }) => {
       if (body.error_code !== this.successCode) return this.getList(sortId, tagId, page, ++tryNum)
       return {
         list: this.filterList(body.diyInfo),

@@ -4,7 +4,6 @@ import { useTheme } from '@/store/theme/hook'
 import Button, { type BtnType } from '@/components/common/Button'
 import { createStyle } from '@/utils/tools'
 import { type BoardItem } from '@/store/leaderboard/state'
-import { Icon } from '@/components/common/Icon'
 
 // index={index}
 // longPressIndex={longPressIndex}
@@ -38,15 +37,12 @@ export default ({ item, activeId, index, longPressIndex, onBoundChange, onShowMe
   return (
     <Button
       ref={buttonRef}
-      style={{ ...styles.button, backgroundColor: index == longPressIndex ? theme['c-button-background-active'] : undefined }}
+      accessibilityRole="button" accessibilityState={{ selected: active }}
+      style={{ ...styles.button, borderColor: active ? theme['q-outline'] : 'transparent', backgroundColor: active ? theme['q-surface-tint'] : index == longPressIndex ? theme['c-button-background-active'] : undefined }}
       key={item.id} onLongPress={setPosition}
       onPress={() => { onBoundChange(item) }}
     >
-      {
-        active
-          ? <Icon style={styles.listActiveIcon} name="chevron-right" size={12} color={theme['c-primary-font']} />
-          : null
-      }
+      <Text style={styles.number} size={11} color={active ? theme['q-accent-text'] : theme['q-text-secondary']}>{String(index + 1).padStart(2, '0')}</Text>
       <Text style={styles.listName} size={14} textBreakStrategy="simple" color={active ? theme['c-primary-font-active'] : theme['c-font']} numberOfLines={1}>{item.name}</Text>
     </Button>
   )
@@ -54,21 +50,21 @@ export default ({ item, activeId, index, longPressIndex, onBoundChange, onShowMe
 
 const styles = createStyle({
   button: {
-    paddingLeft: 5,
+    minHeight: 48,
+    marginHorizontal: 8,
+    marginVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingLeft: 10,
     paddingRight: 10,
     paddingTop: 10,
     paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  listActiveIcon: {
-    // width: 18,
-    marginLeft: 3,
-    // paddingRight: 5,
-    textAlign: 'center',
-  },
+  number: { width: 24, textAlign: 'center', fontVariant: ['tabular-nums'] },
   listName: {
-    height: '100%',
+    flex: 1,
     justifyContent: 'center',
     paddingLeft: 6,
     // backgroundColor: 'rgba(0,0,0,0.1)',

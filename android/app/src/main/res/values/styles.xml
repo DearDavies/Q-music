@@ -26,4 +26,12 @@
         <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
     </style>
 
+    <style name="AccountTransferScannerTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#11161B</item>
+        <item name="android:statusBarColor">#11161B</item>
+        <item name="android:navigationBarColor">#11161B</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
+        <item name="android:colorAccent">#FFFFFF</item>
+    </style>
 </resources>

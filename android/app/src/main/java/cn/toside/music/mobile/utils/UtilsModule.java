@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -16,6 +17,8 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.Settings;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
@@ -34,6 +37,8 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 
 import java.io.File;
+import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Map;
@@ -98,6 +103,54 @@ public class UtilsModule extends ReactContextBaseJavaModule {
         promise.resolve(false);
       }
     });
+  }
+
+  @ReactMethod
+  public void saveWechatLoginQr(String dataUrl, Promise promise) {
+    new Thread(() -> {
+      Uri saved = null;
+      try {
+        if (dataUrl == null || !dataUrl.startsWith("data:image/png;base64,") || dataUrl.length() > 600000) {
+          throw new IllegalArgumentException("Invalid QR image");
+        }
+        byte[] bytes = Base64.decode(dataUrl.substring(22), Base64.DEFAULT);
+        if (bytes.length < 8 || bytes[0] != (byte) 0x89 || bytes[1] != 0x50 || bytes[2] != 0x4e || bytes[3] != 0x47) {
+          throw new IllegalArgumentException("Invalid PNG image");
+        }
+        String name = "Q-music-WeChat-" + System.currentTimeMillis() + ".png";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          // Android 10+ 通过媒体库保存自己的图片，无需申请所有文件访问权限。
+          ContentValues values = new ContentValues();
+          values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+          values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+          values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Q-music");
+          values.put(MediaStore.Images.Media.IS_PENDING, 1);
+          saved = reactContext.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+          if (saved == null) throw new IllegalStateException("Unable to create image");
+          try (OutputStream stream = reactContext.getContentResolver().openOutputStream(saved)) {
+            if (stream == null) throw new IllegalStateException("Unable to write image");
+            stream.write(bytes);
+          }
+          values.clear();
+          values.put(MediaStore.Images.Media.IS_PENDING, 0);
+          reactContext.getContentResolver().update(saved, values, null, null);
+          promise.resolve(saved.toString());
+        } else {
+          File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Q-music");
+          if (!folder.isDirectory() && !folder.mkdirs()) throw new IllegalStateException("Unable to create directory");
+          File file = new File(folder, name);
+          try (OutputStream stream = new FileOutputStream(file)) { stream.write(bytes); }
+          MediaScannerConnection.scanFile(reactContext, new String[]{file.getAbsolutePath()}, new String[]{"image/png"},
+              (path, uri) -> promise.resolve(uri == null ? file.getAbsolutePath() : uri.toString()));
+        }
+      } catch (Exception error) {
+        if (saved != null) {
+          try { reactContext.getContentResolver().delete(saved, null, null); }
+          catch (Exception cleanupError) { Log.w("Utils", "Unable to remove incomplete QR image", cleanupError); }
+        }
+        promise.reject("QR_SAVE_FAILED", "Unable to save login QR image", error);
+      }
+    }, "QMusicWechatQrSave").start();
   }
 
   @ReactMethod

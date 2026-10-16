@@ -1,9 +1,10 @@
 {
   "name": "q-music-mobile",
-  "version": "0.4.14",
-  "versionCode": 44,
+  "version": "0.4.15",
+  "versionCode": 45,
   "private": true,
   "scripts": {
+    "test:account-transfer": "node --test scripts/verify-account-transfer.cjs",
     "postinstall": "node scripts/patch-android-dependencies.cjs",
     "test:background": "node scripts/verify-background-playback.cjs",
     "test:update": "node --test scripts/verify-update-network.cjs",
@@ -27,7 +28,8 @@
     "publish": "node publish",
     "test:accounts": "node --test scripts/verify-music-accounts.cjs",
     "test:qq-sync": "node --test scripts/verify-qq-sync.cjs",
-    "test:adaptive": "node --test scripts/verify-adaptive-layout.cjs"
+    "test:adaptive": "node --test scripts/verify-adaptive-layout.cjs",
+    "test:browse": "node --test scripts/verify-browse-navigation.cjs"
   },
   "engines": {
     "node": ">= 18",

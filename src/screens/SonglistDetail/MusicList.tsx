@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import OnlineList, { type OnlineListType, type OnlineListProps } from '@/components/OnlineList'
-import { clearListDetail, getListDetail, setListDetail, setListDetailInfo } from '@/core/songlist'
+import { getListDetail, setListDetail, setListDetailInfo } from '@/core/songlist'
 import songlistState from '@/store/songlist/state'
 import { handlePlay } from './listAction'
 import Header, { type HeaderType } from './Header'
@@ -29,16 +29,19 @@ export default forwardRef<MusicListType, MusicListProps>(({ componentId, onTitle
   }
   const headerRef = useRef<HeaderType>(null)
   const isUnmountedRef = useRef(false)
+  const requestIdRef = useRef(0)
   const info = useListInfo()
 
   useImperativeHandle(ref, () => ({
     async loadList(source, id) {
-      clearListDetail()
+      const requestId = ++requestIdRef.current
       const listDetailInfo = songlistState.listDetailInfo
       listRef.current?.setList([])
       if (listDetailInfo.id == id && listDetailInfo.source == source && listDetailInfo.list.length) {
         requestAnimationFrame(() => {
+          if (isUnmountedRef.current || requestId != requestIdRef.current) return
           listRef.current?.setList(listDetailInfo.list)
+          listRef.current?.setStatus(listDetailInfo.maxPage <= listDetailInfo.page ? 'end' : 'idle')
           headerRef.current?.setInfo({
             name: (info.name || listDetailInfo.info.name) ?? '',
             // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -50,7 +53,7 @@ export default forwardRef<MusicListType, MusicListProps>(({ componentId, onTitle
       } else {
         listRef.current?.setStatus('loading')
         const page = 1
-        setListDetailInfo(info.source, info.id)
+        setListDetailInfo(source, id)
         headerRef.current?.setInfo({
           name: (info.name || listDetailInfo.info.name) ?? '',
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -59,9 +62,10 @@ export default forwardRef<MusicListType, MusicListProps>(({ componentId, onTitle
           imgUrl: info.img ?? listDetailInfo.info.img,
         })
         return getListDetail(id, source, page).then((listDetail) => {
+          if (isUnmountedRef.current || requestId != requestIdRef.current) return
           const result = setListDetail(listDetail, id, page)
-          if (isUnmountedRef.current) return
           requestAnimationFrame(() => {
+            if (isUnmountedRef.current || requestId != requestIdRef.current) return
             headerRef.current?.setInfo({
               name: (info.name || listDetailInfo.info.name) ?? '',
               // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -73,7 +77,7 @@ export default forwardRef<MusicListType, MusicListProps>(({ componentId, onTitle
             listRef.current?.setStatus(songlistState.listDetailInfo.maxPage <= page ? 'end' : 'idle')
           })
         }).catch(() => {
-          if (songlistState.listDetailInfo.list.length && page == 1) clearListDetail()
+          if (isUnmountedRef.current || requestId != requestIdRef.current) return
           listRef.current?.setStatus('error')
         })
       }
@@ -94,28 +98,32 @@ export default forwardRef<MusicListType, MusicListProps>(({ componentId, onTitle
     void handlePlay(listDetailInfo.id, listDetailInfo.source, listDetailInfo.list, index)
   }
   const handleRefresh: OnlineListProps['onRefresh'] = () => {
+    const requestId = ++requestIdRef.current
     const page = 1
+    const { id, source } = songlistState.listDetailInfo
     listRef.current?.setStatus('refreshing')
-    getListDetail(songlistState.listDetailInfo.id, songlistState.listDetailInfo.source, page, true).then((listDetail) => {
-      const result = setListDetail(listDetail, songlistState.listDetailInfo.id, page)
-      if (isUnmountedRef.current) return
+    getListDetail(id, source, page, true).then((listDetail) => {
+      if (isUnmountedRef.current || requestId != requestIdRef.current) return
+      const result = setListDetail(listDetail, id, page)
       listRef.current?.setList(result.list)
       listRef.current?.setStatus(songlistState.listDetailInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
-      if (songlistState.listDetailInfo.list.length && page == 1) clearListDetail()
+      if (isUnmountedRef.current || requestId != requestIdRef.current) return
       listRef.current?.setStatus('error')
     })
   }
   const handleLoadMore: OnlineListProps['onLoadMore'] = () => {
+    const requestId = ++requestIdRef.current
     listRef.current?.setStatus('loading')
+    const { id, source } = songlistState.listDetailInfo
     const page = songlistState.listDetailInfo.list.length ? songlistState.listDetailInfo.page + 1 : 1
-    getListDetail(songlistState.listDetailInfo.id, songlistState.listDetailInfo.source, page).then((listDetail) => {
-      const result = setListDetail(listDetail, songlistState.listDetailInfo.id, page)
-      if (isUnmountedRef.current) return
+    getListDetail(id, source, page).then((listDetail) => {
+      if (isUnmountedRef.current || requestId != requestIdRef.current) return
+      const result = setListDetail(listDetail, id, page)
       listRef.current?.setList(result.list, true)
       listRef.current?.setStatus(songlistState.listDetailInfo.maxPage <= page ? 'end' : 'idle')
     }).catch(() => {
-      if (songlistState.listDetailInfo.list.length && page == 1) clearListDetail()
+      if (isUnmountedRef.current || requestId != requestIdRef.current) return
       listRef.current?.setStatus('error')
     })
   }

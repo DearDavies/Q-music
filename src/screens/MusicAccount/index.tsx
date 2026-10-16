@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { BackHandler, StyleSheet, View } from 'react-native'
 
 import Text from '@/components/common/Text'
 import Button from '@/components/common/Button'
@@ -9,10 +9,11 @@ import { useTheme } from '@/store/theme/hook'
 import { useStatusbarHeight } from '@/store/common/hook'
 import { pop } from '@/navigation'
 import { clearProviderCookies, isMusicAccountConnected, logoutMusicAccount, type MusicAccountProvider } from '@/core/musicAccount'
-import { LOGIN_URLS, QQ_WECHAT_LOGIN_URL } from '@/core/musicAccount/login'
+import { LOGIN_URLS } from '@/core/musicAccount/login'
 import Playlists from './Playlists'
 import KugouLogin from './KugouLogin'
 import LoginPage from './LoginPage'
+import AccountTransfer from './AccountTransfer'
 import DailySettings from '@/screens/Home/Views/Search/BlankView/DailySettings'
 import { getDailyProvider, setDailyProvider, type DailyProvider } from '@/core/musicAccount/daily'
 import { toast } from '@/utils/tools'
@@ -27,12 +28,26 @@ export default ({ componentId, initialProvider = 'tx' }: { componentId: string, 
   const [connected, setConnected] = useState<Record<MusicAccountProvider, boolean | null>>({ tx: null, wy: null, kg: null })
   const [dailyProvider, setSelectedDailyProvider] = useState<DailyProvider>('tx')
   const [dailySettings, setDailySettings] = useState(false)
+  const [transferring, setTransferring] = useState(false)
   const [revision, setRevision] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [qqLoginMethod, setQQLoginMethod] = useState<'qq' | 'wechat'>('qq')
   const mounted = useRef(false)
   const checkId = useRef(0)
+
+  useEffect(() => {
+    if (!transferring) return
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { setTransferring(false); return true })
+    return () => { subscription.remove() }
+  }, [transferring])
+
+  const onTransferred = () => {
+    setConnected(value => ({ ...value, tx: true }))
+    setTransferring(false)
+    setRevision(value => value + 1)
+    toast('已导入 QQ 音乐账号')
+  }
 
   const checkConnections = useCallback(() => {
     const id = ++checkId.current
@@ -72,7 +87,17 @@ export default ({ componentId, initialProvider = 'tx' }: { componentId: string, 
     }
   }
 
-  return <View style={[styles.container, { paddingTop: statusBarHeight, backgroundColor: theme['c-main-background'] }]}>
+  if (transferring) {
+    return <View style={[styles.container, { paddingTop: statusBarHeight, backgroundColor: theme['c-content-background'] }]}>
+    <View style={styles.header}>
+      <Button style={styles.backBtn} accessibilityLabel={t('back')} onPress={() => { setTransferring(false) }}><Icon name="chevron-left" size={24} color={theme['c-font']} /></Button>
+      <Text size={16} style={styles.heading}>从电脑连接账号</Text><View style={styles.backBtn} />
+    </View>
+    <AccountTransfer onConnected={onTransferred} />
+    </View>
+  }
+
+  return <View style={[styles.container, { paddingTop: statusBarHeight, backgroundColor: theme['c-content-background'] }]}>
     <View style={styles.header}>
       <Button style={styles.backBtn} accessibilityLabel={t('back')} onPress={() => { void pop(componentId) }}><Icon accessible={false} name="chevron-left" size={24} color={theme['c-font']} /></Button>
       <Text size={16} style={styles.heading}>{t('setting_music_account_title')}</Text>
@@ -92,13 +117,14 @@ export default ({ componentId, initialProvider = 'tx' }: { componentId: string, 
       <Button disabled={loggingOut || syncing} style={styles.recommendButton} onPress={() => { setDailySettings(true) }}><Text size={12} color={theme['q-text-secondary']}>{t(provider == 'tx' ? 'daily_official_daily' : 'daily_settings')} ›</Text></Button>
     </View>
     {dailySettings ? <DailySettings provider={provider} onClose={() => { setDailySettings(false) }} onChanged={checkConnections} /> : null}
+    {provider == 'tx' && connected.tx ? <View style={styles.recommendActions}><Button disabled={loggingOut || syncing} style={styles.recommendButton} onPress={() => { setTransferring(true) }}><Text size={12} color={theme['q-accent-text']}>从电脑更换账号 ›</Text></Button></View> : null}
     {connected[provider] ? <Playlists key={`${provider}-${revision}`} provider={provider} onBusyChange={setSyncing} onLogin={() => { void reconnect().catch(() => {}) }} onOpenLibrary={() => { void pop(componentId) }} /> : <>
       {provider == 'tx' ? <View style={styles.loginMethods}>
         {(['qq', 'wechat'] as const).map(method => <Button key={method} accessibilityRole="tab" accessibilityState={{ selected: qqLoginMethod == method }} onPress={() => { setQQLoginMethod(method) }} style={[styles.loginMethod, { backgroundColor: qqLoginMethod == method ? theme['q-surface-tint'] : theme['q-surface-raised'] }]}>
-          <Text size={13} color={qqLoginMethod == method ? theme['q-accent-text'] : theme['c-font-label']}>{method == 'qq' ? 'QQ 登录' : '微信扫码登录'}</Text>
+          <Text size={13} color={qqLoginMethod == method ? theme['q-accent-text'] : theme['c-font-label']}>{method == 'qq' ? 'QQ 登录' : '微信登录'}</Text>
         </Button>)}
       </View> : null}
-      {provider == 'kg' ? <KugouLogin key={revision} onConnected={checkConnections} /> : <LoginPage key={`${provider}-${revision}-${qqLoginMethod}`} provider={provider} initialUrl={provider == 'tx' && qqLoginMethod == 'wechat' ? QQ_WECHAT_LOGIN_URL : LOGIN_URLS[provider]} connected={false} onConnected={checkConnections} />}
+      {provider == 'tx' && qqLoginMethod == 'wechat' ? <AccountTransfer onConnected={onTransferred} /> : provider == 'kg' ? <KugouLogin key={revision} onConnected={checkConnections} /> : <LoginPage key={`${provider}-${revision}-${qqLoginMethod}`} provider={provider} initialUrl={LOGIN_URLS[provider]} connected={false} onConnected={checkConnections} />}
     </>}
   </View>
 }

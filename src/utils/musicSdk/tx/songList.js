@@ -5,7 +5,6 @@ import { formatSingerName } from '../utils'
 export default {
   _requestObj_tags: null,
   _requestObj_hotTags: null,
-  _requestObj_list: null,
   limit_list: 36,
   limit_song: 100000,
   successCode: 0,
@@ -116,13 +115,12 @@ export default {
 
   // 获取列表数据
   getList(sortId, tagId, page, tryNum = 0) {
-    if (this._requestObj_list) this._requestObj_list.cancelHttp()
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    this._requestObj_list = httpFetch(
+    const requestObj_list = httpFetch(
       this.getListUrl(sortId, tagId, page),
     )
     // console.log(this.getListUrl(sortId, tagId, page))
-    return this._requestObj_list.promise.then(({ body }) => {
+    return requestObj_list.promise.then(({ body }) => {
       if (body.code !== this.successCode) return this.getList(sortId, tagId, page, ++tryNum)
       return tagId ? this.filterList2(body.playlist.data, page) : this.filterList(body.playlist.data, page)
     })
