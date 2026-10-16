@@ -32,7 +32,7 @@ export default () => {
           if (listRef.value) listRef.value.scrollToTop()
         })
       }
-    })
+    }).catch(() => {})
   }
 
   const handlePlayList = async(index: number) => {

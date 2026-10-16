@@ -17,6 +17,7 @@ interface SearchResult {
 
 const aggregateSources = new WeakMap<LX.Music.MusicInfo, LX.Music.MusicInfo[]>()
 const aggregateSourceRanks = new WeakMap<LX.Music.MusicInfo, SearchSourceRank>()
+const activeSearches = new Map<string, symbol>()
 
 // Music IDs are normally source-prefixed, but a few providers (notably
 // legacy KuGou results) can reuse the same ID format. Search aggregation must
@@ -62,7 +63,8 @@ export const selectAggregateSource = (index: number, source: LX.OnlineSource) =>
   const listInfo = listInfos.all
   const current = listInfo.list[index]
   const target = current && getAggregateSources(current).find(item => item.source == source)
-  if (target) listInfo.list[index] = target
+  // 虚拟列表按数组引用失效缓存；替换数组，保证显示与播放使用同一音源。
+  if (target && target !== current) listInfo.list = listInfo.list.map((item, i) => i == index ? target : item)
 }
 
 
@@ -141,7 +143,7 @@ const setLists = (results: SearchResult[], page: number, text: string): LX.Music
   // 平台返回了零散同名歌曲，也要启用保守的单来源簇识别；识别门槛由
   // ranking.ts 统一控制，避免把普通同名歌曲误判为原声。
   listInfo.list = rankAggregateList(list, text, true)
-  if (text && !list.length && page == 1) listInfo.noItemLabel = window.i18n.t('no_item')
+  if (text && !list.length) listInfo.noItemLabel = window.i18n.t(page > 1 ? 'search__page_empty' : 'search__empty')
   else listInfo.noItemLabel = ''
   return listInfo.list
 }
@@ -157,17 +159,17 @@ const setList = (datas: SearchResult, page: number, text: string): LX.Music.Musi
     return musicInfo
   }))
   listInfo.list = rankAggregateList(list, text, true)
-  if (page == 1 || (datas.total && datas.list.length)) listInfo.total = datas.total
-  else listInfo.total = datas.limit * page
+  listInfo.total = datas.total
   listInfo.maxPage = datas.allPage
   listInfo.page = page
   listInfo.limit = datas.limit
-  if (text && !datas.list.length && page == 1) listInfo.noItemLabel = window.i18n.t('no_item')
+  if (text && !datas.list.length) listInfo.noItemLabel = window.i18n.t(page > 1 ? 'search__page_empty' : 'search__empty')
   else listInfo.noItemLabel = ''
   return listInfo.list
 }
 
 export const resetListInfo = (sourceId: LX.OnlineSource | 'all'): [] => {
+  activeSearches.delete(sourceId)
   let listInfo = listInfos[sourceId]
   if (!listInfo) return []
   listInfo.list = []
@@ -175,6 +177,7 @@ export const resetListInfo = (sourceId: LX.OnlineSource | 'all'): [] => {
   listInfo.maxPage = 0
   listInfo.total = 0
   listInfo.noItemLabel = ''
+  listInfo.key = null
   return []
 }
 
@@ -182,6 +185,11 @@ export const search = async(text: string, page: number, sourceId: LX.OnlineSourc
   const listInfo = listInfos[sourceId]
   if (!text) return resetListInfo(sourceId)
   const key = `${page}__${text}`
+  if (sourceId != 'all' && listInfo?.key == key && listInfo.list.length && !listInfo.noItemLabel) return listInfo.list
+  const request = Symbol(key)
+  activeSearches.set(sourceId, request)
+  listInfo!.list = []
+  listInfo!.page = page
   if (sourceId == 'all') {
     listInfo!.noItemLabel = window.i18n.t('list__loading')
     listInfo!.key = key
@@ -200,18 +208,18 @@ export const search = async(text: string, page: number, sourceId: LX.OnlineSourc
       }))
     }
     return Promise.all(task).then((results: SearchResult[]) => {
-      if (key != listInfo!.key) return []
+      if (activeSearches.get(sourceId) !== request) return []
       return setLists(results, page, text)
     })
   } else {
-    if (listInfo?.key == key && listInfo?.list.length) return listInfo?.list
     listInfo!.noItemLabel = window.i18n.t('list__loading')
     listInfo!.key = key
     return music[sourceId].musicSearch.search(text, page, listInfo!.limit).then((data: SearchResult) => {
-      if (key != listInfo!.key) return []
+      if (activeSearches.get(sourceId) !== request) return []
       return setList(data, page, text)
     }).catch((error: any) => {
-      resetListInfo(sourceId)
+      if (activeSearches.get(sourceId) !== request) return []
+      listInfo!.key = null
       listInfo!.noItemLabel = window.i18n.t('list__load_failed')
       console.log(error)
       throw error

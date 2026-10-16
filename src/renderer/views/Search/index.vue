@@ -1,6 +1,6 @@
 <template>
   <div :class="$style.container">
-    <div :class="$style.header">
+    <div v-if="!isSearchEmpty" :class="$style.header">
       <base-tab v-if="searchText" v-model="searchType" :list="searchTypes" @change="handleTypeChange" />
     </div>
     <div :class="$style.main">
@@ -38,13 +38,16 @@ const normalizePageQuery = value => String(normalizePage(value))
 
 const verifyQueryParams = async(to, from, next) => {
   const validSources = new Set(['all', ...music.sources.map(item => item.id)])
-  const _source = validSources.has(to.query.source) ? to.query.source : 'all'
+  const setting = await getSearchSetting().catch(() => ({ ...DEFAULT_SETTING.search }))
+  // 返回主页没有 source 参数时恢复搜索偏好，不能用聚合搜索覆盖用户选择。
+  const _source = validSources.has(to.query.source)
+    ? to.query.source
+    : validSources.has(setting.source) ? setting.source : 'all'
   let _type = to.query.type
   let _page = to.query.page
   const pageNeedsNormalization = _page != null && _page != normalizePageQuery(_page)
 
   if (to.query.source != _source || _type == null || pageNeedsNormalization) {
-    const setting = await getSearchSetting().catch(() => ({ ...DEFAULT_SETTING.search }))
     _type ??= setting.type
 
     next({

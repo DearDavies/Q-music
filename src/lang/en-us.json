@@ -1024,5 +1024,8 @@
   "search__provider_playlists": "{name} · My playlists",
   "search__account_kugou_tip": "Scan to import favorites and get daily recommendations",
   "search__account_manage": "Manage",
-  "search__account_collapse": "Collapse"
+  "search__account_collapse": "Collapse",
+  "search__empty": "No matching songs. Try another keyword or source.",
+  "search__page_empty": "No songs on this page. Go back or retry.",
+  "search__retry": "Reload"
 }

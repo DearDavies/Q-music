@@ -26,33 +26,6 @@
             </button>
           </header>
 
-          <div v-if="hasDiscoveryContent" :class="$style.noitemListContainer">
-            <dl v-if="appSetting['search.isShowHotSearch']" :class="[$style.noitemList, $style.noitemHotSearchList]">
-              <dt :class="$style.noitemListTitle">
-                <span>{{ $t('search__hot_search') }}</span>
-                <button type="button" :class="$style.listActionBtn" :disabled="isHotSearchLoading" @click="refreshHotSearch">
-                  {{ isHotSearchLoading ? $t('search__hot_search_loading') : $t('search__hot_search_refresh') }}
-                </button>
-              </dt>
-              <div v-if="isHotSearchLoading && !hotSearchList.length" :class="$style.chipSkeletons" aria-hidden="true">
-                <i v-for="index in 6" :key="index" />
-              </div>
-              <dd v-else-if="!hotSearchList.length" :class="$style.listEmpty">{{ $t('search__hot_search_empty') }}</dd>
-              <template v-else>
-                <dd v-for="(item, index) in hotSearchList" :key="index" :class="$style.noitemListItem" @click="handleSearch(item)">{{ item }}</dd>
-              </template>
-            </dl>
-            <dl v-if="appSetting['search.isShowHistorySearch'] && historyList.length" :class="$style.noitemList">
-              <dt :class="$style.noitemListTitle">
-                <span>{{ $t('history_search') }}</span><button type="button" :class="$style.historyClearBtn" :aria-label="$t('history_clear')" @click="clearHistoryList">
-                  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 512 512" space="preserve">
-                    <use xlink:href="#icon-eraser" />
-                  </svg></button>
-              </dt>
-              <dd v-for="(item, index) in historyList" :key="index + item" :class="$style.noitemListItem" :aria-label="$t('history_remove')" @contextmenu="removeHistoryWord(index)" @click="handleSearch(item)">{{ item }}</dd>
-            </dl>
-          </div>
-
           <nav :class="$style.recommendProviders" :aria-label="$t('search__recommend_provider')">
             <span>{{ $t('search__recommend_provider') }}</span>
             <button
@@ -311,11 +284,6 @@
 <script setup>
 import AccountTransferModal from '@renderer/components/common/AccountTransferModal.vue'
 import { computed, watch, shallowRef, ref } from '@common/utils/vueTools'
-import { historyList } from '@renderer/store/search/state'
-import { getHistoryList, removeHistoryWord, clearHistoryList } from '@renderer/store/search/action'
-import { clearList, getList } from '@renderer/store/hotSearch'
-import { appSetting } from '@renderer/store/setting'
-import { useRouter } from '@common/utils/vueRouter'
 import { getDailyRecommend } from '@renderer/core/dailyRecommend'
 import { setTempList } from '@renderer/store/list/action'
 import { playList, togglePlay } from '@renderer/core/player/action'
@@ -337,8 +305,6 @@ const props = defineProps({
   },
 })
 
-const hotSearchList = shallowRef([])
-const isHotSearchLoading = shallowRef(false)
 const dailyRecommendList = shallowRef([])
 const dailyCoverUrls = shallowRef([])
 const isDailyLoading = shallowRef(false)
@@ -377,7 +343,6 @@ const isShowAccountImport = ref(false)
 const importProvider = ref(selectedDailyProvider.value)
 const dailyRecommendMode = ref('loading')
 const dailyRecommendKind = ref('radar')
-let hotSearchRequestId = 0
 let dailyRequestId = 0
 let accountStatusRequestId = 0
 let accountPlaylistsRequestId = 0
@@ -450,37 +415,6 @@ const isDetailLoading = computed(() => detailKind.value == 'playlist' ? isPlayli
 const handleCoverLoad = event => {
   event.target.classList.add('q-cover-loaded')
 }
-const hasDiscoveryContent = computed(() => {
-  return appSetting['search.isShowHotSearch'] ||
-    (appSetting['search.isShowHistorySearch'] && historyList.length > 0)
-})
-
-const loadHotSearch = async(force = false) => {
-  if (!props.visible || !appSetting['search.isShowHotSearch']) {
-    hotSearchList.value = []
-    isHotSearchLoading.value = false
-    return
-  }
-  const source = props.source
-  const requestId = ++hotSearchRequestId
-  if (force) clearList(source)
-  isHotSearchLoading.value = true
-  try {
-    const list = await getList(source)
-    if (requestId == hotSearchRequestId && source == props.source) hotSearchList.value = list
-  } catch {
-    if (requestId == hotSearchRequestId) hotSearchList.value = []
-  } finally {
-    if (requestId == hotSearchRequestId) isHotSearchLoading.value = false
-  }
-}
-
-watch(
-  () => [props.visible, props.source, appSetting['search.isShowHotSearch']],
-  () => { void loadHotSearch() },
-  { immediate: true },
-)
-
 const loadDailyRecommend = async(force = false, sourceOverride = selectedDailyProvider.value) => {
   if (!props.visible) return
   const requestId = ++dailyRequestId
@@ -784,29 +718,6 @@ void refreshAccountStatus().then(() => {
   void loadDailyRecommend(false, selectedDailyProvider.value)
 })
 
-watch(
-  () => [props.visible, appSetting['search.isShowHistorySearch']],
-  ([visible, enabled]) => {
-    if (visible && enabled) void getHistoryList()
-  },
-  { immediate: true },
-)
-
-const refreshHotSearch = () => {
-  void loadHotSearch(true)
-}
-
-const router = useRouter()
-const handleSearch = (text) => {
-  void router.replace({
-    path: '/search',
-    query: {
-      text,
-      source: props.source,
-    },
-  })
-}
-
 </script>
 
 <style lang="less" module>
@@ -828,6 +739,7 @@ const handleSearch = (text) => {
   max-height: 100%;
   display: flex;
   flex-flow: column nowrap;
+  > * { flex-shrink: 0; }
   gap: 18px;
   overflow-y: auto;
   padding: 2px 8px 12px;
@@ -1650,132 +1562,6 @@ const handleSearch = (text) => {
   justify-content: flex-end;
   gap: 9px;
 }
-.noitemListContainer {
-  order: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  padding: 2px 4px 10px;
-}
-.noitemList {
-  min-width: 0;
-  margin: 0;
-  padding: 16px;
-  border-radius: 20px;
-  background: rgb(from var(--color-main-background) r g b / .48);
-  border: 1px solid rgba(54, 83, 70, .13);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .64), 0 12px 30px rgba(35, 54, 46, .08);
-  backdrop-filter: blur(16px) saturate(1.16);
-}
-.noitemHotSearchList {
-  min-height: 104px;
-}
-.noitemListTitle {
-  display: flex;
-  align-items: center;
-  color: var(--color-font);
-  padding: 1px 4px 11px;
-  font-size: 13px;
-  font-weight: 680;
-}
-.noitemListItem {
-  display: inline-block;
-  margin: 3px;
-  padding: 7px 11px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, .44);
-  border: 1px solid rgba(54, 83, 70, .1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55);
-  transition: background-color @transition-fast, color @transition-fast, transform @transition-fast, border-color @transition-fast;
-  cursor: pointer;
-  color: var(--color-button-font);
-  .mixin-ellipsis-1();
-  max-width: 168px;
-  font-size: 12.5px;
-  &:hover {
-    color: var(--color-primary-dark-300);
-    background-color: var(--color-primary-alpha-900);
-    border-color: var(--color-primary-alpha-700);
-    transform: translateY(-1px);
-  }
-  &:active {
-    transform: scale(.97);
-  }
-}
-.historyClearBtn {
-  width: 26px;
-  height: 26px;
-  margin: -5px 0 -5px auto;
-  padding: 5px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--color-font-label);
-  cursor: pointer;
-  transition: @transition-normal;
-  transition-property: color, opacity, background-color;
-  opacity: .55;
-  &:hover {
-    color: var(--color-primary-font-hover);
-    background-color: var(--color-primary-alpha-900);
-    opacity: 1;
-  }
-  &:active {
-    color: var(--color-primary-font-active);
-    opacity: 1;
-  }
-  svg {
-    vertical-align: middle;
-    width: 15px;
-  }
-}
-.listActionBtn {
-  margin-left: auto;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 8px;
-  color: var(--color-primary-font);
-  background: var(--color-primary-alpha-900);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  transition: background-color @transition-fast, opacity @transition-fast;
-
-  &:hover:not(:disabled) {
-    background: var(--color-primary-alpha-800);
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: .56;
-  }
-}
-.listEmpty {
-  margin: 4px;
-  color: var(--color-font-label);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.chipSkeletons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 3px;
-
-  i {
-    width: 64px;
-    height: 29px;
-    border-radius: 11px;
-    background: linear-gradient(100deg, rgba(255, 255, 255, .28) 20%, rgba(255, 255, 255, .68) 45%, rgba(255, 255, 255, .28) 70%);
-    background-size: 220% 100%;
-    animation: q-search-skeleton 1.4s ease-in-out infinite;
-
-    &:nth-child(2n) { width: 82px; }
-    &:nth-child(3n) { width: 54px; }
-  }
-}
-
 @keyframes q-search-skeleton {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }
@@ -1877,9 +1663,6 @@ const handleSearch = (text) => {
   .noitem {
     padding-left: 28px;
     padding-right: 28px;
-  }
-  .noitemListContainer {
-    grid-template-columns: 1fr;
   }
   .detailHeader { flex-wrap: wrap; }
   .detailActions { width: 100%; padding-left: 54px; }

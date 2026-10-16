@@ -136,6 +136,8 @@ export default {
     },
     handleBlur() {
       setTimeout(() => {
+        // 快速切换内部按钮后可能已重新聚焦，不能用过期的 blur 清除焦点样式。
+        if (document.activeElement === this.$refs.dom_input) return
         this.focus = false
         this.sendEvent('blur')
       }, 80)

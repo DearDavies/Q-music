@@ -20,6 +20,8 @@ import { computed, nextTick, watch } from '@common/utils/vueTools'
 import useMenuLocation from '@renderer/utils/compositions/useMenuLocation'
 
 import { appSetting } from '@renderer/store/setting'
+import { useRoute } from '@common/utils/vueRouter'
+import { isShowPlayerDetail } from '@renderer/store/player/state'
 
 
 export default {
@@ -47,6 +49,7 @@ export default {
   emits: ['update:modelValue', 'menu-click'],
   setup(props, { emit }) {
     const visible = computed(() => props.modelValue)
+    const route = useRoute()
     const location = computed(() => props.xy)
     const visibleMenus = computed(() => props.menus.filter(item => !item.hide && (item.action != 'download' || appSetting['download.enable'])))
     let previousFocus = null
@@ -55,6 +58,9 @@ export default {
       emit('update:modelValue', false)
       menuClick(null)
     }
+    watch([() => route.fullPath, isShowPlayerDetail], () => {
+      if (visible.value) onHide()
+    })
 
     const { dom_menu, menuStyles } = useMenuLocation({
       visible,

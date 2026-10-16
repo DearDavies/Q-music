@@ -1,5 +1,5 @@
 <template>
-  <div :class="[$style.songList, $style.listColumns]">
+  <div :class="[$style.songList, $style.listColumns, { [$style.searchResults]: searchResults }]">
     <!-- <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut"> -->
     <div :class="$style.list">
       <material-list-toolbar
@@ -42,19 +42,21 @@
                   <span v-else>{{ index + 1 }}</span>
                   <input type="checkbox" :checked="selectedList.includes(item)" :aria-label="$t('list__select_song', { name: item.name })" @click.stop @change="toggleSelectData(index)">
                 </div>
-                <div class="list-item-cell auto name">
-                  <span class="select name" :aria-label="item.name">{{ item.name }}</span>
-                  <span v-if="item.meta._qualitys.flac24bit" class="no-select badge badge-theme-primary">{{ $t('tag__lossless_24bit') }}</span>
-                  <span v-else-if="item.meta._qualitys.ape || item.meta._qualitys.flac || item.meta._qualitys.wav" class="no-select badge badge-theme-primary">{{ $t('tag__lossless') }}</span>
-                  <span v-else-if="item.meta._qualitys['320k']" class="no-select badge badge-theme-secondary">{{ $t('tag__high_quality') }}</span>
-                  <source-picker
-                    v-if="showSourceSelector" :value="item.source" :options="getSourceOptions(item)" :source-name="getSourceName"
-                    @change="handleSourceChange($event, index)"
-                  />
-                  <source-icon v-else-if="showSourceTag" class="no-select" :source="item.source" :size="15" />
+                <div class="list-item-cell auto name" :class="{ [$style.trackIdentity]: searchResults }">
+                  <span class="select name" :title="item.name" :aria-label="item.name">{{ item.name }}</span>
+                  <span :class="$style.trackBadges">
+                    <span v-if="item.meta._qualitys.flac24bit" class="no-select badge badge-theme-primary">{{ $t('tag__lossless_24bit') }}</span>
+                    <span v-else-if="item.meta._qualitys.ape || item.meta._qualitys.flac || item.meta._qualitys.wav" class="no-select badge badge-theme-primary">{{ $t('tag__lossless') }}</span>
+                    <span v-else-if="item.meta._qualitys['320k']" class="no-select badge badge-theme-secondary">{{ $t('tag__high_quality') }}</span>
+                    <source-picker
+                      v-if="showSourceSelector" :value="item.source" :options="getSourceOptions(item)" :source-name="getSourceName"
+                      @change="handleSourceChange($event, index)"
+                    />
+                    <source-icon v-else-if="showSourceTag" class="no-select" :source="item.source" :size="15" />
+                  </span>
                 </div>
-                <div class="list-item-cell" :class="$style.singerColumn"><span class="select" :aria-label="item.singer">{{ item.singer }}</span></div>
-                <div class="list-item-cell" :class="$style.albumColumn"><span class="select" :aria-label="item.meta.albumName">{{ item.meta.albumName }}</span></div>
+                <div class="list-item-cell" :class="$style.singerColumn"><span class="select" :title="item.singer" :aria-label="item.singer">{{ item.singer }}</span></div>
+                <div class="list-item-cell" :class="$style.albumColumn"><span class="select" :title="item.meta.albumName" :aria-label="item.meta.albumName">{{ item.meta.albumName }}</span></div>
                 <div class="list-item-cell" :class="$style.durationColumn"><span class="no-select">{{ item.interval || '--/--' }}</span></div>
                 <div class="list-item-cell" :class="$style.actionColumn" style="padding-left: 0; padding-right: 0;">
                   <material-list-buttons :index="index" :playing="isCurrentMusic(item) && isPlay" :remove-btn="false" :download-btn="assertApiSupport(item.source)" :play-btn="checkApiSource ? assertApiSupport(item.source) : true" @btn-click="handleListBtnClick" />
@@ -62,7 +64,7 @@
               </div>
             </template>
             <template #footer>
-              <div :class="$style.pagination">
+              <div v-if="!searchResults" :class="$style.pagination">
                 <material-pagination :count="total" :limit="limit" :page="page" @btn-click="$emit('togglePage', $event)" />
               </div>
             </template>
@@ -78,24 +80,26 @@
                   <span v-else>{{ index + 1 }}</span>
                   <input type="checkbox" :checked="selectedList.includes(item)" :aria-label="$t('list__select_song', { name: item.name })" @click.stop @change="toggleSelectData(index)">
                 </div>
-                <div class="list-item-cell auto name">
-                  <span class="select name" :aria-label="item.name">{{ item.name }}</span>
-                  <span v-if="item.meta._qualitys.flac24bit" class="no-select badge badge-theme-primary">{{ $t('tag__lossless_24bit') }}</span>
-                  <span v-else-if="item.meta._qualitys.ape || item.meta._qualitys.flac || item.meta._qualitys.wav" class="no-select badge badge-theme-primary">{{ $t('tag__lossless') }}</span>
-                  <span v-else-if="item.meta._qualitys['320k']" class="no-select badge badge-theme-secondary">{{ $t('tag__high_quality') }}</span>
-                  <source-picker
-                    v-if="showSourceSelector" :value="item.source" :options="getSourceOptions(item)" :source-name="getSourceName"
-                    @change="handleSourceChange($event, index)"
-                  />
-                  <source-icon v-else-if="showSourceTag" class="no-select" :source="item.source" :size="15" />
+                <div class="list-item-cell auto name" :class="{ [$style.trackIdentity]: searchResults }">
+                  <span class="select name" :title="item.name" :aria-label="item.name">{{ item.name }}</span>
+                  <span :class="$style.trackBadges">
+                    <span v-if="item.meta._qualitys.flac24bit" class="no-select badge badge-theme-primary">{{ $t('tag__lossless_24bit') }}</span>
+                    <span v-else-if="item.meta._qualitys.ape || item.meta._qualitys.flac || item.meta._qualitys.wav" class="no-select badge badge-theme-primary">{{ $t('tag__lossless') }}</span>
+                    <span v-else-if="item.meta._qualitys['320k']" class="no-select badge badge-theme-secondary">{{ $t('tag__high_quality') }}</span>
+                    <source-picker
+                      v-if="showSourceSelector" :value="item.source" :options="getSourceOptions(item)" :source-name="getSourceName"
+                      @change="handleSourceChange($event, index)"
+                    />
+                    <source-icon v-else-if="showSourceTag" class="no-select" :source="item.source" :size="15" />
+                  </span>
                 </div>
-                <div class="list-item-cell" :class="$style.singerColumn"><span class="select" :aria-label="item.singer">{{ item.singer }}</span></div>
-                <div class="list-item-cell" :class="$style.albumColumn"><span class="select" :aria-label="item.meta.albumName">{{ item.meta.albumName }}</span></div>
+                <div class="list-item-cell" :class="$style.singerColumn"><span class="select" :title="item.singer" :aria-label="item.singer">{{ item.singer }}</span></div>
+                <div class="list-item-cell" :class="$style.albumColumn"><span class="select" :title="item.meta.albumName" :aria-label="item.meta.albumName">{{ item.meta.albumName }}</span></div>
                 <div class="list-item-cell" :class="$style.durationColumn"><span class="no-select">{{ item.interval || '--/--' }}</span></div>
               </div>
             </template>
             <template #footer>
-              <div :class="$style.pagination">
+              <div v-if="!searchResults" :class="$style.pagination">
                 <material-pagination :count="total" :limit="limit" :page="page" @btn-click="$emit('togglePage', $event)" />
               </div>
             </template>
@@ -113,10 +117,18 @@
             </div>
           </div>
           <div v-else-if="noItem" :class="$style.noitem">
-            <p v-text="noItem" />
+            <svg v-if="searchResults" :class="$style.emptyIcon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+            <p role="status" v-text="noItem" />
+            <div v-if="searchResults" :class="$style.emptyActions">
+              <base-btn v-if="page > 1" min @click="$emit('togglePage', page - 1)">{{ $t('pagination__prev') }}</base-btn>
+              <base-btn min @click="$emit('retry')">{{ $t('search__retry') }}</base-btn>
+            </div>
           </div>
         </transition>
       </div>
+    </div>
+    <div v-if="searchResults && !noItem && total > limit" :class="$style.searchPagination">
+      <material-pagination :count="total" :limit="limit" :page="page" @btn-click="$emit('togglePage', $event)" />
     </div>
     <!-- </transition> -->
     <!-- <material-flow-btn :show="isShowEditBtn && assertApiSupport(source)" :remove-btn="false" @btn-click="handleFlowBtnClick" /> -->
@@ -167,6 +179,7 @@ export default {
       type: Number,
       required: true,
     },
+    searchResults: Boolean,
     sourceTag: {
       type: Boolean,
       default: false,
@@ -192,7 +205,7 @@ export default {
       default: false,
     },
   },
-  emits: ['show-menu', 'play-list', 'togglePage', 'source-change'],
+  emits: ['show-menu', 'play-list', 'togglePage', 'source-change', 'retry'],
   setup(props, { emit }) {
     const actionButtonsVisible = computed(() => appSetting['list.actionButtonsVisible'])
     const showSourceSelector = computed(() => props.sourceSelector)
@@ -389,6 +402,44 @@ export default {
 }
 
 .paused i { animation-play-state: paused !important; }
+
+.trackBadges {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  :global(.badge) { margin-left: 0 !important; }
+}
+
+.searchResults {
+  border: 1px solid rgb(from var(--color-font) r g b / .08);
+  border-radius: 16px;
+  background: rgb(from var(--color-content-background) r g b / .64);
+  box-sizing: border-box;
+  .list { position: relative; height: auto; flex: 1; min-height: 0; }
+  :global(.thead) { background: rgb(from var(--color-font) r g b / .025); }
+  :global(.list) :global(.list-item) {
+    border-radius: 8px;
+    box-shadow: inset 0 -1px 0 rgb(from var(--color-font) r g b / .04);
+    &:hover { transform: none; }
+    &:global(.playing) { background: rgb(from var(--color-primary) r g b / .09); box-shadow: inset 3px 0 var(--color-primary); }
+  }
+  :global(.list) :global(.list-item) :global(.list-item-cell).trackIdentity {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    > :global(.name) { min-width: 0; flex: 0 1 auto; line-height: 18px; }
+  }
+  .durationColumn { font-variant-numeric: tabular-nums; color: var(--color-font-label); }
+  .albumColumn { color: var(--color-font-label); }
+  .noitem { gap: 14px; padding: 24px; box-sizing: border-box; text-align: center; }
+  .noitem p { font-size: 13px; line-height: 1.6; }
+}
+.emptyIcon { width: 36px; height: 36px; fill: none; stroke: var(--color-font-label); stroke-width: 1.4; opacity: .6; }
+.emptyActions { display: flex; gap: 10px; }
+.searchPagination { flex: none; text-align: center; padding: 10px; border-top: 1px solid rgb(from var(--color-font) r g b / .07); }
 
 .content {
   flex: auto;

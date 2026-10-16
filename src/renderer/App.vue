@@ -395,7 +395,7 @@ body {
 #root.show-modal > .view-container {
   opacity: .9;
 }
-#view.show-modal > .view-container {
+#view.show-modal .view-container {
   opacity: .2;
 }
 

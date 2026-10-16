@@ -12,6 +12,8 @@
       :source-options="getSourceOptions"
       :source-name="getSourceName"
       check-api-source
+      search-results
+      @retry="search(searchText, props.sourceId, props.page)"
       @toggle-page="handleTogglePage"
       @play-list="handlePlayList"
       @source-change="handleSourceChange"
@@ -44,15 +46,8 @@ const {
   handleSourceChange,
 } = useList()
 
-watch(() => [props.sourceId, props.page], ([sourceId, page]) => {
-  setTimeout(() => {
-    search(searchText.value, sourceId as SearchSource, page as number || 1)
-  })
-})
-watch(searchText, (searchText) => {
-  setTimeout(() => {
-    search(searchText, props.sourceId, props.page)
-  })
+watch(() => [searchText.value, props.sourceId, props.page] as const, ([text, sourceId, page]) => {
+  search(text, sourceId, page || 1)
 }, {
   immediate: true,
 })
@@ -72,12 +67,15 @@ const handleTogglePage = (page: number) => {
 
 
 <style lang="less" module>
+@import '@renderer/assets/styles/layout.less';
 .container {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
+  padding: 4px 16px calc(@height-player + 18px);
 }
 
 .list {

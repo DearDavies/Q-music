@@ -1,5 +1,5 @@
 <template>
-  <div ref="searchSlotRef" :class="[$style.searchSlot, { [$style.focused]: panelVisible }]" @keydown.esc.stop="closePanel">
+  <div ref="searchSlotRef" :class="[$style.searchSlot, { [$style.focused]: isFocused }]" @keydown.esc.stop="handleEscape" @focusout="handleFocusOut">
     <material-search-input v-model="searchText" :placeholder="$t('search')" :list="panelVisible && !sourceMenuVisible ? tipList : []" :visible-list="false" @event="handleEvent" />
     <button
       type="button"
@@ -16,51 +16,52 @@
       <i aria-hidden="true" />
     </button>
     <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
-      <div v-show="sourceMenuVisible" :class="$style.sourceMenu" role="listbox" @mousedown.prevent>
-        <div :class="$style.sourceMenuHeading">
-          <strong>{{ $t('search__source_select') }}</strong>
-          <span>{{ selectedSourceLabel }}</span>
-        </div>
-        <button
-          v-for="item in sourceOptions" :key="item.id" type="button" role="option"
-          :aria-selected="selectedSource == item.id"
-          :class="{ [$style.activeSource]: selectedSource == item.id }"
-          :title="item.label" @click.stop="selectSource(item.id)"
-        >
-          <source-icon v-if="item.id != 'all'" :source="item.id" :size="19" />
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z" /></svg>
-          <span>{{ item.label }}</span>
-          <svg v-if="selectedSource == item.id" :class="$style.sourceCheck" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-        </button>
-      </div>
-    </transition>
-    <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
-      <section v-show="panelVisible" :class="$style.searchPanel" @mousedown.prevent>
-        <div v-if="searchText" :class="$style.suggestionList">
-          <button v-for="(item, index) in tipList" :key="item" type="button" data-search-suggestion :class="{ [$style.selectedSuggestion]: selectedTipIndex == index }" @click="search(item)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 5.2a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 0 0 0-11.2zm4.1 9.7 4 4" /></svg>
-            <span>{{ item }}</span>
+      <div v-show="panelVisible || sourceMenuVisible" :class="[$style.searchPopover, { [$style.expandedPopover]: isFocused }]">
+        <div v-show="sourceMenuVisible" :class="[$style.sourceMenu, { [$style.inlineSourceMenu]: isFocused }]" role="listbox" :aria-label="$t('search__source_select')" @mousedown.prevent>
+          <div :class="$style.sourceMenuHeading">
+            <strong>{{ $t('search__source_select') }}</strong>
+            <span>{{ selectedSourceLabel }}</span>
+          </div>
+          <button
+            v-for="item in sourceOptions" :key="item.id" type="button" role="option"
+            :aria-selected="selectedSource == item.id"
+            :class="{ [$style.activeSource]: selectedSource == item.id }"
+            :title="item.label" @click.stop="selectSource(item.id)"
+            @keydown.enter.prevent @keyup.enter.stop="selectSource(item.id)"
+          >
+            <source-icon v-if="item.id != 'all'" :source="item.id" :size="19" />
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z" /></svg>
+            <span>{{ item.label }}</span>
+            <svg v-if="selectedSource == item.id" :class="$style.sourceCheck" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
           </button>
-          <p v-if="!tipList.length" role="status">{{ isTipSearchLoading ? $t('search__hot_search_loading') : $t('search__tip_empty') }}</p>
         </div>
-        <div v-else :class="$style.discoveryPanel">
-          <div v-if="appSetting['search.isShowHistorySearch']" :class="[$style.panelSection, $style.historySection]">
-            <header><strong>{{ $t('history_search') }}</strong><button v-if="historyList.length" type="button" @click="clearHistoryList">{{ $t('history_clear') }}</button></header>
-            <div v-if="historyList.length" :class="$style.chips">
-              <button v-for="(item, index) in historyList.slice(0, 10)" :key="item" type="button" @click="search(item)" @contextmenu.prevent="removeHistoryWord(index)">{{ item }}</button>
+        <section v-show="panelVisible" :class="$style.searchPanel" @mousedown.prevent>
+          <div v-if="searchText" :class="$style.suggestionList">
+            <button v-for="(item, index) in tipList" :key="item" type="button" data-search-suggestion :class="{ [$style.selectedSuggestion]: selectedTipIndex == index }" @click="search(item)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 5.2a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 0 0 0-11.2zm4.1 9.7 4 4" /></svg>
+              <span>{{ item }}</span>
+            </button>
+            <p v-if="!tipList.length" role="status">{{ isTipSearchLoading ? $t('search__hot_search_loading') : $t('search__tip_empty') }}</p>
+          </div>
+          <div v-else :class="$style.discoveryPanel">
+            <div v-if="appSetting['search.isShowHistorySearch']" :class="[$style.panelSection, $style.historySection]">
+              <header><strong>{{ $t('history_search') }}</strong><button v-if="historyList.length" type="button" @click="clearHistoryList">{{ $t('history_clear') }}</button></header>
+              <div v-if="historyList.length" :class="$style.chips">
+                <button v-for="(item, index) in historyList.slice(0, 10)" :key="item" type="button" @click="search(item)" @contextmenu.prevent="removeHistoryWord(index)">{{ item }}</button>
+              </div>
+              <div v-else :class="$style.emptyHistory">{{ $t('history_search_empty') }}</div>
             </div>
-            <div v-else :class="$style.emptyHistory">{{ $t('history_search_empty') }}</div>
+            <div v-if="appSetting['search.isShowHotSearch']" :class="[$style.panelSection, $style.hotSection]">
+              <header><strong>{{ selectedSourceLabel }} · {{ $t('search__hot_search') }}</strong><button type="button" :disabled="isHotSearchLoading" @click="refreshHotSearch">{{ $t('search__hot_search_refresh') }}</button></header>
+              <div v-if="isHotSearchLoading" :class="$style.loading">{{ $t('search__hot_search_loading') }}</div>
+              <ol v-else-if="hotSearchList.length" :class="$style.hotList">
+                <li v-for="(item, index) in hotSearchList.slice(0, 10)" :key="item"><button type="button" @click="search(item)"><b>{{ index + 1 }}</b><span>{{ item }}</span></button></li>
+              </ol>
+              <div v-else :class="$style.loading">{{ $t('search__hot_search_empty') }}</div>
+            </div>
           </div>
-          <div v-if="appSetting['search.isShowHotSearch']" :class="[$style.panelSection, $style.hotSection]">
-            <header><strong>{{ selectedSourceLabel }} · {{ $t('search__hot_search') }}</strong><button type="button" :disabled="isHotSearchLoading" @click="refreshHotSearch">{{ $t('search__hot_search_refresh') }}</button></header>
-            <div v-if="isHotSearchLoading" :class="$style.loading">{{ $t('search__hot_search_loading') }}</div>
-            <ol v-else-if="hotSearchList.length" :class="$style.hotList">
-              <li v-for="(item, index) in hotSearchList.slice(0, 10)" :key="item"><button type="button" @click="search(item)"><b>{{ index + 1 }}</b><span>{{ item }}</span></button></li>
-            </ol>
-            <div v-else :class="$style.loading">{{ $t('search__hot_search_empty') }}</div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </transition>
   </div>
 </template>
@@ -93,14 +94,13 @@ export default {
     const isTipSearchLoading = ref(false)
     const selectedTipIndex = ref(-1)
     const isFocused = ref(false)
-    const panelPinned = ref(false)
     const sourceMenuVisible = ref(false)
     const searchSlotRef = ref(null)
     const hotSearchList = shallowRef([])
     const isHotSearchLoading = ref(false)
     let hotSearchRequestId = 0
     let tipSearchGeneration = 0
-    let sourceRouteTimer = null
+    let sourceChangePath = null
 
     const route = useRoute()
     const router = useRouter()
@@ -111,9 +111,8 @@ export default {
         : [{ id: 'all', label: window.i18n.t('source_all') }, ...options]
     })
     const selectedSourceLabel = computed(() => sourceOptions.value.find(item => item.id == selectedSource.value)?.label ?? window.i18n.t('source_all'))
-    // Keep the discovery panel mounted while the source menu is open so the
-    // compact platform list can layer above it instead of replacing it.
-    const panelVisible = computed(() => (isFocused.value || panelPinned.value) && (searchText.value || appSetting['search.isShowHistorySearch'] || appSetting['search.isShowHotSearch']))
+    // 切源属于同一次搜索交互；未聚焦时只显示独立的音源菜单。
+    const panelVisible = computed(() => isFocused.value && (searchText.value || appSetting['search.isShowHistorySearch'] || appSetting['search.isShowHotSearch']))
 
     getSearchSetting().then(setting => {
       if (route.query.source != null || route.name == 'SongList') return
@@ -203,16 +202,22 @@ export default {
     }
 
     watch(selectedSource, () => {
-      void setSearchSetting({ source: selectedSource.value })
       if (panelVisible.value && !searchText.value) void loadHotSearch()
       if (searchText.value) handleTipSearch()
     })
 
     const closePanel = () => {
-      panelPinned.value = false
       isFocused.value = false
       sourceMenuVisible.value = false
       searchSlotRef.value?.querySelector('input')?.blur()
+    }
+    const handleFocusOut = event => {
+      if (!searchSlotRef.value?.contains(event.relatedTarget)) closePanel()
+    }
+    const handleEscape = () => {
+      if (!sourceMenuVisible.value) { closePanel(); return }
+      sourceMenuVisible.value = false
+      if (isFocused.value) searchSlotRef.value?.querySelector('input')?.focus({ preventScroll: true })
     }
 
     const handleSearch = () => {
@@ -242,10 +247,8 @@ export default {
           if (searchText.value) handleTipSearch()
           break
         case 'blur':
-          isFocused.value = false
-          // Keep the discovery layer alive while the source picker owns focus.
-          // Some browsers dispatch blur before the menu click is handled.
-          if (sourceMenuVisible.value) panelPinned.value = true
+          // 基础输入组件延迟发送 blur；内部按钮取焦或输入框重新聚焦时不能关闭面板。
+          if (!searchSlotRef.value?.contains(document.activeElement)) closePanel()
           break
         case 'submit':
           handleSearch()
@@ -261,35 +264,22 @@ export default {
     }
 
     const toggleSourceMenu = () => {
-      const opening = !sourceMenuVisible.value
-      sourceMenuVisible.value = opening
-      if (!opening) {
-        // If the menu was opened from an unfocused search box, return to the
-        // compact idle state after it closes. A focused search keeps its panel.
-        if (!isFocused.value) panelPinned.value = false
-        return
-      }
-
-      // Make the discovery panel the stable layer underneath the source menu,
-      // even when the picker is opened before the input receives focus.
-      if (!isFocused.value && !panelPinned.value) {
-        panelPinned.value = true
-        void getHistoryList().catch(() => {})
-        if (!searchText.value) void loadHotSearch()
-      }
+      sourceMenuVisible.value = !sourceMenuVisible.value
     }
     const selectSource = value => {
       selectedSource.value = value
+      // 浏览页也会更新 selectedSource；只有手动选择才保存为搜索偏好。
+      void setSearchSetting({ source: value })
       sourceMenuVisible.value = false
-      const routeSearchText = typeof route.query.text == 'string' ? route.query.text.trim() : ''
-      if (route.name != 'Search' || !routeSearchText) return
+      if (isFocused.value) searchSlotRef.value?.querySelector('input')?.focus({ preventScroll: true })
+      if (route.name != 'Search' || route.query.source == value) return
 
-      if (sourceRouteTimer) clearTimeout(sourceRouteTimer)
-      sourceRouteTimer = setTimeout(() => {
-        sourceRouteTimer = null
-        if (route.name != 'Search' || route.query.source == value) return
-        void router.replace({ path: '/search', query: { ...route.query, source: value, page: 1 } }).catch(_ => _)
-      }, 120)
+      const target = { path: '/search', query: { ...route.query, source: value, page: 1 } }
+      const targetPath = router.resolve(target).fullPath
+      sourceChangePath = targetPath
+      void router.replace(target).catch(_ => _).finally(() => {
+        if (sourceChangePath == targetPath) sourceChangePath = null
+      })
     }
     const search = text => {
       searchText.value = text
@@ -298,14 +288,16 @@ export default {
     const refreshHotSearch = () => { void loadHotSearch(true) }
     const handleOutside = event => {
       if (!searchSlotRef.value?.contains(event.target)) {
-        panelPinned.value = false
-        sourceMenuVisible.value = false
+        closePanel()
       }
     }
-    onMounted(() => { document.addEventListener('mousedown', handleOutside) })
+    watch(() => route.fullPath, value => {
+      // 仅本次切源的路由更新保留输入上下文，提交搜索和跨页导航仍正常收起。
+      if (value != sourceChangePath) closePanel()
+    })
+    onMounted(() => { document.addEventListener('pointerdown', handleOutside, true) })
     onBeforeUnmount(() => {
-      document.removeEventListener('mousedown', handleOutside)
-      if (sourceRouteTimer) clearTimeout(sourceRouteTimer)
+      document.removeEventListener('pointerdown', handleOutside, true)
     })
 
     return {
@@ -315,6 +307,8 @@ export default {
       selectedTipIndex,
       appSetting,
       closePanel,
+      handleEscape,
+      handleFocusOut,
       handleEvent,
       isFocused,
       panelVisible,
@@ -389,33 +383,10 @@ export default {
 }
 
 .sourceMenu {
-  position: absolute;
-  z-index: 100;
-  top: calc(100% + 8px);
-  left: 0;
-  // Keep the platform picker compact; it is intentionally narrower than the
-  // discovery panel and is layered above it when both are visible.
-  width: 248px;
-  max-width: calc(100vw - 24px);
+  width: 100%;
   padding: 8px;
   box-sizing: border-box;
-  overflow: hidden;
   color: var(--color-font);
-  border: 1px solid rgb(from var(--color-font) r g b / .1);
-  border-radius: 16px;
-  background:
-    linear-gradient(145deg, rgb(from var(--color-content-background) r g b / .98), rgb(from var(--color-content-background) r g b / .92)),
-    var(--color-content-background);
-  box-shadow: 0 18px 42px rgba(24, 35, 31, .18), inset 0 1px rgba(255,255,255,.8);
-  backdrop-filter: blur(28px) saturate(1.2);
-  max-height: min(360px, calc(100vh - 96px));
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(from var(--color-font) r g b / .2) transparent;
-
-  &::-webkit-scrollbar { width: 5px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { border-radius: 99px; background: rgb(from var(--color-font) r g b / .2); }
 
   button {
     width: 100%;
@@ -435,9 +406,18 @@ export default {
   button:hover { color: var(--color-font); background: rgb(from var(--color-font) r g b / .06); }
   button:active { transform: scale(.985); }
   .activeSource { color: var(--color-primary); border-color: var(--color-primary-alpha-600); background: rgb(from var(--color-content-background) r g b / .92); }
-  button > span { min-width: 0; flex: 1; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  button > span:not([role="img"]) { min-width: 0; flex: 1; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
   button > svg { width: 19px; height: 19px; flex: none; fill: currentColor; }
   .sourceCheck { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+}
+
+.inlineSourceMenu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgb(from var(--color-font) r g b / .07);
+  .sourceMenuHeading { grid-column: 1 / -1; }
 }
 
 .sourceMenuHeading {
@@ -454,15 +434,14 @@ export default {
   span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
-.searchPanel {
+.searchPopover {
   position: absolute;
   z-index: 90;
   top: calc(100% + 9px);
   left: 0;
-  width: 100%;
-  max-width: min(940px, calc(100vw - 220px));
+  width: 248px;
+  max-width: 100%;
   max-height: min(620px, calc(100vh - 92px));
-  padding: 16px;
   box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
@@ -482,6 +461,9 @@ export default {
   &::-webkit-scrollbar-thumb { border-radius: 99px; background: rgb(from var(--color-font) r g b / .22); }
   &::-webkit-scrollbar-thumb:hover { background: rgb(from var(--color-font) r g b / .34); }
 }
+
+.expandedPopover { width: 100%; }
+.searchPanel { padding: 16px; }
 
 .suggestionList {
   display: grid;
@@ -530,7 +512,7 @@ export default {
   // The panel lives inside #right (which intentionally clips the app chrome).
   // Keep it tied to the search slot at narrow widths so it cannot spill under
   // the sidebar or be cut off by the window edge.
-  .searchPanel { width: 100%; max-width: 100%; max-height: min(600px, calc(100vh - 84px)); }
+  .searchPopover { max-height: min(600px, calc(100vh - 84px)); }
 }
 
 @media (max-width: 760px) {
@@ -539,14 +521,16 @@ export default {
     width: calc(100vw - 36px);
     min-width: 0;
   }
-  .searchPanel { width: 100%; max-width: 100%; max-height: min(600px, calc(100vh - 72px)); padding: 12px; border-radius: 17px; }
+  .searchPopover { max-height: min(600px, calc(100vh - 72px)); border-radius: 17px; }
+  .searchPanel { padding: 12px; }
+  .inlineSourceMenu { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px 12px; }
   .discoveryPanel { grid-template-columns: 1fr; gap: 9px; }
   .panelSection { min-height: 0; padding: 12px; }
   .hotList { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {
-  .searchPanel { width: 100%; max-width: 100%; padding: 9px; }
+  .searchPanel { padding: 9px; }
   .panelSection { padding: 10px; }
 }
 </style>

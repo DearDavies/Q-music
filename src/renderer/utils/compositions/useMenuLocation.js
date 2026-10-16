@@ -48,7 +48,7 @@ export default ({ visible, location, onHide }) => {
   const handleDocumentClick = (event) => {
     if (!show) return
 
-    if (event.target == dom_menu.value || dom_menu.value.contains(event.target)) return
+    if (dom_menu.value?.contains(event.target)) return
 
     if (show && menuStyles.transitionProperty != transition1) menuStyles.transitionProperty = transition1
 
@@ -71,11 +71,12 @@ export default ({ visible, location, onHide }) => {
   }, { deep: true })
 
   onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
+    // 捕获阶段关闭，播放详情等入口即使阻止冒泡也能正确收起菜单。
+    document.addEventListener('pointerdown', handleDocumentClick, true)
   })
 
   onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
+    document.removeEventListener('pointerdown', handleDocumentClick, true)
   })
 
   return {

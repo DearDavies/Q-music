@@ -1024,5 +1024,8 @@
   "search__provider_playlists": "{name} · 我的歌单",
   "search__account_kugou_tip": "扫码登录，导入收藏与开启每日推荐",
   "search__account_manage": "管理",
-  "search__account_collapse": "收起"
+  "search__account_collapse": "收起",
+  "search__empty": "没有找到匹配的歌曲，试试其他关键词或音源。",
+  "search__page_empty": "这一页没有可显示的歌曲，可以返回上一页或重试。",
+  "search__retry": "重新加载"
 }

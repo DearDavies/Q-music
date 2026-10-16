@@ -54,8 +54,10 @@ export default {
         indicator.width = 0
         return
       }
-      indicator.left = target.offsetLeft + label.offsetLeft
-      indicator.width = label.offsetWidth
+      // label 的 offsetParent 不一定是 tab，不能叠加两个 offsetLeft。
+      const bounds = label.getBoundingClientRect()
+      indicator.left = bounds.left - list.getBoundingClientRect().left + list.scrollLeft
+      indicator.width = bounds.width
     }
 
     const handleToggle = id => {

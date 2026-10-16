@@ -1,11 +1,11 @@
 <template>
   <div :class="$style.main">
     <div class="scroll" :class="$style.toc">
-      <ul :class="$style.tocList" role="tablist" aria-label="设置分类" aria-orientation="vertical">
+      <ul ref="tocRef" :class="$style.tocList" role="tablist" aria-label="设置分类" aria-orientation="vertical">
         <li
-          v-show="activeIndex > -1" role="presentation" aria-hidden="true"
+          v-show="indicator.height > 0" role="presentation" aria-hidden="true"
           :class="[$style.tocIndicator, { [$style.tocIndicatorReady]: indicatorReady }]"
-          :style="{ transform: `translateY(${activeIndex * 49}px)` }"
+          :style="{ transform: `translateY(${indicator.top}px)`, height: `${indicator.height}px` }"
         />
         <li v-for="(h2, index) in tocList" :key="h2.id" :class="$style.tocListItem" role="presentation">
           <button
@@ -55,7 +55,7 @@
 </template>
 
 <script>
-import { ref, computed, nextTick, onMounted } from '@common/utils/vueTools'
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from '@common/utils/vueTools'
 // import { currentStting } from './setting'
 import { useI18n } from '@renderer/plugins/i18n'
 import { useRoute } from '@common/utils/vueRouter'
@@ -130,10 +130,26 @@ export default {
       : tocList.value[0].id)
 
     const activeIndex = computed(() => tocList.value.findIndex(item => item.id == avtiveComponentName.value))
+    const tocRef = ref(null)
+    const indicator = reactive({ top: 0, height: 0 })
     const indicatorReady = ref(false)
+    const updateIndicator = () => {
+      const list = tocRef.value
+      const target = list?.querySelector('[role="tab"][aria-selected="true"]')
+      if (!target) { indicator.height = 0; return }
+      const bounds = target.getBoundingClientRect()
+      indicator.top = bounds.top - list.getBoundingClientRect().top
+      indicator.height = bounds.height
+    }
+    watch([activeIndex, tocList], updateIndicator, { flush: 'post' })
+    let resizeObserver
+    let readyFrame = 0
 
     onMounted(() => {
-      requestAnimationFrame(() => {
+      updateIndicator()
+      resizeObserver = new ResizeObserver(updateIndicator)
+      resizeObserver.observe(tocRef.value)
+      readyFrame = requestAnimationFrame(() => {
         indicatorReady.value = true
       })
       if (route.query.section != 'cloud-library') return
@@ -143,6 +159,10 @@ export default {
         if (!target) return
         content.scrollTop += target.getBoundingClientRect().top - content.getBoundingClientRect().top
       })
+    })
+    onBeforeUnmount(() => {
+      resizeObserver?.disconnect()
+      cancelAnimationFrame(readyFrame)
     })
 
     const toggleTab = id => {
@@ -172,7 +192,8 @@ export default {
 
     return {
       tocList,
-      activeIndex,
+      tocRef,
+      indicator,
       indicatorReady,
       avtiveComponentName,
       dom_content_ref,
@@ -246,7 +267,7 @@ export default {
   flex-flow: column nowrap;
   gap: 7px;
 }
-// 选中底块在分类之间滑动；49px = 分类高度 42px + 间距 7px
+// 选中底块跟随分类的实际尺寸，兼容字号与窗口缩放。
 .tocIndicator {
   position: absolute;
   left: 0;

@@ -150,19 +150,22 @@ export default {
     if (limit == null) limit = this.limit
     // http://newlyric.kuwo.cn/newlyric.lrc?62355680
     return this.musicSearch(str, page, limit).then(({ body, meta }) => {
-      let list = this.handleResult(body.item_song)
-
-      this.total = meta.estimate_sum
-      this.page = page
-      this.allPage = Math.ceil(this.total / limit)
-
-      return Promise.resolve({
+      const rawList = body?.item_song
+      if (!Array.isArray(rawList)) throw new Error('Invalid QQ music search response')
+      const list = this.handleResult(rawList)
+      const received = (page - 1) * limit + rawList.length
+      // estimate_sum 是估算值；未满一页时以原始条目数确认末页，不能用过滤后的数量截断。
+      const estimate = Number(meta?.estimate_sum)
+      const total = rawList.length < limit
+        ? received
+        : Math.max(received, Number.isFinite(estimate) ? estimate : received)
+      return {
         list,
-        allPage: this.allPage,
+        allPage: Math.ceil(total / limit),
         limit,
-        total: this.total,
+        total,
         source: 'tx',
-      })
+      }
     })
   },
 }
