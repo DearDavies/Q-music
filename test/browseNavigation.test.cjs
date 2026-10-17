@@ -11,7 +11,12 @@ function load(file, dependencies = {}) {
     return dependencies[id]
   } }
   const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
-  const script = file.endsWith('.vue') ? require('@vue/compiler-sfc').parse(source).descriptor.script.content : source
+  let script = source
+  if (file.endsWith('.vue')) {
+    const compiler = require('@vue/compiler-sfc')
+    const { descriptor } = compiler.parse(source)
+    script = descriptor.scriptSetup ? compiler.compileScript(descriptor, { id: 'browse-test' }).content : descriptor.script.content
+  }
   vm.runInNewContext(ts.transpileModule(script, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
   }).outputText, context)
@@ -20,6 +25,212 @@ function load(file, dependencies = {}) {
 const timeout = load('src/renderer/store/browseRequest.ts')
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b }); return { promise, resolve, reject } }
 const result = (name, source = 'wy') => ({ list: [{ id: name, name }], total: 1, limit: 30, page: 1, source, info: { name } })
+
+test('离开并返回同一专辑不重新请求或清空曲目，切换专辑仍重新加载', async () => {
+  const vue = require('vue')
+  const query = { albumId: 'first', albumSource: 'tx', albumName: '专辑' }
+  const route = vue.reactive({ path: '/search', query })
+  let calls = 0
+  const scope = vue.effectScope()
+  const component = load('src/renderer/views/Search/AlbumList.vue', {
+    '@common/utils/vueTools': { ...vue, onBeforeUnmount() {} },
+    '@common/utils/vueRouter': { useRoute: () => route, useRouter: () => ({}) },
+    '@renderer/components/common/SourceIcon.vue': {},
+    '@renderer/store/search/albums': { albumSources: ['tx'], getAlbumTracks: async (_, id) => { calls++; return [{ id, meta: {} }] } },
+    '@renderer/store/search/action': {}, '@renderer/store/list/action': {},
+    '@renderer/core/player/action': {}, '@common/constants': {},
+  }).default
+  try {
+    const state = scope.run(() => component.setup(vue.reactive({ source: 'tx', page: 1, text: '歌手' }), { expose() {} }))
+    await new Promise(setImmediate)
+    const tracks = state.tracks.value
+    assert.equal(calls, 1)
+    route.path = '/setting'; route.query = {}
+    await vue.nextTick()
+    route.path = '/search'; route.query = { ...query }
+    await vue.nextTick()
+    assert.equal(calls, 1)
+    assert.equal(state.tracks.value, tracks)
+    route.query = { ...query, albumId: 'second' }
+    await new Promise(setImmediate)
+    assert.equal(calls, 2)
+    assert.equal(state.tracks.value[0].id, 'second')
+  } finally { scope.stop() }
+})
+
+test('响应式专辑曲目写入队列时可跨进程克隆，保留嵌套音质信息', async () => {
+  const { reactive, toRaw } = require('vue')
+  const tracks = reactive([{ id: 'tx_1', source: 'tx', meta: { types: [{ type: '128k' }] } }])
+  assert.throws(() => structuredClone([...tracks]), /clone/)
+  let transferred
+  const api = load('src/renderer/store/list/action.ts', {
+    '@renderer/store/setting': { appSetting: {} }, './state': { tempListMeta: {} },
+    '@common/utils/vueTools': { toRaw }, '@common/constants': { LIST_IDS: { TEMP: 'temp' } },
+    '@renderer/store/list/listManage': { overwriteListMusics: async data => { transferred = structuredClone(data) } },
+  })
+  await api.setTempList('album__tx__1', [...tracks])
+  assert.deepEqual(transferred, { listId: 'temp', musicInfos: toRaw(tracks) })
+  await api.setTempList('album__tx__1', tracks)
+  assert.deepEqual(transferred.musicInfos[0].meta.types, [{ type: '128k' }])
+})
+
+function albumsHarness(overrides = {}) {
+  return load('src/renderer/store/search/albums.js', {
+    '@renderer/utils/request': { httpFetch: () => { throw Error('unexpected request') } },
+    '@renderer/utils': { toNewMusicInfo: item => item },
+    '@renderer/utils/musicSdk/tx/musicSearch': {},
+    '@renderer/utils/musicSdk/tx/utils': {},
+    '@renderer/utils/musicSdk/wy/utils': {},
+    '@renderer/utils/musicSdk/wy/musicDetail': {},
+    '@renderer/utils/musicSdk/kg/musicInfo': {},
+    '../browseRequest': timeout,
+    ...overrides,
+  })
+}
+
+function kugouPlaylistHarness(request = () => { throw Error('unexpected request') }) {
+  return load('src/renderer/utils/musicSdk/kg/songList.js', {
+    '../../request': { httpFetch: request }, '../../index': {},
+    '@renderer/utils/musicSdk/kg/vendors/infSign.min': {}, './util': { signatureParams: () => 'test' },
+  }).default
+}
+
+test('酷狗分享文案提取链接和 gcid，重定向解析使用新地址', async () => {
+  const sdk = kugouPlaylistHarness(() => ({ promise: Promise.resolve({ statusCode: 302, headers: { location: 'https://www.kugou.com/songlist/gcid_redirect.html' } }) }))
+  sdk.getUserListDetail2 = async id => id
+  sdk.decodeGcid = async id => 'decoded:' + id
+  assert.equal(await sdk.getListDetail('分享歌单 https://www.kugou.com/songlist/gcid_original.html 收听一下', 1), 'decoded:gcid_original')
+  assert.equal(await sdk.getListDetail('gcid_direct', 1), 'decoded:gcid_direct')
+  assert.equal(await sdk.getListDetail('collection_3_1_2_0', 1), 'collection_3_1_2_0')
+  assert.equal(await sdk.getListDetail('https://t.kugou.com/short', 1), 'decoded:gcid_redirect')
+  sdk.getUserListDetailByCode = async () => { throw Error('not a share code') }
+  sdk.getListDetailBySpecialId = async id => 'playlist:' + id
+  assert.equal(await sdk.getListDetail('1067062', 1), 'playlist:1067062')
+})
+
+test('酷狗 305 首分享歌单的尾页保持固定页宽，曲目不重叠遗漏', async () => {
+  const sdk = kugouPlaylistHarness()
+  const requested = []
+  sdk.createHttp = async url => {
+    const params = new URL(url).searchParams
+    const page = Number(params.get('page')), size = Number(params.get('pagesize'))
+    requested.push([page, size])
+    return { info: Array.from({ length: Math.min(size, 305 - (page - 1) * size) }, (_, i) => (page - 1) * size + i) }
+  }
+  const songs = await sdk.createGetListDetail2Task('collection_3_1_2_0', 305)
+  assert.deepEqual(requested, [[1, 300], [2, 300]])
+  assert.equal(songs.length, 305)
+  assert.equal(new Set(songs).size, 305)
+  assert.equal(songs[304], 304)
+  assert.throws(() => sdk.createGetListDetail2Task('x', -1), /Invalid/)
+})
+
+test('酷狗旧分享链接的 95 首歌单按固定 90 首分页', async () => {
+  const sdk = kugouPlaylistHarness()
+  sdk.getMusicInfos = async list => list
+  sdk.createHttp = async url => {
+    const params = new URL(url).searchParams
+    const page = Number(params.get('page')), size = Number(params.get('pagesize'))
+    assert.equal(size, 90)
+    return { list: { info: Array.from({ length: Math.min(size, 95 - (page - 1) * size) }, (_, i) => (page - 1) * size + i) } }
+  }
+  const result = await sdk.getUserListDetailByLink({ info: { 0: { count: 95 } } }, 'https://m3ws.kugou.com/zlist/list?page=1&pagesize=30')
+  assert.equal(result.total, 95)
+  assert.equal(new Set(result.list).size, 95)
+  assert.equal(result.page, 1)
+})
+
+test('聚合专辑搜索保留可用平台，单平台失败可见，不将失败当作空结果', async () => {
+  const api = albumsHarness({
+    '@renderer/utils/musicSdk/tx/musicSearch': { musicSearch: async (...args) => {
+      assert.equal(args[4], 2)
+      return { body: { item_album: [{ albummid: 'qq1', name: '专辑', singer: '歌手' }] }, meta: { sum: 1 } }
+    } },
+    '@renderer/utils/musicSdk/wy/utils': { eapiRequest: () => ({ promise: Promise.reject(Error('offline')) }) },
+    '@renderer/utils/request': { httpFetch: () => ({ promise: Promise.resolve({ body: { status: 1, data: { info: [{ albumid: 1, albumname: '专辑' }], total: 1 } } }) }) },
+  })
+  const data = await api.searchAlbums('专辑', 'all')
+  assert.deepEqual(Array.from(data.list, item => item.source), ['tx', 'kg'])
+  assert.deepEqual(Array.from(data.failedSources), ['wy'])
+  assert.equal(data.hasMore, false)
+  await assert.rejects(api.searchAlbums('专辑', 'wy'), /failed/)
+})
+
+test('QQ 专辑曲目按碟号与曲序排列，拒绝重复分页，详情参数不接受路径', async () => {
+  let repeated = false
+  const api = albumsHarness({
+    '@renderer/utils/musicSdk/tx/utils': { signRequest: async () => ({ body: { code: 0, req: { code: 0, data: {
+      totalNum: repeated ? 3 : 2,
+      songList: [{ mid: 'b', index_cd: 1, index_album: 2 }, { mid: 'a', index_cd: 1, index_album: 1 }].map(songInfo => ({ songInfo })),
+    } } } }) },
+    '@renderer/utils/musicSdk/tx/musicSearch': { handleResult: rows => rows },
+  })
+  assert.deepEqual(Array.from(await api.getAlbumTracks('tx', 'album1'), song => song.mid), ['a', 'b'])
+  repeated = true
+  await assert.rejects(api.getAlbumTracks('tx', 'album1'), /Repeated/)
+  await assert.rejects(api.getAlbumTracks('wy', '../1'), /Invalid/)
+})
+
+test('网易云专辑详情乱序时恢复曲序，缺歌时报告失败', async () => {
+  let incomplete = false
+  const api = albumsHarness({
+    '@renderer/utils/musicSdk/wy/utils': { eapiRequest: url => ({ promise: Promise.resolve({ body: url.includes('/album/') ? { code: 200, songs: [{ id: 1 }, { id: 2 }] } : { code: 200, songs: [], privileges: [] } }) }) },
+    '@renderer/utils/musicSdk/wy/musicDetail': { filterList: () => incomplete ? [{ songmid: 1 }] : [{ songmid: 2 }, { songmid: 1 }] },
+  })
+  assert.deepEqual(Array.from(await api.getAlbumTracks('wy', '123'), song => song.songmid), [1, 2])
+  incomplete = true
+  await assert.rejects(api.getAlbumTracks('wy', '123'), /Incomplete/)
+})
+
+test('酷狗专辑按 hash 恢复顺序，详情缺失不会以部分曲目冒充完整专辑', async () => {
+  let incomplete = false
+  const api = albumsHarness({
+    '@renderer/utils/request': { httpFetch: () => ({ promise: Promise.resolve({ body: { errcode: 0, data: { total: 2, info: [{ hash: 'A' }, { hash: 'B' }] } } }) }) },
+    '@renderer/utils/musicSdk/kg/musicInfo': { getMusicInfosByList: async () => incomplete ? [{ hash: 'a' }] : [{ hash: 'b' }, { hash: 'a' }] },
+  })
+  assert.deepEqual(Array.from(await api.getAlbumTracks('kg', '123'), song => song.hash), ['a', 'b'])
+  incomplete = true
+  await assert.rejects(api.getAlbumTracks('kg', '123'), /Incomplete/)
+})
+
+test('排行榜和专辑行内播放接入上下文队列，普通搜索继续沿用单曲播放', async () => {
+  const events = []
+  const added = []
+  const song = { id: 'tx_1', source: 'tx' }
+  const props = { list: [song], playInContext: true }
+  const api = load('src/renderer/components/material/OnlineList/usePlay.ts', {
+    '@renderer/store/list/state': { defaultList: { id: 'default' } },
+    '@renderer/store/list/action': { addListMusics: async (id, songs) => added.push(...songs), getListMusics: async () => [song] },
+    '@renderer/store/player/action': {}, '@renderer/store/setting': { appSetting: {} },
+    '@common/utils/vueTools': {}, '@renderer/core/player': { playList: () => {} }, '@common/constants': { LIST_IDS: {} },
+  }).default({ selectedList: { value: [] }, props, removeAllSelect() {}, emit: (...args) => events.push(args) })
+  await api.handlePlayMusic(0, true)
+  assert.equal(added.length, 0)
+  assert.deepEqual(events, [['play-list', 0]])
+  props.playInContext = false
+  await api.handlePlayMusic(0, true)
+  assert.equal(added.length, 1)
+})
+
+test('先后播放两个榜单，同榜单再次播放，旧完整列表均不能覆盖最后一次队列', async () => {
+  const fullRequests = []
+  const writes = []
+  const meta = { id: '' }
+  const api = load('src/renderer/views/Leaderboard/action.ts', {
+    '@renderer/store/list/state': { tempListMeta: meta, userLists: [] },
+    '@renderer/plugins/Dialog': {}, '@renderer/store/list/syncSourceList': {},
+    '@renderer/store/leaderboard/action': { getListDetailAll: () => { const task = deferred(); fullRequests.push(task); return task.promise } },
+    '@renderer/store/list/action': { setTempList: async (id, songs) => { meta.id = id; writes.push(songs[0].id) } },
+    '@renderer/core/player/action': { playList() {} }, '@common/constants': { LIST_IDS: { TEMP: 'temp' } }, '@renderer/utils': {},
+  })
+  const a = api.playSongListDetail('tx__a', [{ id: 'a-page' }]); await new Promise(setImmediate)
+  const b = api.playSongListDetail('tx__b', [{ id: 'b-page' }]); await new Promise(setImmediate)
+  const a2 = api.playSongListDetail('tx__a', [{ id: 'a-new-page' }]); await new Promise(setImmediate)
+  fullRequests[2].resolve([{ id: 'a-new-full' }]); await a2
+  fullRequests[0].resolve([{ id: 'a-old-full' }]); await a
+  fullRequests[1].resolve([{ id: 'b-old-full' }]); await b
+  assert.deepEqual(writes, ['a-page', 'b-page', 'a-new-page', 'a-new-full'])
+})
 
 test('QQ 搜索按原始条目确认末页，估算总数和不可播放条目不会制造多余页码或提前截断', async () => {
   const sdk = load('src/renderer/utils/musicSdk/tx/musicSearch.js', {
@@ -108,6 +319,7 @@ function searchRouteHarness(savedSource, readFails = false) {
   const setting = { source: savedSource, type: 'music' }
   const writes = []
   const api = load('src/renderer/views/Search/index.vue', {
+    vue: require('vue'),
     '@common/utils/vueRouter': {},
     '@common/constants': { DEFAULT_SETTING: { search: { source: 'all', type: 'music' } } },
     '@renderer/store/search/state': { searchText: { value: '' } },
@@ -117,6 +329,7 @@ function searchRouteHarness(savedSource, readFails = false) {
     },
     './MusicList/index.vue': {},
     './SongListList/index.vue': {},
+    './AlbumList.vue': {},
     './components/BlankView.vue': {},
     '@common/utils/vueTools': require('vue'),
     '@renderer/utils/musicSdk': { sources: ['kw', 'kg', 'tx', 'wy', 'mg'].map(id => ({ id })) },

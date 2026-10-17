@@ -8,6 +8,7 @@ import { LIST_IDS } from '@common/constants'
 import { toMD5 } from '@renderer/utils'
 
 const getListId = (id: string) => `board__${id}`
+let playRequestId = 0
 
 export const addSongListDetail = async(id: string, name: string, source: LX.OnlineSource) => {
   // console.log(this.listDetail.info)
@@ -36,16 +37,20 @@ export const addSongListDetail = async(id: string, name: string, source: LX.Onli
 }
 
 export const playSongListDetail = async(id: string, list?: LX.Music.MusicInfoOnline[], index: number = 0) => {
+  const requestId = ++playRequestId
   let isPlayingList = false
   // console.log(list)
   const listId = getListId(id)
   if (!list?.length) list = (await getListDetail(id, 1)).list
+  if (requestId != playRequestId) return
   if (list?.length) {
     await setTempList(listId, [...list])
+    if (requestId != playRequestId || tempListMeta.id != listId) return
     playList(LIST_IDS.TEMP, index)
     isPlayingList = true
   }
   const fullList = await getListDetailAll(id)
+  if (requestId != playRequestId) return
   if (!fullList.length) return
   if (isPlayingList) {
     if (tempListMeta.id == listId) {

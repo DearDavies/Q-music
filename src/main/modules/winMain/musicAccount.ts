@@ -70,7 +70,7 @@ export interface MusicAccountPlaylist {
 export interface MusicAccountPlaylistsResult {
   provider: MusicAccountProvider
   playlists: MusicAccountPlaylist[]
-  status: 'available' | 'login_required' | 'unavailable'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
 }
 
 export interface MusicAccountPlaylistDetailResult {
@@ -78,7 +78,7 @@ export interface MusicAccountPlaylistDetailResult {
   provider: MusicAccountProvider
   id: string
   ids: string[]
-  status: 'available' | 'login_required' | 'unavailable'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
 }
 
 export interface MusicAccountMusicUrlRequest {
@@ -1343,6 +1343,7 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
     return { provider, playlists, status: playlists.length ? 'available' : 'unavailable' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlists unavailable`, error)
+    if (provider == 'kg' && error instanceof Error && error.message == 'verification_required') return { provider, playlists: [], status: 'verification_required' }
     return { provider, playlists: [], status: (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
   }
 }
@@ -1418,7 +1419,7 @@ export const getMusicAccountPlaylistDetail = async(
     return { provider, id, ids, status: ids.length ? 'available' : 'unavailable' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlist detail unavailable`, error)
-    return { provider, id, ids: [], status: (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
+    return { provider, id, ids: [], status: error instanceof Error && error.message == 'verification_required' ? 'verification_required' : (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
   }
 }
 

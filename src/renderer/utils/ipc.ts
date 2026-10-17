@@ -95,14 +95,14 @@ export interface MusicAccountPlaylist {
 export interface MusicAccountPlaylistsResult {
   provider: MusicAccountProvider
   playlists: MusicAccountPlaylist[]
-  status: 'available' | 'login_required' | 'unavailable'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
 }
 export interface MusicAccountPlaylistDetailResult {
   accountId?: string
   provider: MusicAccountProvider
   id: string
   ids: string[]
-  status: 'available' | 'login_required' | 'unavailable'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
 }
 export interface MusicAccountMusicUrlResult {
   provider: MusicAccountProvider

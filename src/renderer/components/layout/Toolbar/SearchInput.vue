@@ -80,7 +80,7 @@ import {
 } from '@common/utils/vueTools'
 import { useRouter, useRoute } from '@common/utils/vueRouter'
 import { historyList, searchText as _searchText, selectedSource } from '@renderer/store/search/state'
-import { clearHistoryList, getHistoryList, removeHistoryWord, setSearchText } from '@renderer/store/search/action'
+import { clearHistoryList, getHistoryList, removeHistoryWord } from '@renderer/store/search/action'
 import { clearList, getList } from '@renderer/store/hotSearch'
 import { getSearchSetting, setSearchSetting } from '@renderer/utils/data'
 import SourceIcon from '@renderer/components/common/SourceIcon.vue'
@@ -123,17 +123,13 @@ export default {
       if (typeof value == 'string' && sourceOptions.value.some(item => item.id == value)) selectedSource.value = value
     }, { immediate: true })
 
-    watch(() => route.name, (newValue, oldValue) => {
-      if (oldValue == 'Search' && newValue != 'SongListDetail') {
-        setTimeout(() => {
-          searchText.value = ''
-          setSearchText('')
-        })
-      }
-    })
+    // 导航只清空顶部输入显示，不清空缓存搜索页的数据。
+    watch(() => [route.name, route.query.text], ([name, text]) => {
+      searchText.value = name == 'Search' && typeof text == 'string' ? text : ''
+    }, { immediate: true })
 
     watch(_searchText, newValue => {
-      if (newValue !== searchText.value) searchText.value = newValue
+      if (route.name == 'Search' && newValue !== searchText.value) searchText.value = newValue
     })
     watch(searchText, () => {
       handleTipSearch()
@@ -223,7 +219,6 @@ export default {
     const handleSearch = () => {
       closePanel()
       if (!searchText.value && route.path != '/search') {
-        setSearchText('')
         return
       }
       setTimeout(() => {
@@ -274,7 +269,8 @@ export default {
       if (isFocused.value) searchSlotRef.value?.querySelector('input')?.focus({ preventScroll: true })
       if (route.name != 'Search' || route.query.source == value) return
 
-      const target = { path: '/search', query: { ...route.query, source: value, page: 1 } }
+      const { albumId, albumSource, albumName, albumSinger, albumPic, ...query } = route.query
+      const target = { path: '/search', query: { ...query, source: value, page: 1 } }
       const targetPath = router.resolve(target).fullPath
       sourceChangePath = targetPath
       void router.replace(target).catch(_ => _).finally(() => {
@@ -295,9 +291,13 @@ export default {
       // 仅本次切源的路由更新保留输入上下文，提交搜索和跨页导航仍正常收起。
       if (value != sourceChangePath) closePanel()
     })
-    onMounted(() => { document.addEventListener('pointerdown', handleOutside, true) })
+    onMounted(() => {
+      document.addEventListener('pointerdown', handleOutside, true)
+      window.addEventListener('blur', closePanel)
+    })
     onBeforeUnmount(() => {
       document.removeEventListener('pointerdown', handleOutside, true)
+      window.removeEventListener('blur', closePanel)
     })
 
     return {

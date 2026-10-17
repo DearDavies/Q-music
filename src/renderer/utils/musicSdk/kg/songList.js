@@ -465,13 +465,11 @@ export default {
 
   async getUserListDetailByLink({ info }, link) {
     let listInfo = info['0']
-    let total = listInfo.count
+    const total = Number(listInfo.count)
+    if (!Number.isSafeInteger(total) || total < 0 || total > 100000) throw new Error('Invalid playlist size')
     let tasks = []
-    let page = 0
-    while (total) {
-      const limit = total > 90 ? 90 : total
-      total -= limit
-      page += 1
+    const limit = 90
+    for (let page = 1; page <= Math.ceil(total / limit); page++) {
       tasks.push(this.createHttp(link.replace(/pagesize=\d+/, 'pagesize=' + limit).replace(/page=\d+/, 'page=' + page), {
         headers: {
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
@@ -484,7 +482,7 @@ export default {
     // console.log(result)
     return {
       list: result,
-      page,
+      page: 1,
       limit: this.listDetailLimit,
       total: result.length,
       source: 'kg',
@@ -498,12 +496,12 @@ export default {
     }
   },
   createGetListDetail2Task(id, total) {
+    total = Number(total)
+    if (!Number.isSafeInteger(total) || total < 0 || total > 100000) throw new Error('Invalid playlist size')
     let tasks = []
-    let page = 0
-    while (total) {
-      const limit = total > 300 ? 300 : total
-      total -= limit
-      page += 1
+    // 尾页仍使用相同 pagesize，否则服务端计算的偏移会回到前面的歌曲。
+    const limit = 300
+    for (let page = 1; page <= Math.ceil(total / limit); page++) {
       const params = 'appid=1058&global_specialid=' + id + '&specialid=0&plat=0&version=8000&page=' + page + '&pagesize=' + limit + '&srcappid=2919&clientver=20000&clienttime=1586163263991&mid=1586163263991&uuid=1586163263991&dfid=-'
       tasks.push(this.createHttp(`https://mobiles.kugou.com/api/v5/special/song_v2?${params}&signature=${signatureParams(params, 'web')}`, {
         headers: {
@@ -673,7 +671,7 @@ export default {
       // console.log(location)
       if (location.includes('global_collection_id')) return this.getUserListDetail2(location.replace(/^.*?global_collection_id=(\w+)(?:&.*$|#.*$|$)/, '$1'))
       if (location.includes('gcid_')) {
-        let gcid = link.match(/gcid_\w+/)?.[0]
+        let gcid = location.match(/gcid_\w+/)?.[0]
         if (gcid) {
           const global_collection_id = await this.decodeGcid(gcid)
           if (global_collection_id) return this.getUserListDetail2(global_collection_id)
@@ -709,14 +707,20 @@ export default {
   },
 
   async getListDetail(id, page) { // 获取歌曲列表内的音乐
-    id = id.toString()
+    id = id.toString().trim()
+    // 支持直接粘贴“分享歌单 + 链接”的完整文案，不把末尾文字带进请求。
+    const sharedUrl = id.match(/https?:\/\/[^\s<>"'，。！）】]+/i)?.[0]
+    if (sharedUrl) id = sharedUrl
+    if (/^gcid_\w+$/.test(id)) return this.getUserListDetail2(await this.decodeGcid(id))
+    if (/^collection_[\w]+$/.test(id)) return this.getUserListDetail2(id)
     if (id.includes('special/single/')) {
       id = id.replace(this.regExps.listDetailLink, '$1')
     } else if (/https?:/.test(id)) {
       // fix https://www.kugou.com/songlist/xxx/?uid=xxx&chl=qq_client&cover=http%3A%2F%2Fimge.kugou.com%xxx.jpg&iszlist=1
       return this.getUserListDetail(id.replace(/^.*?http/, 'http'), page)
     } else if (/^\d+$/.test(id)) {
-      return this.getUserListDetailByCode(id)
+      // 分享酷狗码与公开歌单编号都是数字，兼容两种输入。
+      return this.getUserListDetailByCode(id).catch(() => this.getListDetailBySpecialId(id, page))
     } else if (id.startsWith('id_')) {
       id = id.replace('id_', '')
     }

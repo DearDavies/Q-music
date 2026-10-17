@@ -18,7 +18,7 @@ dd
           id="setting_close_action_exit" name="setting_close_action" need
           :model-value="closeAction" value="exit" :label="$t('setting__basic_close_action_exit')"
           @update:model-value="updateCloseAction")
-        base-checkbox.gap-left(
+        base-checkbox(
           id="setting_close_action_tray" name="setting_close_action" need
           :model-value="closeAction" value="tray" :label="$t('setting__basic_close_action_tray')"
           @update:model-value="updateCloseAction")
@@ -746,6 +746,8 @@ export default {
   display: flex;
   flex-flow: row wrap;
   align-items: center;
+  gap: 10px 24px;
+  padding: 4px 0;
 }
 .closeActionTip {
   margin-top: 5px;

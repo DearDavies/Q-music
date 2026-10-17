@@ -14,6 +14,7 @@ export default ({ isPlay, lyric, playProgress, isShowLyricProgressSetting, isSho
   const timeStr = ref('--/--')
   const linePlayVisible = ref(false)
   const linePlayTop = ref(0)
+  const linePlayLeft = ref(0)
   const linePlayTimeStr = ref('--:--')
 
   let msDownY = 0
@@ -255,7 +256,8 @@ export default ({ isPlay, lyric, playProgress, isShowLyricProgressSetting, isSho
     const lineRect = line.getBoundingClientRect()
     linePlayTime = nextTime
     linePlayTimeStr.value = formatPlayTime2(nextTime)
-    linePlayTop.value = lineRect.top + lineRect.height / 2 - parentRect.top
+    linePlayTop.value = lineRect.top + lineRect.height / 2
+    linePlayLeft.value = parentRect.right + 4
     linePlayVisible.value = true
   }
   const handleLyricMouseMove = event => {
@@ -355,8 +357,10 @@ export default ({ isPlay, lyric, playProgress, isShowLyricProgressSetting, isSho
 
   watch(() => lyric.lines, initLrc)
   watch(() => lyric.line, scrollLine)
+  watch(() => [isShowPlayComment?.value, appSetting['playDetail.style.layout']], hideLinePlay)
 
   onMounted(() => {
+    window.addEventListener('resize', hideLinePlay)
     document.addEventListener('mousemove', handleMouseMsMove)
     document.addEventListener('mouseup', handleMouseMsUp)
     document.addEventListener('touchmove', handleTouchMove)
@@ -366,6 +370,7 @@ export default ({ isPlay, lyric, playProgress, isShowLyricProgressSetting, isSho
   })
 
   onBeforeUnmount(() => {
+    window.removeEventListener('resize', hideLinePlay)
     clearLinePlayRetry()
     document.removeEventListener('mousemove', handleMouseMsMove)
     document.removeEventListener('mouseup', handleMouseMsUp)
@@ -381,6 +386,7 @@ export default ({ isPlay, lyric, playProgress, isShowLyricProgressSetting, isSho
     isMsDown,
     linePlayVisible,
     linePlayTop,
+    linePlayLeft,
     linePlayTimeStr,
     timeStr,
     handleLyricMouseDown,

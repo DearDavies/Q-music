@@ -6,7 +6,7 @@ transition(enter-active-class="q-detail-enter-active" leave-active-class="q-deta
     //- div(:class="$style.bg2")
     ControlBtnsLeftHeader(v-if="appSetting['common.controlBtnPosition'] == 'left'" :detail-action-enabled="appSetting['playDetail.style.layout'] != 'immersive'")
     ControlBtnsRightHeader(v-else)
-    button(type="button" :class="$style.detailBackBtn" :aria-label="$t('player__hide_detail_tip')" :title="$t('player__hide_detail_tip')" @click="hide")
+    button(type="button" :class="$style.detailBackBtn" :aria-label="$t('player__hide_detail_tip')" @click="hide")
       svg(viewBox="0 0 24 24" aria-hidden="true")
         path(d="M6.5 9.5 12 15l5.5-5.5")
     div(ref="dom_main" :class="[$style.main, {[$style.showComment]: isCommentLayoutVisible, [$style.commentOpening]: isCommentLayoutOpening, [$style.commentGliding]: isCommentLayoutGliding, [$style.commentClosing]: isCommentLayoutClosing, [$style.commentSettling]: isCommentLayoutSettling}]" :style="mainStyle")
@@ -23,8 +23,10 @@ transition(enter-active-class="q-detail-enter-active" leave-active-class="q-deta
         div.description(:class="['scroll', $style.description]")
           div(:key="musicInfo.id || musicInfo.name" :class="$style.trackChange")
             p {{ musicInfo.name }}
-            p {{ musicInfo.singer }}
-            p(v-if="musicInfo.album") {{ musicInfo.album }}
+            p
+              button(v-for="(singer, index) in singers" :key="`${singer}:${index}`" type="button" :class="$style.metadataLink" :title="$t('player__search_artist', { name: singer })" @click="openMetadata('music', singer)") {{ singer }}
+            p(v-if="musicInfo.album")
+              button(type="button" :class="$style.metadataLink" :title="$t('player__open_album', { name: musicInfo.album })" @click="openMetadata('album', musicInfo.album)") {{ musicInfo.album }}
 
       LyricPlayer(:comment-layout-visible="isCommentLayoutVisible" :comment-layout-settling="isCommentLayoutSettling")
       button(
@@ -68,6 +70,8 @@ import EmptyCoverMark from '@renderer/components/common/EmptyCoverMark.vue'
 import { registerAutoHideMounse, unregisterAutoHideMounse } from './autoHideMounse'
 import { appSetting } from '@renderer/store/setting'
 import { closeWindow, maxWindow, minWindow, setFullScreen } from '@renderer/utils/ipc'
+import { useRouter } from '@common/utils/vueRouter'
+import { albumSources } from '@renderer/store/search/albums'
 
 const COMMENT_WIDTH_KEY = 'q-music.play-detail.comment-width'
 const COMMENT_MIN_WIDTH = 320
@@ -112,6 +116,20 @@ export default {
     MusicComment,
   },
   setup() {
+    const router = useRouter()
+    const singers = computed(() => musicInfo.singer?.split('、').map(name => name.trim()).filter(Boolean) || [])
+    const openMetadata = async(type, text) => {
+      if (!text?.trim()) return
+      const song = playMusicInfo.musicInfo
+      const source = ['tx', 'wy', 'kg', 'kw', 'mg'].includes(song?.source) ? song.source : 'all'
+      const query = { text, source, type, page: 1 }
+      const albumId = song?.meta.albumId
+      if (type == 'album' && albumSources.includes(source) && albumId && (source != 'tx' || /^[a-z\d]{14}$/i.test(String(albumId)))) {
+        Object.assign(query, { albumId: String(albumId), albumSource: source, albumName: text, albumSinger: musicInfo.singer, albumPic: musicInfo.pic })
+      }
+      await router.push({ path: '/search', query }).catch(() => {})
+      hide()
+    }
     const visibled = ref(false)
     const dom_main = ref(null)
     const dom_record = ref(null)
@@ -578,6 +596,8 @@ export default {
 
 
     return {
+      singers,
+      openMetadata,
       appSetting,
       playMusicInfo,
       isPlay,
@@ -696,6 +716,24 @@ export default {
     background: rgba(255, 255, 255, .14);
     transform: translateY(2px);
   }
+}
+
+.metadataLink {
+  max-width: 100%;
+  padding: 0;
+  margin-right: .65em;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  &:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+  &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
 }
 
 :global(.q-detail-enter-active) {

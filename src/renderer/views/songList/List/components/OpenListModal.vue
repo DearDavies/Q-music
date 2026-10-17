@@ -58,13 +58,22 @@ const source = ref('')
 
 watch(() => props.modelValue, (visible) => {
   if (!visible) return
-  source.value = openSongListInputInfo.source || route.query.source
+  source.value = route.query.source ?? openSongListInputInfo.source
   // text.value = openSongListInputInfo.text
+})
+
+// 分享文案中的官方域名比上次记住的平台更可靠，避免用 QQ 接口读取酷狗链接。
+watch([text, () => props.modelValue], ([value, visible]) => {
+  if (!visible) return
+  if (/https?:\/\/(?:[\w-]+\.)*kugou\.com(?:[/:?#]|$)/i.test(value)) source.value = 'kg'
+  else if (/https?:\/\/(?:y\.qq\.com|c\.y\.qq\.com)(?:[/:?#]|$)/i.test(value)) source.value = 'tx'
+  else if (/https?:\/\/(?:music\.163\.com|163cn\.tv)(?:[/:?#]|$)/i.test(value)) source.value = 'wy'
 })
 
 const handleSubmit = () => {
   if (!text.value.length) return
   setOpenSongListInputInfo(text.value, source.value)
+  emit('update:model-value', false)
   void router.push({
     path: '/songList/detail',
     query: {

@@ -1,8 +1,9 @@
 <template>
   <div :class="$style.container">
     <div :class="$style.actions">
-      <base-btn :disabled="!listDetailInfo.list.length || !!listDetailInfo.noItemLabel" @click="handlePlayList(0)">{{ $t('list__play_all') }}</base-btn>
+      <base-btn :disabled="queueLoading || !listDetailInfo.list.length || !!listDetailInfo.noItemLabel" @click="handlePlayList(0, true)">{{ $t(queueLoading ? 'list__loading' : 'list__play_all') }}</base-btn>
       <base-btn :disabled="loading || !boardId" @click="getList(boardId, listDetailInfo.page, true)">{{ $t(failed ? 'play_queue__retry' : 'playlist_import_modal__refresh') }}</base-btn>
+      <span v-if="queueError" role="status">{{ $t('leaderboard__queue_failed') }}</span>
     </div>
     <div :class="$style.songs" :aria-busy="loading">
     <material-online-list
@@ -13,6 +14,7 @@
       :list="listDetailInfo.list"
       :no-item="listDetailInfo.noItemLabel"
       source-tag
+      play-in-context
       @show-menu="hideListsMenu"
       @play-list="handlePlayList"
       @toggle-page="togglePage"
@@ -39,6 +41,8 @@ const {
   listDetailInfo,
   getList,
   handlePlayList,
+  queueLoading,
+  queueError,
 } = useList()
 
 const loading = computed(() => listDetailInfo.noItemLabel == window.i18n.t('list__loading'))

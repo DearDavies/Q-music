@@ -1,6 +1,10 @@
 <template>
   <div :class="[$style.toolbar, { [$style.fullscreen]: isFullscreen }, appSetting['common.controlBtnPosition'] == 'left' ? $style.controlBtnLeft : $style.controlBtnRight]">
     <div :class="$style.dragArea" aria-hidden="true" />
+    <router-link v-if="lastSearch && route.fullPath != lastSearch" :to="lastSearch" :class="$style.resumeSearch" :aria-label="$t('search__resume')">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+      <span>{{ $t('search__resume') }}</span>
+    </router-link>
     <SearchInput />
     <div v-if="appSetting['common.controlBtnPosition'] == 'left'" :class="$style.logo">Q-music</div>
   </div>
@@ -10,6 +14,14 @@
 import { isFullscreen } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
 import SearchInput from './SearchInput.vue'
+import { ref, watch } from '@common/utils/vueTools'
+import { useRoute } from '@common/utils/vueRouter'
+
+const route = useRoute()
+const lastSearch = ref('')
+watch(() => route.fullPath, () => {
+  if (route.path == '/search' && typeof route.query.text == 'string' && route.query.text.trim()) lastSearch.value = route.fullPath
+}, { immediate: true })
 
 </script>
 
@@ -25,6 +37,7 @@ import SearchInput from './SearchInput.vue'
   height: @height-toolbar;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   padding: 0 calc(@window-control-width + 18px) 0 18px;
   -webkit-app-region: no-drag;
   z-index: 2;
@@ -47,6 +60,12 @@ import SearchInput from './SearchInput.vue'
     bottom: 0;
     z-index: 0;
     -webkit-app-region: drag;
+  }
+
+  // 搜索展开时，空白区先接收点击来收起面板；失焦后恢复原生窗口拖动。
+  &:has(input:focus) .dragArea,
+  &:has([aria-expanded='true']) .dragArea {
+    -webkit-app-region: no-drag;
   }
 
   > * {
@@ -89,6 +108,24 @@ import SearchInput from './SearchInput.vue'
   line-height: @height-toolbar;
   font-weight: bold;
   // -webkit-app-region: no-drag;
+}
+
+.resumeSearch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 8px 6px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-font);
+  font-size: 12px;
+  svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+  &:hover { background: var(--color-primary-alpha-100); }
+  &:focus-visible { outline: 2px solid var(--color-primary); }
+}
+@media (max-width: 1000px) {
+  .resumeSearch span { display: none; }
 }
 
 </style>

@@ -25,6 +25,12 @@ const qr = { key: 'test-code', mid: session.mid, expiresAt: Date.now() + 120000 
 const response = data => ({ ok: true, status: 200, json: async () => ({ status: 1, error_code: 0, data }) })
 const hash = n => n.toString(16).padStart(32, '0').toUpperCase()
 
+test('酷狗安全验证不再误报为账号失效或普通网络失败', async () => {
+  const api = kg.createKugouApi(async () => ({ ok: true, status: 200, json: async () => ({ status: 0, error_code: 20028, data: {} }) }), md5)
+  await assert.rejects(api.getPlaylists(session), /verification_required/)
+  await assert.rejects(api.getPlaylistHashes(session, '7'), /verification_required/)
+})
+
 if (!mobile) {
   const songMid = '003testSongMid0'
   const signing = load('src/common/utils/qqSign.ts', { 'node:crypto': require('node:crypto') }, { Buffer })

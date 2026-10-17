@@ -80,7 +80,8 @@ export const setTempList = async(id: string, list: LX.Music.MusicInfoOnline[]) =
   tempListMeta.id = id
   await overwriteListMusics({
     listId: LIST_IDS.TEMP,
-    musicInfos: list,
+    // 响应式数组展开后仍包含 Proxy；IPC 的结构化克隆不能接收这些对象。
+    musicInfos: toRaw(list).map(music => toRaw(music)),
   })
 }
 

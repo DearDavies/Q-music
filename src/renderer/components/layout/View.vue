@@ -5,7 +5,9 @@
       <router-view v-slot="{ Component, route }">
         <transition name="q-route">
           <!-- 筛选和翻页复用页面，避免新旧实例同时请求、取消请求和修改路由。 -->
-          <component :is="Component" :key="['Search', 'Leaderboard', 'SongList', 'SongListDetail'].includes(route.name) ? route.path : route.fullPath" class="view-container" />
+          <keep-alive include="Search">
+            <component :is="Component" :key="['Search', 'Leaderboard', 'SongList', 'SongListDetail'].includes(route.name) ? route.path : route.fullPath" class="view-container" />
+          </keep-alive>
         </transition>
       </router-view>
     </div>

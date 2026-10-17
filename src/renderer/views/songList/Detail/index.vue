@@ -4,7 +4,7 @@
       <button type="button" :class="$style.backButton" :aria-label="$t('back')" :title="$t('back')" @click="handleBack">
         <svg-icon name="angle-right-solid" />
       </button>
-      <div :class="$style.songListHeaderLeft" :style="{ backgroundImage: 'url('+(picUrl || listDetailInfo.info.img)+')' }">
+      <div :class="$style.songListHeaderLeft" :style="{ backgroundImage: (picUrl || listDetailInfo.info.img) ? `url(${picUrl || listDetailInfo.info.img})` : 'none' }">
         <!-- <span v-if="listDetailInfo.info.play_count" :class="$style.playNum">{{ listDetailInfo.info.play_count }}</span> -->
       </div>
       <div :class="$style.songListHeaderMiddle">

@@ -7,9 +7,22 @@ import { playSongListDetail } from '../action'
 
 export default () => {
   const listRef = ref<any>(null)
+  const queueLoading = ref(false)
+  const queueError = ref(false)
+  let playRequestId = 0
 
-  const handlePlayList = (index: number) => {
-    void playSongListDetail(listDetailInfo.id, listDetailInfo.list, index)
+  const handlePlayList = async(index: number, fromStart = false) => {
+    if (!listDetailInfo.id || !listDetailInfo.list[index]) return
+    const requestId = ++playRequestId
+    queueLoading.value = true
+    queueError.value = false
+    try {
+      await playSongListDetail(listDetailInfo.id, fromStart ? undefined : [...listDetailInfo.list], fromStart ? 0 : index)
+    } catch {
+      if (requestId == playRequestId) queueError.value = true
+    } finally {
+      if (requestId == playRequestId) queueLoading.value = false
+    }
   }
 
   let requestId = 0
@@ -28,5 +41,7 @@ export default () => {
     listDetailInfo,
     getList,
     handlePlayList,
+    queueLoading,
+    queueError,
   }
 }

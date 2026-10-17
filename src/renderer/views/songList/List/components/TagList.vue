@@ -1,19 +1,19 @@
 <template>
   <div :class="[$style.tagList, {[$style.active]: popupVisible}]">
-    <div ref="dom_btn" :class="$style.label" @click.stop="handleShow">
+    <button id="songlist-category-trigger" ref="dom_btn" type="button" :class="$style.label" :aria-expanded="popupVisible" aria-controls="songlist-categories" @click.stop="handleShow">
       <span>{{ tagName }}</span>
       <div :class="$style.icon">
         <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 451.847 451.847" space="preserve">
           <use xlink:href="#icon-down" />
         </svg>
       </div>
-    </div>
-    <div :class="$style.popup" :style="popupStyle" :aria-hidden="!popupVisible" @click.stop>
+    </button>
+    <div id="songlist-categories" :class="$style.popup" :style="popupStyle" role="region" aria-labelledby="songlist-category-trigger" :aria-hidden="!popupVisible" :inert="!popupVisible || undefined" @click.stop>
       <div :class="$style.list" class="scroll">
-        <div :class="$style.tag" @click="handleToggleTag('')">{{ $t('default') }}</div>
+        <button type="button" :class="[$style.tag, {[$style.selected]: !props.tagId}]" :aria-pressed="!props.tagId" @click="handleToggleTag('')">{{ $t('default') }}</button>
         <dl v-for="tagInfo in list" :key="tagInfo.name">
           <dt :class="$style.type">{{ tagInfo.name }}</dt>
-          <dd v-for="tag in tagInfo.list" :key="tag.id" :class="$style.tag" @click="handleToggleTag(tag.id)">{{ tag.name }}</dd>
+          <dd v-for="tag in tagInfo.list" :key="tag.id"><button type="button" :class="[$style.tag, {[$style.selected]: props.tagId == tag.id}]" :aria-pressed="props.tagId == tag.id" @click="handleToggleTag(tag.id)">{{ tag.name }}</button></dd>
         </dl>
       </div>
     </div>
@@ -59,6 +59,7 @@ const handleToggleTag = (id) => {
     },
   })
   handleHide()
+  dom_btn.value?.focus()
 }
 watch(() => props.source, async(source) => {
   if (!source) return
@@ -90,21 +91,35 @@ const tagName = computed(() => {
   return props.tagId
 })
 
-const popupStyle = reactive({
-  width: '645px',
-  maxHeight: '250px',
-})
+const popupStyle = reactive({ width: '0px', maxHeight: '0px', left: '0px', '--arrow-left': '20px' })
 
-const setTagPopupWidth = () => {
-  window.setTimeout(() => {
-    const dom_view = document.getElementById('view')
-    popupStyle.width = dom_view.clientWidth * 0.96 + 'px'
-    popupStyle.maxHeight = dom_view.clientHeight * 0.65 + 'px'
-  }, 50)
+// 按按钮的实际位置约束面板，而不是从按钮处再展开几乎整个页面宽度。
+const updatePopupBounds = () => {
+  const button = dom_btn.value
+  const view = document.getElementById('view')
+  const page = button?.closest('.view-container')
+  if (!button || !view || !page) return
+  const bounds = view.getBoundingClientRect()
+  const anchor = button.getBoundingClientRect()
+  const parent = button.parentElement.getBoundingClientRect()
+  const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+  const start = Math.max(0, bounds.left) + 12
+  const end = Math.min(window.innerWidth, bounds.right) - 12
+  const width = Math.max(0, Math.min(42 * fontSize, end - start))
+  const left = Math.max(start, Math.min(anchor.left, end - width))
+  // 歌单页底部的 padding 为迷你播放器预留空间，分类滚动也应止于这里。
+  const bottom = Math.min(window.innerHeight, page.getBoundingClientRect().bottom - parseFloat(getComputedStyle(page).paddingBottom))
+  popupStyle.width = `${width}px`
+  popupStyle.left = `${left - parent.left}px`
+  popupStyle.maxHeight = `${Math.max(0, bottom - anchor.bottom - 20)}px`
+  popupStyle['--arrow-left'] = `${Math.max(16, Math.min(width - 32, anchor.left + anchor.width / 2 - left - 8))}px`
 }
 
 const dom_btn = ref(null)
-const handleShow = () => popupVisible.value = !popupVisible.value
+const handleShow = () => {
+  if (!popupVisible.value) updatePopupBounds()
+  popupVisible.value = !popupVisible.value
+}
 const handleHide = (evt) => {
   // if (e && e.target.parentNode != this.$refs.dom_popup && this.show) return this.show = false
   // console.log(this.$refs)
@@ -112,17 +127,29 @@ const handleHide = (evt) => {
   popupVisible.value = false
 }
 
+const handleKeydown = event => {
+  if (event.key != 'Escape' || !popupVisible.value) return
+  event.stopPropagation()
+  handleHide()
+  dom_btn.value?.focus()
+}
+let resizeObserver
 
 onMounted(() => {
-  setTagPopupWidth()
+  resizeObserver = new ResizeObserver(() => { if (popupVisible.value) updatePopupBounds() })
+  resizeObserver.observe(document.getElementById('view'))
+  resizeObserver.observe(dom_btn.value)
   document.addEventListener('click', handleHide)
-  window.addEventListener('resize', setTagPopupWidth)
+  document.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', updatePopupBounds)
 })
 
 onBeforeUnmount(() => {
   requestId++
+  resizeObserver?.disconnect()
   document.removeEventListener('click', handleHide)
-  window.removeEventListener('resize', setTagPopupWidth)
+  document.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', updatePopupBounds)
 })
 
 </script>
@@ -152,6 +179,10 @@ onBeforeUnmount(() => {
 }
 
 .label {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  border-radius: 8px;
   padding: 8px 15px;
   // background-color: var(--color-button-background);
   transition: color @transition-normal;
@@ -190,17 +221,16 @@ onBeforeUnmount(() => {
 .popup {
   position: absolute;
   top: 100%;
-  width: 645px;
-  left: 8px;
-  margin-top: 12px;
-  border-radius: 4px;
+  margin-top: 8px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-primary-alpha-800);
   background-color: var(--color-content-background);
   opacity: 0;
   transform: scale(.95, .8);
-  transform-origin: 0 0 0;
+  transform-origin: var(--arrow-left) 0;
   transition: .25s ease;
   transition-property: transform, opacity;
-  max-height: 250px;
   z-index: 10;
   pointer-events: none;
   filter: drop-shadow(0px 0px 4px rgba(0, 0, 0, .15));
@@ -210,7 +240,7 @@ onBeforeUnmount(() => {
     content: " ";
     position: absolute;
     top: -6px;
-    left: 20px;
+    left: var(--arrow-left);
     width: 0;
     height: 0;
     border-left: 8px solid transparent;
@@ -221,7 +251,14 @@ onBeforeUnmount(() => {
 .list {
   padding: 10px;
   box-sizing: border-box;
-  // box-shadow: 0 0 4px rgba(0, 0, 0, .2);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  dl { display: flex; flex-wrap: wrap; }
+  dt { flex: 0 0 100%; }
+  dd { min-width: 0; max-width: 100%; margin: 0; }
 }
 
 .type {
@@ -231,6 +268,11 @@ onBeforeUnmount(() => {
 }
 
 .tag {
+  border: 1px solid transparent;
+  color: var(--color-font);
+  font: inherit;
+  max-width: calc(100% - 10px);
+  overflow-wrap: anywhere;
   display: inline-block;
   margin: 5px;
   background-color: var(--color-button-background);
@@ -244,6 +286,13 @@ onBeforeUnmount(() => {
   &:active {
     background-color: var(--color-button-background-active);
   }
+  &.selected {
+    border-color: var(--color-primary);
+    color: var(--color-primary-font);
+    background-color: var(--color-primary-alpha-900);
+  }
 }
+
+.label:focus-visible, .tag:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 </style>

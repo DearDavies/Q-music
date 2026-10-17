@@ -26,12 +26,13 @@
       </svg>
       <p>{{ $t('player__no_lyric') }}</p>
     </div>
-    <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
+    <teleport to="#root">
+      <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
       <button
         v-show="linePlayVisible && !isShowLrcSelectContent"
         type="button"
         :class="$style.linePlayBtn"
-        :style="{ top: `${linePlayTop}px` }"
+        :style="{ top: `clamp(1.25rem, ${linePlayTop}px, calc(100vh - 1.25rem))`, left: `min(${linePlayLeft}px, calc(100vw - 6rem))` }"
         :aria-label="linePlayTimeStr"
         ignore-tip
         @mousedown.stop
@@ -45,7 +46,8 @@
         </svg>
         <span>{{ linePlayTimeStr }}</span>
       </button>
-    </transition>
+      </transition>
+    </teleport>
     <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
       <div v-if="isShowLyricProgressSetting" v-show="isStopScroll && !isShowLrcSelectContent" :class="$style.skip">
         <div ref="dom_skip_line" :class="$style.line" />
@@ -116,6 +118,7 @@ export default {
       isStopScroll,
       linePlayVisible,
       linePlayTop,
+      linePlayLeft,
       linePlayTimeStr,
       timeStr,
       handleLyricMouseDown,
@@ -262,6 +265,7 @@ export default {
       isMsDown,
       linePlayVisible,
       linePlayTop,
+      linePlayLeft,
       linePlayTimeStr,
       timeStr,
       handleLyricMouseDown,
@@ -562,10 +566,12 @@ export default {
   }
 }
 .linePlayBtn {
-  position: absolute;
-  right: -86px;
-  z-index: 4;
-  width: 82px;
+  // 浮层不经过歌词/评论的裁切容器；贴着歌词列外侧，并限制在窗口内。
+  position: fixed;
+  z-index: 11;
+  min-width: 82px;
+  box-sizing: border-box;
+  white-space: nowrap;
   height: 32px;
   padding: 0 10px 0 9px;
   border: 1px solid rgba(255, 255, 255, .16);

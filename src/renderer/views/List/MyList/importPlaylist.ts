@@ -14,7 +14,7 @@ import txMusicInfo from '@renderer/utils/musicSdk/tx/musicInfo'
 export type ExternalImportSource = 'tx' | 'wy' | 'kg' | 'spotify'
 export type ExternalImportTarget = 'new' | 'current' | 'love'
 
-export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled'
+export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled' | 'verification_required'
 
 export class ExternalImportError extends Error {
   code: ExternalImportErrorCode
@@ -346,6 +346,7 @@ export const loadAccountPlaylistMusic = async(
   options: { existingMusic?: LX.Music.MusicInfo[], accountId?: string, onAccount?: (accountId: string) => void } = {},
 ) => {
   const result = await getMusicAccountPlaylistDetail(provider, playlistId)
+  if (result.status == 'verification_required') throw new ExternalImportError('verification_required')
   if (result.status != 'available') throw new ExternalImportError('account_unavailable')
   if (provider == 'tx') {
     if (!result.accountId || (options.accountId && options.accountId != result.accountId)) throw new ExternalImportError('account_changed')

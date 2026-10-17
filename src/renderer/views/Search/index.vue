@@ -1,18 +1,19 @@
 <template>
-  <div :class="$style.container">
+  <div ref="pageRef" :class="$style.container">
     <div v-if="!isSearchEmpty" :class="$style.header">
       <base-tab v-if="searchText" v-model="searchType" :list="searchTypes" @change="handleTypeChange" />
     </div>
     <div :class="$style.main">
       <blank-view v-if="isSearchEmpty" :visible="true" :source="source" />
       <song-list-list v-else-if="searchType == 'songlist'" :page="page" :source-id="source" />
+      <album-list v-else-if="searchType == 'album'" :page="page" :source="source" :text="searchText" />
       <music-list v-else :page="page" :source-id="source" />
     </div>
   </div>
 </template>
 
 <script>
-import { useRoute, useRouter } from '@common/utils/vueRouter'
+import { useRoute, useRouter, onBeforeRouteLeave } from '@common/utils/vueRouter'
 import { DEFAULT_SETTING } from '@common/constants'
 import { searchText } from '@renderer/store/search/state'
 import { getSearchSetting, setSearchSetting } from '@renderer/utils/data'
@@ -20,7 +21,9 @@ import { getSearchSetting, setSearchSetting } from '@renderer/utils/data'
 import MusicList from './MusicList/index.vue'
 import SongListList from './SongListList/index.vue'
 import BlankView from './components/BlankView.vue'
-import { computed, ref } from '@common/utils/vueTools'
+import AlbumList from './AlbumList.vue'
+import { computed, ref, nextTick } from '@common/utils/vueTools'
+import { onActivated } from 'vue'
 import music from '@renderer/utils/musicSdk'
 
 const source = ref('all')
@@ -70,22 +73,42 @@ const verifyQueryParams = async(to, from, next) => {
 }
 
 export default {
+  name: 'Search',
   components: {
     MusicList,
     SongListList,
     BlankView,
+    AlbumList,
   },
   beforeRouteEnter: verifyQueryParams,
   beforeRouteUpdate: verifyQueryParams,
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const pageRef = ref(null)
+    let savedLocation = ''
+    let scrollPositions = []
+    onBeforeRouteLeave(() => {
+      savedLocation = route.fullPath
+      scrollPositions = Array.from(pageRef.value?.querySelectorAll('.scroll') ?? [], element => ({ element, top: element.scrollTop, left: element.scrollLeft }))
+    })
+    onActivated(() => {
+      void nextTick(() => {
+        if (savedLocation != route.fullPath) return
+        for (const { element, top, left } of scrollPositions) {
+          if (!pageRef.value?.contains(element)) continue
+          element.scrollTop = top
+          element.scrollLeft = left
+        }
+      })
+    })
     const isSearchEmpty = computed(() => typeof searchText.value != 'string' || !searchText.value.trim())
 
     const searchTypes = computed(() => {
       return [
         { label: window.i18n.t('search__type_music'), id: 'music' },
         { label: window.i18n.t('search__type_songlist'), id: 'songlist' },
+        { label: window.i18n.t('search__type_album'), id: 'album' },
       ]
     })
     const handleTypeChange = (type) => {
@@ -95,6 +118,11 @@ export default {
         query: {
           ...route.query,
           type,
+          albumId: undefined,
+          albumSource: undefined,
+          albumName: undefined,
+          albumSinger: undefined,
+          albumPic: undefined,
           page: 1,
         },
       })
@@ -102,6 +130,7 @@ export default {
 
 
     return {
+      pageRef,
       source,
       searchTypes,
       searchType,

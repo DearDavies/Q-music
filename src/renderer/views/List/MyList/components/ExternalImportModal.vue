@@ -61,6 +61,10 @@
               <em>{{ selectedAccountPlaylistId == playlist.id ? '✓' : '›' }}</em>
             </button>
           </div>
+          <div v-else-if="accountLoadError" :class="$style.accountState" role="status">
+            {{ $t(accountLoadError == 'verification_required' ? 'kugou__verification_required' : 'list__load_failed') }}
+            <base-btn min @click="loadAccountPlaylists(accountProvider)">{{ $t('search__retry') }}</base-btn>
+          </div>
           <div v-else :class="$style.accountState">
             {{ accountStatus[accountProvider] ? $t('playlist_import_modal__account_empty') : $t('playlist_import_modal__account_login_tip') }}
           </div>
@@ -214,6 +218,7 @@ export default {
     const accountPlaylists = ref(/** @type {import('@renderer/utils/ipc').MusicAccountPlaylist[]} */ ([]))
     const selectedAccountPlaylistId = ref('')
     const isAccountLoading = ref(false)
+    const accountLoadError = ref('')
     const progressStageKeys = {
       fetch: 'playlist_import_modal__stage_fetch',
       match: 'playlist_import_modal__stage_match',
@@ -224,6 +229,7 @@ export default {
       invalid_link: 'playlist_import_modal__error_invalid_link',
       no_match: 'playlist_import_modal__error_no_match',
       account_unavailable: 'playlist_import_modal__account_unavailable',
+      verification_required: 'kugou__verification_required',
       account_changed: 'list_sync_account_changed',
     }
 
@@ -304,6 +310,7 @@ export default {
     }
 
     const loadAccountPlaylists = async(provider = accountProvider.value) => {
+      accountLoadError.value = ''
       accountProvider.value = provider
       selectedAccountPlaylistId.value = ''
       accountPlaylists.value = []
@@ -317,9 +324,10 @@ export default {
           selectedAccountPlaylistId.value = result.playlists[0]?.id ?? ''
         } else if (result.status == 'login_required') {
           accountStatus.value = { ...accountStatus.value, [provider]: false }
-        }
+        } else accountLoadError.value = result.status
       } catch {
         accountPlaylists.value = []
+        accountLoadError.value = 'unavailable'
       } finally {
         isAccountLoading.value = false
       }
@@ -463,6 +471,7 @@ export default {
       selectedAccountPlaylistId,
       selectedAccountPlaylist,
       isAccountLoading,
+      accountLoadError,
       loadAccountPlaylists,
       handleAccountProvider,
       handleClose,

@@ -122,6 +122,10 @@
             <div v-else-if="isPlaylistsLoading" :class="[$style.playlistRail, $style.playlistSkeleton]" :aria-label="$t('search__account_playlists_loading')">
               <div v-for="index in 5" :key="index"><i /><b /><b /></div>
             </div>
+            <div v-else-if="accountPlaylistsError" :class="$style.playlistEmpty" role="status">
+              <p>{{ $t(accountPlaylistsError == 'login_required' ? 'search__account_expired' : accountPlaylistsError == 'verification_required' ? 'kugou__verification_required' : 'list__load_failed') }}</p>
+              <base-btn min @click="accountPlaylistsError == 'login_required' ? openAccountModal() : loadAccountPlaylists(true, accountPlaylistsProvider)">{{ $t(accountPlaylistsError == 'login_required' ? 'search__account_manage' : 'search__retry') }}</base-btn>
+            </div>
             <p v-else :class="$style.playlistEmpty">{{ $t('search__account_playlists_empty') }}</p>
           </section>
 
@@ -145,6 +149,7 @@
             <div :class="$style.detailActions">
               <base-btn min :disabled="!detailMusicList.length" @click="playDetailList()">{{ $t('search__daily_recommend_play') }}</base-btn>
               <base-btn v-if="detailKind == 'daily'" min :disabled="isDailyLoading" @click="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
+              <base-btn v-else min :disabled="isPlaylistDetailLoading" @click="openAccountPlaylist(selectedAccountPlaylist)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
             </div>
           </header>
           <div :class="$style.detailList">
@@ -284,6 +289,7 @@
 <script setup>
 import AccountTransferModal from '@renderer/components/common/AccountTransferModal.vue'
 import { computed, watch, shallowRef, ref } from '@common/utils/vueTools'
+import { onDeactivated } from 'vue'
 import { getDailyRecommend } from '@renderer/core/dailyRecommend'
 import { setTempList } from '@renderer/store/list/action'
 import { playList, togglePlay } from '@renderer/core/player/action'
@@ -314,9 +320,11 @@ const selectedAccountPlaylist = ref(null)
 const selectedAccountPlaylistProvider = ref('wy')
 const playlistDetailList = shallowRef([])
 const accountPlaylists = shallowRef([])
+const accountPlaylistsError = ref('')
 const accountPlaylistsProvider = ref('')
 const isPlaylistsLoading = shallowRef(false)
 const isPlaylistDetailLoading = shallowRef(false)
+const playlistDetailError = ref('')
 const isShowAccountModal = ref(false)
 const isShowAccountTransfer = ref(false)
 const isAccountLoginPending = ref(false)
@@ -340,6 +348,11 @@ const storedDailyProvider = window.localStorage.getItem('qmusic.dailyRecommend.p
 const selectedDailyProvider = ref(['tx', 'wy', 'kg'].includes(storedDailyProvider) ? storedDailyProvider : 'tx')
 const expandedAccountProvider = ref(selectedDailyProvider.value)
 const isShowAccountImport = ref(false)
+onDeactivated(() => {
+  isShowAccountModal.value = false
+  isShowAccountImport.value = false
+  isShowAccountTransfer.value = false
+})
 const importProvider = ref(selectedDailyProvider.value)
 const dailyRecommendMode = ref('loading')
 const dailyRecommendKind = ref('radar')
@@ -408,7 +421,7 @@ const detailSubtitle = computed(() => detailKind.value == 'playlist'
 const detailProvider = computed(() => detailKind.value == 'playlist' ? selectedAccountPlaylistProvider.value : selectedDailyProvider.value)
 const detailSourceText = computed(() => detailKind.value == 'playlist' ? selectedAccountPlaylist.value?.creator?.trim() ?? '' : dailySourceText.value)
 const detailEmptyText = computed(() => detailKind.value == 'playlist'
-  ? isPlaylistDetailLoading.value ? window.i18n.t('search__account_playlist_loading') : window.i18n.t('search__account_playlist_empty')
+  ? window.i18n.t(isPlaylistDetailLoading.value ? 'search__account_playlist_loading' : playlistDetailError.value || 'search__account_playlist_empty')
   : dailyDetailEmptyText.value)
 const isDetailLoading = computed(() => detailKind.value == 'playlist' ? isPlaylistDetailLoading.value : isDailyLoading.value)
 // 封面加载完成后再淡入，避免图片逐行硬切出现
@@ -499,6 +512,7 @@ const closeDailyDetail = () => {
 }
 
 const loadAccountPlaylists = async(force = false, provider = selectedDailyProvider.value) => {
+  accountPlaylistsError.value = ''
   if (!accountStatus.value[provider]) {
     accountPlaylistsRequestId++
     if (accountPlaylistsProvider.value == provider) {
@@ -517,9 +531,13 @@ const loadAccountPlaylists = async(force = false, provider = selectedDailyProvid
     const result = await getMusicAccountPlaylists(provider)
     if (requestId == accountPlaylistsRequestId && accountPlaylistsProvider.value == provider) {
       accountPlaylists.value = result?.status == 'available' && Array.isArray(result.playlists) ? result.playlists : []
+      if (result?.status != 'available') accountPlaylistsError.value = result?.status || 'unavailable'
     }
   } catch {
-    if (requestId == accountPlaylistsRequestId && accountPlaylistsProvider.value == provider) accountPlaylists.value = []
+    if (requestId == accountPlaylistsRequestId && accountPlaylistsProvider.value == provider) {
+      accountPlaylists.value = []
+      accountPlaylistsError.value = 'unavailable'
+    }
   } finally {
     if (requestId == accountPlaylistsRequestId) isPlaylistsLoading.value = false
   }
@@ -532,6 +550,7 @@ const openAccountPlaylist = async(playlist) => {
   if (!playlist?.id || !accountStatus.value[provider]) return
   const requestId = ++playlistDetailRequestId
   selectedAccountPlaylist.value = playlist
+  playlistDetailError.value = ''
   selectedAccountPlaylistProvider.value = provider
   playlistDetailList.value = []
   detailKind.value = 'playlist'
@@ -540,6 +559,10 @@ const openAccountPlaylist = async(playlist) => {
   try {
     const result = await getMusicAccountPlaylistDetail(provider, playlist.id)
     if (requestId != playlistDetailRequestId) return
+    if (result.status != 'available') {
+      playlistDetailError.value = result.status == 'verification_required' ? 'kugou__verification_required' : result.status == 'login_required' ? 'search__account_expired' : 'list__load_failed'
+      return
+    }
     if (Array.isArray(result?.ids) && result.ids.length) {
       if (provider == 'kg') {
         const { loadKugouHashMusic } = await import('@renderer/views/List/MyList/importPlaylist')
@@ -559,7 +582,10 @@ const openAccountPlaylist = async(playlist) => {
       }
     }
   } catch {
-    if (requestId == playlistDetailRequestId) playlistDetailList.value = []
+    if (requestId == playlistDetailRequestId) {
+      playlistDetailList.value = []
+      playlistDetailError.value = 'list__load_failed'
+    }
   } finally {
     if (requestId == playlistDetailRequestId) isPlaylistDetailLoading.value = false
   }
@@ -984,9 +1010,10 @@ void refreshAccountStatus().then(() => {
 
   > button {
     display: grid;
-    grid-template-columns: 78px minmax(0, 1fr);
+    // 列宽与封面使用同一 rem 尺寸，跟随界面字号一起缩放。
+    grid-template-columns: 4.875rem minmax(0, 1fr);
     grid-template-rows: 1fr 1fr;
-    column-gap: 12px;
+    column-gap: .75rem;
     align-items: center;
     padding: 8px;
     border-radius: 14px;
@@ -1000,13 +1027,14 @@ void refreshAccountStatus().then(() => {
     }
 
     .playlistCover {
+      grid-column: 1;
       grid-row: 1 / 3;
-      width: 78px;
-      height: 78px;
+      width: 100%;
+      height: auto;
     }
 
-    strong { margin-top: auto; align-self: end; font-size: 12.5px; }
-    small { margin-bottom: auto; align-self: start; }
+    strong { grid-column: 2; min-width: 0; margin-top: auto; align-self: end; font-size: 12.5px; }
+    small { grid-column: 2; min-width: 0; margin-bottom: auto; align-self: start; }
   }
 }
 .playlistCover {
@@ -1677,6 +1705,7 @@ void refreshAccountStatus().then(() => {
     > :nth-child(4) { display: none; }
   }
   .playlistRail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .discoveryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .playlistSkeleton > div:nth-child(n + 4) { display: none; }
 }
 

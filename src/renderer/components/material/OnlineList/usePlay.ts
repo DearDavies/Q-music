@@ -11,6 +11,7 @@ export default ({ selectedList, props, removeAllSelect, emit }: {
   selectedList: Ref<LX.Music.MusicInfoOnline[]>
   props: {
     list: LX.Music.MusicInfoOnline[]
+    playInContext?: boolean
   }
   removeAllSelect: () => void
   emit: (event: 'show-menu' | 'play-list' | 'togglePage', ...args: any[]) => void
@@ -21,6 +22,10 @@ export default ({ selectedList, props, removeAllSelect, emit }: {
   const handlePlayMusic = async(index: number, single: boolean) => {
     let targetSong = props.list[index]
     if (!targetSong) return
+    if (props.playInContext && (single || !selectedList.value.length)) {
+      emit('play-list', index)
+      return
+    }
     if (selectedList.value.length && !single) {
       await addListMusics(defaultList.id, [...selectedList.value])
       removeAllSelect()
@@ -52,7 +57,7 @@ export default ({ selectedList, props, removeAllSelect, emit }: {
       clickIndex = index
       return
     }
-    if (appSetting['list.isClickPlayList']) {
+    if (props.playInContext === true || appSetting['list.isClickPlayList']) {
       emit('play-list', index)
     } else {
       void handlePlayMusic(index, true)

@@ -161,6 +161,10 @@ export default {
   name: 'MaterialOnlineList',
   components: { SourceIcon, SourcePicker },
   props: {
+    playInContext: {
+      type: Boolean,
+      default: false,
+    },
     list: {
       type: Array,
       default() {
