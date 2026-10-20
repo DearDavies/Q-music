@@ -142,3 +142,42 @@ test('音频解析器没有抛错但未识别到音频时，不把损坏文件�
   assert.equal(valid.singer, 'Artist')
   assert.equal(valid.meta.albumName, 'Album')
 })
+
+test('下载入口的响应式歌曲及嵌套元数据可跨线程传递，任务保存后才更新列表', async() => {
+  const vue = require('vue')
+  const song = vue.reactive({ id: 'tx_123', name: '歌曲', singer: '歌手', source: 'tx', meta: vue.reactive({ qualitys: [{ type: '128k' }], _qualitys: { '128k': {} } }) })
+  const list = vue.reactive([])
+  let saved
+  let received
+  let rejectSave = false
+  const actions = load('src/renderer/store/download/action.ts', {
+    '@renderer/utils/ipc': { downloadTasksCreate: async tasks => { if (rejectSave) throw Error('disk unavailable'); saved = structuredClone(tasks) } },
+    './state': { downloadList: list },
+    '@common/utils/vueTools': vue,
+    '@renderer/core/music/online': {},
+    '../setting': { appSetting: { 'download.maxDownloadNum': 0, 'download.fileName': 'name - singer', 'list.addMusicLocationType': 'bottom' } },
+    '..': { qualityList: vue.ref({ tx: ['128k'] }) },
+    '@renderer/worker/utils': {},
+    '@renderer/utils': { arrPush: (target, items) => target.push(...items) },
+    '@common/constants': { DOWNLOAD_STATUS: {} },
+    '../index': {}, './utils': {},
+  }, { window: { app_event: { downloadListUpdate() {} }, lx: { worker: { download: {
+    createDownloadTasks: async(...args) => {
+      received = structuredClone(args)
+      return received[0].map(musicInfo => ({ id: musicInfo.id, metadata: { musicInfo, quality: received[1], listId: received[4] } }))
+    },
+  } } } } })
+  assert.throws(() => structuredClone([song]), { name: 'DataCloneError' })
+  await actions.createDownloadTasks([song], '128k', 'source-list')
+  assert.equal(list.length, 1)
+  assert.equal(saved[0].metadata.musicInfo.name, '歌曲')
+  assert.equal(received[4], 'source-list')
+  song.meta.qualitys[0].type = 'flac'
+  assert.equal(saved[0].metadata.musicInfo.meta.qualitys[0].type, '128k')
+  await actions.createDownloadTasks([song], '128k')
+  assert.equal(list.length, 1)
+  song.id = 'tx_456'
+  rejectSave = true
+  await assert.rejects(actions.createDownloadTasks([song], '128k'), /disk unavailable/)
+  assert.equal(list.length, 1)
+})

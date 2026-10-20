@@ -356,7 +356,9 @@ const filterTask = (list: LX.Download.ListItem[]) => {
  */
 export const createDownloadTasks = async(list: LX.Music.MusicInfoOnline[], quality: LX.Quality, listId?: string) => {
   if (!list.length) return
-  const tasks = filterTask(await window.lx.worker.download.createDownloadTasks(list, quality,
+  // 歌曲可能来自 ref/reactive，嵌套元数据也可能是 Proxy；在线程边界创建纯数据快照。
+  const musicInfos: LX.Music.MusicInfoOnline[] = JSON.parse(JSON.stringify(list))
+  const tasks = filterTask(await window.lx.worker.download.createDownloadTasks(musicInfos, quality,
     appSetting['download.fileName'],
     toRaw(qualityList.value), listId),
   )

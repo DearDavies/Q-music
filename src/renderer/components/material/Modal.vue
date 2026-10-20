@@ -470,6 +470,17 @@ export default {
 }
 
 :global(body:has(#container.show-player-detail)) .content {
+  // 背景变为深色时同步覆盖内容令牌，避免子组件继续读取主界面的浅色主题。
+  --color-font: rgba(255, 255, 255, .94);
+  --color-font-label: rgba(255, 255, 255, .72);
+  --color-button-font: rgba(255, 255, 255, .94);
+  --color-button-background: rgba(255, 255, 255, .06);
+  --color-button-background-hover: rgba(255, 255, 255, .12);
+  --color-button-background-active: rgba(255, 255, 255, .16);
+  --color-primary-dark-300: #fff;
+  --q-surface: rgba(255, 255, 255, .08);
+  --q-surface-strong: rgba(255, 255, 255, .14);
+  --q-border: rgba(255, 255, 255, .16);
   color: rgba(255, 255, 255, .9);
   border: 1px solid rgba(255, 255, 255, .12);
   background: rgba(25, 30, 34, .9);

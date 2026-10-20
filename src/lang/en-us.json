@@ -19,7 +19,7 @@
   "player_download_enable": "Downloads are disabled. Enable them and choose a quality for this song?",
   "player_download_enable_confirm": "Enable downloads",
   "player_download_unavailable": "No download quality is available from the current source. Configure a custom source supporting downloads for this platform and try again.",
-  "player_download_failed": "Could not add the download task. Check download settings and try again.",
+  "player_download_failed": "Could not add the download task. Try again; if it still fails, restart the app.",
   "list_sync_verification_required": "The platform requires verification. Your playlist is preserved. Complete verification in the official Kugou app and retry.",
   "list_sync_incomplete": "The platform returned an incomplete playlist. Your playlist is preserved. Please retry later.",
   "list_sync_login_required": "Your platform session has expired or you are signed out. Your playlist is preserved. Sign in to the same account and retry.",

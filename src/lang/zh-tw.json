@@ -19,7 +19,7 @@
   "player_download_enable": "下載功能尚未開啟。是否開啟並選擇目前歌曲的下載音質？",
   "player_download_enable_confirm": "開啟並下載",
   "player_download_unavailable": "目前音源沒有可用的下載音質。請在設定中配置支援該平台下載的自訂源後重試。",
-  "player_download_failed": "未能新增下載任務，請檢查下載設定後重試。",
+  "player_download_failed": "未能新增下載任務，請重試；若仍失敗，請重新開啟軟體。",
   "list_sync_verification_required": "平台要求安全驗證，原歌單已保留。請先在酷狗官方 App 完成驗證後重試。",
   "list_sync_incomplete": "平台回傳的歌曲不完整，原歌單已保留。請稍後重試。",
   "list_sync_login_required": "平台帳號未登入或登入已失效，原歌單已保留。請重新登入同一帳號後重試。",
