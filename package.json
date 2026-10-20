@@ -1,6 +1,6 @@
 {
   "name": "q-music",
-  "version": "0.4.17",
+  "version": "0.4.18",
   "description": "一个免费的音乐查找助手",
   "main": "./dist/main.js",
   "private": true,
@@ -73,7 +73,8 @@
     "test:accounts": "node --test test/musicAccounts.test.cjs test/officialAccountLogin.test.cjs",
     "test:qq-favorite-transport": "electron test/qqFavoriteTransport.electron.cjs",
     "test:qq-sync": "node --test test/qqPlaylistSync.test.cjs",
-    "test:browse": "node --test test/browseNavigation.test.cjs"
+    "test:browse": "node --test test/browseNavigation.test.cjs",
+    "test:local-music": "node --test test/localMusicImport.test.cjs"
   },
   "browserslist": [
     "Electron 22.3.0"

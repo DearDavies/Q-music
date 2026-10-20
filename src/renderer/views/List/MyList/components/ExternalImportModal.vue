@@ -229,6 +229,8 @@ export default {
       invalid_link: 'playlist_import_modal__error_invalid_link',
       no_match: 'playlist_import_modal__error_no_match',
       account_unavailable: 'playlist_import_modal__account_unavailable',
+      login_required: 'list_sync_login_required',
+      playlist_incomplete: 'list_sync_incomplete',
       verification_required: 'kugou__verification_required',
       account_changed: 'list_sync_account_changed',
     }
@@ -563,7 +565,7 @@ export default {
   padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: 12px;
-  background: rgba(255, 255, 255, .48);
+  background: var(--q-surface);
   color: var(--color-button-font);
   text-align: left;
   cursor: pointer;
@@ -616,8 +618,8 @@ export default {
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, .46);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .58);
+  background: var(--q-surface);
+  box-shadow: inset 0 0 0 1px var(--q-border);
 }
 
 .accountPlaylistHeader {
@@ -672,7 +674,7 @@ export default {
   padding: 7px;
   border: 1px solid transparent;
   border-radius: 11px;
-  background: rgba(255, 255, 255, .38);
+  background: var(--q-surface-soft);
   color: var(--color-button-font);
   text-align: left;
   cursor: pointer;
@@ -741,7 +743,7 @@ export default {
   justify-content: center;
   min-height: 94px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, .34);
+  background: var(--q-surface-soft);
   color: var(--color-font-label);
   font-size: 12px;
 }
@@ -768,9 +770,9 @@ export default {
   height: 32px;
   border: none;
   border-radius: @form-radius;
-  background: rgba(255, 255, 255, .54);
+  background: var(--q-surface);
   color: var(--color-button-font);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .62);
+  box-shadow: inset 0 0 0 1px var(--q-border);
   cursor: pointer;
   transition: @transition-fast;
   transition-property: background-color, color, box-shadow, opacity;
@@ -781,7 +783,7 @@ export default {
 
   &:hover {
     color: var(--color-primary-dark-300);
-    background-color: rgba(255, 255, 255, .72);
+    background-color: var(--q-surface-strong);
   }
 
   &:disabled {

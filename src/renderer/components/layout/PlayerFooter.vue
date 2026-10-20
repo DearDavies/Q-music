@@ -148,13 +148,13 @@ const handleImgError = () => {
   border-radius: 24px;
   color: var(--color-font);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .78), rgba(241, 250, 246, .58)),
-    rgba(255, 255, 255, .54);
+    linear-gradient(180deg, var(--q-surface-strong), var(--q-surface)),
+    var(--q-surface);
   border: 1px solid rgba(54, 83, 70, .17);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .78),
+    inset 0 1px 0 var(--q-border),
     inset 0 -1px 0 rgba(54, 83, 70, .12),
-    inset 0 0 0 1px rgba(255, 255, 255, .42),
+    inset 0 0 0 1px var(--q-border),
     0 18px 42px rgba(54, 83, 70, .14);
   backdrop-filter: blur(26px) saturate(1.22);
 
@@ -193,14 +193,14 @@ const handleImgError = () => {
   overflow: hidden;
   border: none;
   border-radius: 14px;
-  color: rgba(45, 54, 50, .72);
+  color: var(--color-font-label);
   cursor: pointer;
   pointer-events: auto;
   -webkit-app-region: no-drag;
-  background: rgba(250, 252, 251, .78);
+  background: var(--q-surface-strong);
   border: 1px solid rgba(54, 83, 70, .14);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .84),
+    inset 0 1px 0 var(--q-border),
     0 8px 18px rgba(50, 63, 82, .1);
   transition: transform @transition-fast, box-shadow @transition-fast, opacity @transition-fast;
 
@@ -231,7 +231,7 @@ const handleImgError = () => {
 .coverPlaceholder {
   width: 30px;
   height: 30px;
-  color: rgba(42, 55, 49, .7);
+  color: var(--color-font-label);
 }
 .coverHint {
   position: absolute;
@@ -308,7 +308,7 @@ const handleImgError = () => {
   margin-top: 6px;
   line-height: 1.35;
   font-size: 13px;
-  color: rgba(54, 58, 60, .62);
+  color: var(--color-font-label);
   .mixin-ellipsis-1();
 }
 
@@ -333,11 +333,11 @@ const handleImgError = () => {
   width: 100%;
 }
 .progress {
-  --q-progress-track-color: rgba(49, 55, 59, .12);
+  --q-progress-track-color: var(--color-font-label);
   --q-progress-bar-color: var(--color-primary);
   --q-progress-drag-color: var(--color-primary-dark-100);
   height: 100%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3);
+  box-shadow: inset 0 0 0 1px var(--q-border);
 }
 
 .barTransition {
@@ -348,7 +348,7 @@ const handleImgError = () => {
 .timeLabel {
   font-size: 12px;
   line-height: 1;
-  color: rgba(49, 55, 59, .62);
+  color: var(--color-font-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -776,14 +776,16 @@ const handleImgError = () => {
   }
 
   .footer:not(.detailFooter) .toolArea {
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
+    justify-content: flex-end;
+  }
 
-    &::-webkit-scrollbar {
-      display: none;
-    }
+  .footer:not(.detailFooter) .tools {
+    flex: 1;
+    width: 0;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: flex-end;
+    row-gap: 2px;
   }
 }
 

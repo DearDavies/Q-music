@@ -4,7 +4,7 @@
       <h2>{{ $t('list_update_modal__title') }}</h2>
     </div>
     <div :class="$style.toolbar">
-      <base-btn :disabled="batchWorking || !qqLists.length" @click="syncQQLists">{{ $t(batchWorking ? 'list_sync_working' : 'list_sync_all_qq') }}</base-btn>
+      <base-btn :disabled="batchWorking || !lists.length" @click="syncAllLists">{{ $t(batchWorking ? 'list_sync_working' : 'list_sync_all') }}</base-btn>
       <span v-if="batchTotal" role="status">{{ $t(batchWorking ? 'list_sync_batch_progress' : 'list_sync_batch_done', { current: batchCurrent, total: batchTotal, failed: batchFailed }) }}</span>
     </div>
     <main class="scroll" :class="$style.main">
@@ -23,6 +23,7 @@
             <p v-else-if="isQQSyncList(list) && !updateInfo[list.id]?.sourceAccountId" :class="$style.status">{{ $t('list_sync_binding_required') }}</p>
           </div>
           <div :class="$style.btns">
+            <base-btn v-if="listSyncStates[list.id]?.error == 'list_sync_login_required'" :disabled="batchWorking || loginWorking" @click.stop="relogin(list)">{{ $t('list_sync_relogin') }}</base-btn>
             <button :class="$style.btn" :disabled="fetchingListStatus[list.id]" outline="outline" :aria-label="$t('list_update_modal__update')" @click.stop="handleUpdate(list)">
               <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="transform: rotate(45deg);" viewBox="0 0 24 24" space="preserve">
                 <use xlink:href="#icon-refresh" />
@@ -50,6 +51,7 @@ import { getListUpdateInfo, setListAutoUpdate } from '@renderer/utils/data'
 import SourceIcon from '@renderer/components/common/SourceIcon.vue'
 import { useI18n } from '@renderer/plugins/i18n'
 import { dialog } from '@renderer/plugins/Dialog'
+import { loginMusicAccount } from '@renderer/utils/ipc'
 
 export default {
   components: { SourceIcon },
@@ -58,7 +60,6 @@ export default {
   setup(props) {
     const t = useI18n()
     const lists = computed(() => userLists.filter(l => !!l.source && !!musicSdk[l.source]?.songList))
-    const qqLists = computed(() => lists.value.filter(isQQSyncList))
     const updateInfo = ref({})
     const refreshSettings = async() => { updateInfo.value = structuredClone(await getListUpdateInfo()) }
     watch(() => props.visible, visible => {
@@ -68,6 +69,15 @@ export default {
     const batchCurrent = ref(0)
     const batchTotal = ref(0)
     const batchFailed = ref(0)
+    const loginWorking = ref(false)
+    const relogin = async(list) => {
+      if (loginWorking.value || !['tx', 'wy', 'kg'].includes(list.source)) return
+      loginWorking.value = true
+      try {
+        const result = await loginMusicAccount(list.source)
+        if (result.status == 'connected') await handleUpdate(list)
+      } catch { void dialog(t('list_sync_login_required')) } finally { loginWorking.value = false }
+    }
     const handleUpdate = async(targetListInfo) => {
       try {
         const updated = await handleSyncSourceList(targetListInfo)
@@ -75,9 +85,9 @@ export default {
         return updated
       } catch { return false }
     }
-    const syncQQLists = async() => {
+    const syncAllLists = async() => {
       if (batchWorking.value) return
-      const targets = [...qqLists.value]
+      const targets = [...lists.value]
       batchWorking.value = true
       batchTotal.value = targets.length
       batchCurrent.value = batchFailed.value = 0
@@ -106,12 +116,13 @@ export default {
       listUpdateTimes,
       handleUpdate,
       handleChangeAutoUpdate,
-      qqLists,
+      relogin,
+      loginWorking,
       batchWorking,
       batchCurrent,
       batchTotal,
       batchFailed,
-      syncQQLists,
+      syncAllLists,
       listSyncStates,
       syncStatus,
       isQQSyncList,

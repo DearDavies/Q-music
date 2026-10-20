@@ -211,7 +211,7 @@ const createTarget = {
         winOptions.artifactName = `\${productName}-v\${version}-win_${arch}-green.\${ext}`
         return {
           buildOptions: { win: ['7z'] },
-          options: winOptions,
+          options: { ...winOptions, extraFiles: [{ from: './resources/portable', to: 'portable' }] },
         }
       case 'win7_setup':
         winOptions.artifactName = `\${productName}-v\${version}-win7_${arch}-Setup.\${ext}`

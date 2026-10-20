@@ -71,6 +71,9 @@ export const createLocalMusicInfo = async(path: string): Promise<LX.Music.MusicI
     return null
   }
 
+  // 部分损坏的 MP3 只返回空标签而不抛错，不能当成可播放歌曲导入。
+  if (!metadata.format.codec && !metadata.format.sampleRate) return null
+
   // console.log(metadata)
   let ext = extname(path)
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing

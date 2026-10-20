@@ -251,7 +251,7 @@ export default {
   box-sizing: border-box;
   border-top: var(--color-list-header-border-bottom);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, .34), rgba(255, 255, 248, .74)),
+    linear-gradient(135deg, var(--q-surface-soft), var(--q-surface-strong)),
     radial-gradient(circle at 18% 18%, var(--color-primary-alpha-900), transparent 34%);
 }
 
@@ -276,8 +276,8 @@ export default {
   height: 42px;
   border-radius: 16px;
   pointer-events: none;
-  background-color: rgba(255, 255, 255, .68);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .82), 0 14px 30px rgba(72, 91, 112, .08);
+  background-color: var(--q-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--q-border), 0 14px 30px rgba(72, 91, 112, .08);
 }
 .tocIndicatorReady {
   transition: transform .42s cubic-bezier(.22, 1, .36, 1);
@@ -316,8 +316,8 @@ export default {
   &:not(.active) {
     cursor: pointer;
     &:hover {
-      background-color: rgba(255, 255, 255, .44);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .58);
+      background-color: var(--q-surface);
+      box-shadow: inset 0 0 0 1px var(--q-border);
       .tocIcon {
         color: var(--color-primary);
         background-color: var(--color-primary-alpha-900);
@@ -330,7 +330,7 @@ export default {
     .tocIcon {
       color: #fff;
       background: linear-gradient(145deg, var(--color-primary-light-100), var(--color-primary));
-      box-shadow: 0 8px 18px var(--color-primary-alpha-700), inset 0 1px 0 rgba(255, 255, 255, .4);
+      box-shadow: 0 8px 18px var(--color-primary-alpha-700), inset 0 1px 0 var(--q-border);
     }
   }
 }
@@ -341,8 +341,8 @@ export default {
   border-radius: 10px;
   // 未选中用中性灰，只有 hover/选中才上主色，避免整列全绿显脏
   color: var(--color-500);
-  background-color: rgba(255, 255, 255, .5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+  background-color: var(--q-surface);
+  box-shadow: inset 0 0 0 1px var(--q-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -398,8 +398,8 @@ export default {
       font-size: 17px;
       font-weight: 750;
       letter-spacing: 0;
-      background: rgba(255, 255, 255, .64);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .78), 0 18px 42px rgba(75, 92, 109, .08);
+      background: var(--q-surface);
+      box-shadow: inset 0 0 0 1px var(--q-border), 0 18px 42px rgba(75, 92, 109, .08);
 
       + dd h3 {
         margin-top: 0;
@@ -411,8 +411,8 @@ export default {
       padding: 13px 16px;
       border-radius: 18px;
       color: var(--color-font);
-      background: rgba(255, 255, 255, .48);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .62), 0 12px 32px rgba(78, 94, 112, .06);
+      background: var(--q-surface);
+      box-shadow: inset 0 0 0 1px var(--q-border), 0 12px 32px rgba(78, 94, 112, .06);
       backdrop-filter: blur(12px);
 
       > div {
@@ -445,14 +445,14 @@ export default {
       margin: 0 0.4em;
       border: none;
       border-radius: 10px;
-      background: rgba(255, 255, 255, .46);
+      background: var(--q-surface);
       color: var(--color-button-font);
       cursor: pointer;
       transition: @transition-fast;
       transition-property: background-color, color, transform;
       &:hover {
         color: var(--color-primary-dark-300);
-        background: rgba(255, 255, 255, .68);
+        background: var(--q-surface-strong);
         transform: translateY(-1px);
       }
     }

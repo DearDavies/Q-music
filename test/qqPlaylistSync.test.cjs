@@ -183,7 +183,7 @@ const importHarness = (options = {}) => {
   const api = load('src/renderer/views/List/MyList/importPlaylist.ts', {
     '@common/constants': { LIST_IDS: { LOVE: 'love' } },
     '@renderer/utils': { toNewMusicInfo: row => row, filterMusicList: rows => rows },
-    '@renderer/utils/request': {}, '@renderer/utils/musicSdk': {}, '@renderer/store/songList/action': {},
+    '@renderer/utils/request': {}, '@renderer/utils/musicSdk': { tx: { songList: { filterListDetail: rows => rows } } }, '@renderer/store/songList/action': {},
     '@renderer/store/list/state': { userLists: lists },
     '@renderer/store/list/action': {
       getListMusics: async () => [{ source: 'tx', meta: { songId: 'old' }, name: 'cached' }],
@@ -197,7 +197,7 @@ const importHarness = (options = {}) => {
       setListUpdateTime: async (id, value) => { settings[id].updateTime = value },
     },
     '@common/utils/qqPlaylist': qq,
-    '@renderer/utils/ipc': { getMusicAccountPlaylistDetail: async () => ({ status: 'available', ids: options.ids ?? ['new', 'old'], accountId: options.accountId ?? 'account-a' }) },
+    '@renderer/utils/ipc': { getMusicAccountPlaylistDetail: async () => ({ status: options.status ?? 'available', ids: options.ids ?? ['new', 'old'], tracks: options.tracks, accountId: options.accountId ?? 'account-a' }) },
     '@renderer/utils/musicSdk/wy/musicDetail': {},
     '@renderer/utils/musicSdk/tx/musicInfo': async id => {
       fetched.push(id)
@@ -232,6 +232,22 @@ test('QQ 导入遇新歌曲解析失败或账号变化不保存，真实空歌�
   assert.equal(empty.saved[0].musicInfos.length, 0)
 })
 
+test('账号歌单元数据齐全时不逐曲请求匿名接口，掉登录和缺曲分别反馈', async () => {
+  const tracks = ['new', 'old'].map(mid => ({ mid, title: mid, file: {}, album: {}, source: 'tx', meta: { songId: mid }, name: mid }))
+  const h = importHarness({ tracks, missing: 'new' })
+  await h.run()
+  assert.deepEqual(h.fetched, [])
+  assert.equal(h.saved[0].list.length, 2)
+  for (const status of ['login_required', 'playlist_incomplete', 'verification_required']) {
+    const failed = importHarness({ existing: true, status })
+    await assert.rejects(failed.run(), error => error.code == status)
+    assert.equal(failed.saved.length, 0)
+    assert.equal(failed.settings.local.updateTime, 123)
+  }
+  assert.equal(harness().syncErrorKey(Error('login_required')), 'list_sync_login_required')
+  assert.equal(harness().syncErrorKey(Error('incomplete')), 'list_sync_incomplete')
+})
+
 test('自动更新只注册一次，回前台按间隔节流，未关联旧歌单不自动覆盖', async () => {
   let now = 1000000
   class FakeDate extends Date { static now() { return now } }
@@ -259,4 +275,49 @@ test('自动更新只注册一次，回前台按间隔节流，未关联旧歌�
   assert.deepEqual(calls, ['qq', 'other', 'qq'])
   settings.qq.isAutoUpdate = false; now += 600000; interval(); await tick()
   assert.equal(calls.length, 3)
+})
+const realTools = load("src/common/utils/tools.ts")
+const sdkUtils = { formatPlayTime: seconds => String(seconds), sizeFormate: size => String(size) }
+const realQQ = load("src/renderer/utils/musicSdk/tx/songList.js", {
+  "../../request": {}, "../../index": sdkUtils, "../utils": { formatSingerName: singers => singers.map(s => s.name).join("、") },
+}).default
+const realWY = load("src/renderer/utils/musicSdk/wy/musicDetail.js", {
+  "../../request": {}, "./utils/crypto": {}, "../../index": sdkUtils,
+}).default
+function realImport(result) {
+  let anonymousCalls = 0
+  const api = load("src/renderer/views/List/MyList/importPlaylist.ts", {
+    "@common/constants": { LIST_IDS: {} }, "@renderer/utils": realTools,
+    "@renderer/utils/request": {}, "@renderer/utils/musicSdk": { tx: { songList: realQQ } },
+    "@renderer/store/songList/action": {}, "@renderer/store/list/action": {}, "@renderer/utils/data": {},
+    "@common/utils/qqPlaylist": qq, "@renderer/store/list/state": {},
+    "@renderer/utils/ipc": { getMusicAccountPlaylistDetail: async () => result },
+    "@renderer/utils/musicSdk/wy/musicDetail": realWY,
+    "@renderer/utils/musicSdk/tx/musicInfo": async () => { anonymousCalls++; throw Error("anonymous unavailable") },
+  })
+  return { read: provider => api.loadAccountPlaylistMusic(provider, "123"), anonymousCalls: () => anonymousCalls }
+}
+test("QQ 224 首真实转换保留 mid 与数字 ID，账号资料足够时完全不依赖匿名详情", async () => {
+  const tracks = Array.from({ length: 224 }, (_, i) => ({
+    mid: `mid${i}`, id: 1000 + i, title: `歌曲${i}`, interval: 180,
+    singer: [{ name: "歌手", mid: "singer" }], album: { mid: "album", name: "专辑" },
+    file: { media_mid: `media${i}`, size_128mp3: 1024, size_320mp3: 0, size_flac: 0, size_hires: 0 },
+  }))
+  const h = realImport({ status: "available", ids: tracks.map(s => s.mid), tracks, accountId: "qq:1:123" })
+  const songs = await h.read("tx")
+  assert.equal(songs.length, 224)
+  assert.equal(songs[223].meta.songId, "mid223")
+  assert.equal(songs[223].meta.id, 1223)
+  assert.equal(h.anonymousCalls(), 0)
+})
+test("网易云按歌单顺序匹配详情与权限，缺曲或缺权限拒绝返回残缺列表", async () => {
+  const tracks = [1, 2].map(id => ({ id, name: `歌${id}`, dt: 180000, ar: [], al: {} }))
+  const result = { status: "available", ids: ["2", "1"], tracks, privileges: [{ id: 2, maxbr: 0 }, { id: 1, maxbr: 0 }] }
+  assert.deepEqual(plain((await realImport(result).read("wy")).map(s => s.meta.songId)), [2, 1])
+  await assert.rejects(realImport({ ...result, tracks: [tracks[0]] }).read("wy"), /playlist_incomplete/)
+  await assert.rejects(realImport({ ...result, privileges: [] }).read("wy"), /playlist_incomplete/)
+  for (const provider of ["tx", "wy", "kg"]) {
+    assert.deepEqual(plain(await realImport({ status: "available", ids: [], tracks: [], accountId: "test" }).read(provider)), [])
+    await assert.rejects(realImport({ status: "login_required", ids: [] }).read(provider), /login_required/)
+  }
 })

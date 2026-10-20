@@ -366,7 +366,7 @@ export default {
   width: 100%;
   height: 100%;
   // background-color: rgba(0, 0, 0, .2);
-  // background-color: rgba(255, 255, 255, .6);
+  // background-color: var(--q-surface);
   // background-color: var(--color-primary-light-600-alpha-900);
   // backdrop-filter: blur(4px);
   // backdrop-filter: grayscale(70%);
@@ -381,7 +381,7 @@ export default {
   }
 
   &.filter {
-    background: rgba(255, 255, 255, .22);
+    background: var(--q-surface-soft);
     backdrop-filter: blur(14px) saturate(1.08);
   }
 
@@ -409,7 +409,7 @@ export default {
   display: flex;
   flex-flow: column nowrap;
   z-index: 100;
-  background: rgba(255, 255, 255, .86);
+  background: var(--q-surface-strong);
   backdrop-filter: blur(18px);
 }
 
@@ -421,12 +421,12 @@ export default {
 
 .header {
   flex: none;
-  background: rgba(255, 255, 255, .42);
+  background: var(--q-surface);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   height: 32px;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .58);
+  box-shadow: inset 0 -1px 0 var(--q-border);
 
   button {
     border: none;
@@ -449,7 +449,7 @@ export default {
 
     &:hover {
       color: var(--color-primary-dark-300);
-      background-color: rgba(255, 255, 255, .7);
+      background-color: var(--q-surface-strong);
       transform: translateY(-1px);
     }
     &:active {

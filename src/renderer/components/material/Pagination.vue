@@ -135,8 +135,8 @@ export default {
   gap: 8px;
   padding: 4px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, .42);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6), 0 8px 22px rgba(35, 54, 46, .07);
+  background: var(--q-surface);
+  box-shadow: inset 0 0 0 1px var(--q-border), 0 8px 22px rgba(35, 54, 46, .07);
   backdrop-filter: blur(14px);
 
   ul {
@@ -183,7 +183,7 @@ export default {
         transition: background-color @transition-fast, color @transition-fast, transform @transition-fast;
         &:hover {
           color: var(--color-primary-dark-100);
-          background-color: rgba(255, 255, 255, .62);
+          background-color: var(--q-surface);
         }
         &:focus-visible {
           box-shadow: inset 0 0 0 2px var(--color-primary-alpha-600);
@@ -224,7 +224,7 @@ export default {
     border-radius: 8px;
     outline: none;
     color: var(--color-font);
-    background: rgba(255, 255, 255, .6);
+    background: var(--q-surface);
     box-shadow: inset 0 0 0 1px rgba(54, 83, 70, .12);
     font: inherit;
     font-size: 12px;

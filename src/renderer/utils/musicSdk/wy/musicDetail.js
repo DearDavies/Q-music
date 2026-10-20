@@ -12,6 +12,7 @@ export default {
     return arr.join('、')
   },
   filterList({ songs, privileges }) {
+    privileges ??= []
     // console.log(songs, privileges)
     const list = []
     songs.forEach((item, index) => {
@@ -19,7 +20,7 @@ export default {
       const _types = {}
       let size
       let privilege = privileges[index]
-      if (privilege.id !== item.id) privilege = privileges.find(p => p.id === item.id)
+      if (privilege?.id !== item.id) privilege = privileges.find(p => p.id === item.id)
       if (!privilege) return
 
       if (privilege.maxBrLevel == 'hires') {

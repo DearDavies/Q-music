@@ -100,8 +100,8 @@ export default {
   outline: none;
   transition: @transition-fast;
   transition-property: background-color, box-shadow, color, opacity;
-  background: rgba(255, 255, 255, .5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .64), 0 8px 18px rgba(70, 88, 106, .05);
+  background: var(--q-surface);
+  box-shadow: inset 0 0 0 1px var(--q-border), 0 8px 18px rgba(70, 88, 106, .05);
   font-size: 13.3px;
   letter-spacing: 0;
 
@@ -122,12 +122,12 @@ export default {
   }
 
   &:hover:not([disabled]) {
-    background-color: rgba(255, 255, 255, .62);
+    background-color: var(--q-surface);
     box-shadow: inset 0 0 0 1px var(--color-primary-alpha-800), 0 8px 18px rgba(70, 88, 106, .06);
   }
   &:focus {
     color: var(--color-primary-dark-300);
-    background-color: rgba(255, 255, 255, .74);
+    background-color: var(--q-surface-strong);
     box-shadow: inset 0 0 0 1px var(--color-primary-alpha-500), 0 0 0 3px var(--color-primary-alpha-900), 0 10px 22px rgba(70, 88, 106, .08);
   }
 }

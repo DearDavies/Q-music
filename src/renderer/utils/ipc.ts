@@ -99,10 +99,12 @@ export interface MusicAccountPlaylistsResult {
 }
 export interface MusicAccountPlaylistDetailResult {
   accountId?: string
+  tracks?: Array<Record<string, any>>
+  privileges?: Array<Record<string, any>>
   provider: MusicAccountProvider
   id: string
   ids: string[]
-  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required' | 'account_changed' | 'playlist_incomplete'
 }
 export interface MusicAccountMusicUrlResult {
   provider: MusicAccountProvider

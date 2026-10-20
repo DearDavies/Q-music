@@ -300,7 +300,7 @@ test('账号导入和日推使用逐曲完整性校验，合法音质合并可�
   }
   assert.equal((await read()).length, 1)
   complete = false
-  await assert.rejects(read(), error => mobile ? error.message === 'incomplete' : error.code === 'account_unavailable')
+  await assert.rejects(read(), error => mobile ? error.message === 'incomplete' : error.code === 'playlist_incomplete')
 })
 
 test('微信凭证使用 wxuin 和微信音乐令牌，不混入残留的 QQ 身份', () => {
@@ -588,4 +588,10 @@ test('酷狗默认收藏和我喜欢归入自建，收藏他人的歌单按创�
     { listid: 3, name: '收藏的歌单', list_create_userid: '456', is_mine: 0 },
   ] }), md5).getPlaylists(session)
   assert.equal(lists.map(x => x.kind).join(','), 'created,created,favorite')
+})
+test("酷狗 HTTP 200 内的失效凭证单独提示重新登录", async () => {
+  const api = kg.createKugouApi(async () => ({ ok: true, status: 200, json: async () => ({ status: 0, error_code: 999, error_msg: "token expired" }) }), md5)
+  await assert.rejects(api.getPlaylistHashes(session, "7"), /login_required/)
+  const network = kg.createKugouApi(async () => { throw Error("network") }, md5)
+  await assert.rejects(network.getPlaylistHashes(session, "7"), /unavailable/)
 })

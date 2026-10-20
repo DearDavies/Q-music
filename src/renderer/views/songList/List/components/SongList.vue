@@ -152,8 +152,8 @@ defineExpose({
   animation-delay: calc(var(--q-stagger, 0) * 22ms);
 
   &:hover, &:focus-visible {
-    background-color: rgba(255, 255, 255, .46);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6), 0 10px 26px rgba(35, 54, 46, .08);
+    background-color: var(--q-surface);
+    box-shadow: inset 0 0 0 1px var(--q-border), 0 10px 26px rgba(35, 54, 46, .08);
     transform: translateY(-2px);
 
     .img { transform: scale(1.06); }
@@ -179,7 +179,7 @@ defineExpose({
   overflow: hidden;
   border-radius: 12px;
   background: var(--color-primary-alpha-900);
-  box-shadow: 0 8px 20px rgba(35, 54, 46, .14), inset 0 0 0 1px rgba(255, 255, 255, .4);
+  box-shadow: 0 8px 20px rgba(35, 54, 46, .14), inset 0 0 0 1px var(--q-border);
 }
 .img {
   width: 100%;
@@ -266,7 +266,7 @@ defineExpose({
 
 .skeletonBlock() {
   display: block;
-  background: linear-gradient(100deg, rgba(255, 255, 255, .28) 20%, rgba(255, 255, 255, .68) 45%, rgba(255, 255, 255, .28) 70%);
+  background: linear-gradient(100deg, var(--q-surface-soft) 20%, var(--q-surface-strong) 45%, var(--q-surface-soft) 70%);
   background-size: 220% 100%;
   animation: q-songlist-skeleton 1.4s ease-in-out infinite;
 }

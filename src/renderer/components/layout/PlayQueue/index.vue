@@ -357,9 +357,9 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   color: var(--color-font);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(244, 250, 247, .94)),
+    linear-gradient(180deg, var(--q-surface-strong), var(--q-surface-strong)),
     var(--color-main-background);
-  box-shadow: 0 22px 56px rgba(31, 45, 39, .22), inset 0 1px 0 rgba(255, 255, 255, .86);
+  box-shadow: 0 22px 56px rgba(31, 45, 39, .22), inset 0 1px 0 var(--q-border);
   backdrop-filter: blur(24px) saturate(1.12);
   outline: none;
   pointer-events: auto;

@@ -73,7 +73,7 @@ export default {
   padding: 16px 18px calc(@height-player + 18px);
   box-sizing: border-box;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, .18), rgba(255, 255, 248, .42)),
+    linear-gradient(135deg, var(--q-surface-soft), var(--q-surface)),
     radial-gradient(circle at 16% 14%, var(--color-primary-alpha-900), transparent 34%);
 }
 

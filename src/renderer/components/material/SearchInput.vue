@@ -223,23 +223,23 @@ export default {
   display: flex;
   flex-flow: column nowrap;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .72), rgba(241, 250, 246, .58)),
-    rgba(255, 255, 255, .45);
-  border: 1px solid rgba(54, 83, 70, .2);
+    linear-gradient(180deg, var(--q-surface-strong), var(--q-surface)),
+    var(--q-surface-soft);
+  border: 1px solid var(--q-outline);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, .68),
+    inset 0 0 0 1px var(--q-border),
     inset 0 -1px 0 rgba(54, 83, 70, .065),
     0 8px 24px rgba(31, 45, 39, .075);
   backdrop-filter: blur(16px) saturate(1.1);
 
   &.active {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(244, 252, 248, .76)),
-      rgba(255, 255, 255, .78);
-    border-color: rgba(75, 174, 126, .42);
+      linear-gradient(180deg, var(--q-surface-strong), var(--q-surface)),
+      var(--q-surface-strong);
+    border-color: var(--color-primary-alpha-600);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, .82),
-      0 0 0 3px rgba(75, 174, 126, .08),
+      inset 0 0 0 1px var(--q-border),
+      0 0 0 3px var(--color-primary-alpha-900),
       0 12px 32px rgba(31, 45, 39, .12);
     .form {
       input {
@@ -297,7 +297,7 @@ export default {
 
       &:hover {
         color: var(--color-primary-dark-300);
-        background-color: rgba(255, 255, 255, .54);
+        background-color: var(--q-surface);
       }
       &:active {
         background-color: var(--color-button-background-active);
@@ -312,7 +312,7 @@ export default {
     transition-property: height;
     overflow: hidden;
     border-top: 1px solid rgba(54, 83, 70, .12);
-    background-color: rgba(255, 255, 255, .82);
+    background-color: var(--q-menu-bg);
     backdrop-filter: blur(14px);
     li {
       cursor: pointer;

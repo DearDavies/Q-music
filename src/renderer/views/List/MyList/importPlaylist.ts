@@ -14,7 +14,7 @@ import txMusicInfo from '@renderer/utils/musicSdk/tx/musicInfo'
 export type ExternalImportSource = 'tx' | 'wy' | 'kg' | 'spotify'
 export type ExternalImportTarget = 'new' | 'current' | 'love'
 
-export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled' | 'verification_required'
+export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled' | 'verification_required' | 'login_required' | 'playlist_incomplete'
 
 export class ExternalImportError extends Error {
   code: ExternalImportErrorCode
@@ -346,34 +346,54 @@ export const loadAccountPlaylistMusic = async(
   options: { existingMusic?: LX.Music.MusicInfo[], accountId?: string, onAccount?: (accountId: string) => void } = {},
 ) => {
   const result = await getMusicAccountPlaylistDetail(provider, playlistId)
-  if (result.status == 'verification_required') throw new ExternalImportError('verification_required')
-  if (result.status != 'available') throw new ExternalImportError('account_unavailable')
+  assertNotCancelled(shouldCancel)
+  if (result.status != 'available') throw new ExternalImportError(result.status == 'unavailable' ? 'account_unavailable' : result.status)
   if (provider == 'tx') {
     if (!result.accountId || (options.accountId && options.accountId != result.accountId)) throw new ExternalImportError('account_changed')
     const cached = new Map<string, LX.Music.MusicInfo>()
     for (const song of options.existingMusic ?? []) {
       if (song.source == 'tx') cached.set(String(song.meta.songId), song)
     }
+    // 账号歌单已经返回完整歌曲信息，优先复用，避免大歌单再逐首请求匿名接口。
+    const tracks = (result.tracks ?? []).filter(track => track.mid && track.title && track.file && track.album)
+    for (const item of musicSdk.tx.songList.filterListDetail(tracks)) {
+      const song = toNewMusicInfo(item)
+      cached.set(String(song.meta.songId), song)
+    }
     const list = await resolveQQPlaylistTracks(result.ids, cached, async id => {
       const item = await txMusicInfo(id)
-      if (!item) throw new ExternalImportError('account_unavailable')
+      if (!item) throw new ExternalImportError('playlist_incomplete')
       const song = toNewMusicInfo(item)
-      if (song.source != 'tx' || String(song.meta.songId) != id) throw new ExternalImportError('account_unavailable')
+      if (song.source != 'tx' || String(song.meta.songId) != id) throw new ExternalImportError('playlist_incomplete')
       return song
     }, (current, total) => onProgress?.({ stage: 'fetch', current, total }), shouldCancel)
     options.onAccount?.(result.accountId)
     return list
   }
-  if (!result.ids.length) throw new ExternalImportError('account_unavailable')
+  if (!result.ids.length) return []
   if (provider == 'kg') return loadKugouHashMusic(result.ids, onProgress, shouldCancel)
 
   const list: LX.Music.MusicInfo[] = []
+  const authenticated = result.tracks && result.privileges
+    ? wyMusicDetail.filterList({ songs: result.tracks, privileges: result.privileges }).map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)) as LX.Music.MusicInfo[]
+    : undefined
+  const byId = new Map(authenticated?.map(song => [String(song.meta.songId), song]))
   const chunkSize = 200
   for (let index = 0; index < result.ids.length; index += chunkSize) {
     assertNotCancelled(shouldCancel)
     const ids = result.ids.slice(index, index + chunkSize)
-    const data = await wyMusicDetail.getList(ids)
-    list.push(...data.list.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
+    if (!authenticated) {
+      const data = await wyMusicDetail.getList(ids)
+      for (const item of data.list) {
+        const song = toNewMusicInfo(item)
+        byId.set(String(song.meta.songId), song)
+      }
+    }
+    for (const id of ids) {
+      const song = byId.get(id)
+      if (!song?.name) throw new ExternalImportError('playlist_incomplete')
+      list.push(song)
+    }
     onProgress?.({
       stage: 'fetch',
       current: Math.min(index + ids.length, result.ids.length),
@@ -389,7 +409,7 @@ export const loadKugouHashMusic = async(ids: string[], onProgress?: (progress: E
     assertNotCancelled(shouldCancel)
     const group = ids.slice(index, index + 100)
     const songs = await musicSdk.kg.songList.getMusicInfos(group.map(hash => ({ hash })), { requireComplete: true, shouldCancel }).catch((error: Error) => {
-      throw new ExternalImportError(error.message == 'cancelled' ? 'cancelled' : 'account_unavailable')
+      throw new ExternalImportError(error.message == 'cancelled' || error.message == 'verification_required' || error.message == 'login_required' ? error.message : 'playlist_incomplete')
     })
     list.push(...songs.map((item: LX.Music.MusicInfoOnline) => toNewMusicInfo(item)))
     onProgress?.({ stage: 'fetch', current: Math.min(index + group.length, ids.length), total: ids.length })

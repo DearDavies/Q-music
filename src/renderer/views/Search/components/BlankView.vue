@@ -821,7 +821,7 @@ void refreshAccountStatus().then(() => {
   box-sizing: border-box;
   border-radius: 16px;
   color: var(--color-font);
-  background: linear-gradient(118deg, var(--color-primary-alpha-800), rgba(255, 255, 255, .88) 62%, var(--color-primary-alpha-1000));
+  background: linear-gradient(118deg, var(--color-primary-alpha-800), var(--q-surface-strong) 62%, transparent);
   border: 0;
   box-shadow: 0 12px 34px rgba(35, 54, 46, .1);
   cursor: pointer;
@@ -831,7 +831,7 @@ void refreshAccountStatus().then(() => {
   &:hover, &:focus-visible {
     transform: translateY(-2px);
     border-color: var(--color-primary-alpha-700);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 54px rgba(35, 54, 46, .16);
+    box-shadow: inset 0 1px 0 var(--q-border), 0 24px 54px rgba(35, 54, 46, .16);
   }
 
   &:active { transform: scale(.995); }
@@ -848,7 +848,7 @@ void refreshAccountStatus().then(() => {
   gap: 3px;
   border-radius: 12px;
   background: var(--color-primary-alpha-900);
-  box-shadow: 0 18px 38px rgba(35, 54, 46, .18), inset 0 0 0 1px rgba(255, 255, 255, .45);
+  box-shadow: 0 18px 38px rgba(35, 54, 46, .18), inset 0 0 0 1px var(--q-border);
 }
 .coverTile {
   min-width: 0;
@@ -857,7 +857,7 @@ void refreshAccountStatus().then(() => {
   align-items: center;
   justify-content: center;
   color: var(--color-primary);
-  background: linear-gradient(145deg, var(--color-primary-alpha-900), rgba(255, 255, 255, .72));
+  background: linear-gradient(145deg, var(--color-primary-alpha-900), var(--q-surface-strong));
 
   img { width: 100%; height: 100%; object-fit: cover; }
   :global(.svg-icon) { width: 24px; height: 24px; }
@@ -874,8 +874,8 @@ void refreshAccountStatus().then(() => {
   justify-content: center;
   border-radius: 12px;
   color: var(--color-font);
-  background: rgba(255, 255, 255, .88);
-  box-shadow: 0 10px 28px rgba(35, 54, 46, .2), inset 0 0 0 1px rgba(255, 255, 255, .8);
+  background: var(--q-surface-strong);
+  box-shadow: 0 10px 28px rgba(35, 54, 46, .2), inset 0 0 0 1px var(--q-border);
   backdrop-filter: blur(16px);
 
   strong { font-size: 20px; line-height: 1; }
@@ -978,7 +978,7 @@ void refreshAccountStatus().then(() => {
       cursor: pointer;
       font: inherit;
       font-size: 11px;
-      &:hover { color: var(--color-primary); background: var(--color-primary-alpha-1000); }
+      &:hover { color: var(--color-primary); background: transparent; }
     }
   }
 }
@@ -1017,12 +1017,12 @@ void refreshAccountStatus().then(() => {
     align-items: center;
     padding: 8px;
     border-radius: 14px;
-    background: rgba(255, 255, 255, .38);
+    background: var(--q-surface-soft);
     transition: background-color @transition-fast, transform @transition-fast, box-shadow @transition-fast;
 
     &:hover {
       transform: translateY(-2px);
-      background: rgba(255, 255, 255, .68);
+      background: var(--q-surface-strong);
       box-shadow: 0 12px 26px rgba(35, 54, 46, .1);
     }
 
@@ -1076,7 +1076,7 @@ void refreshAccountStatus().then(() => {
   padding: 20px;
   border-radius: 12px;
   color: var(--color-font-label);
-  background: var(--color-primary-alpha-1000);
+  background: transparent;
   font-size: 11px;
   text-align: center;
 }
@@ -1093,8 +1093,8 @@ void refreshAccountStatus().then(() => {
   font: inherit;
   font-size: 12px;
   font-weight: 650;
-  background: rgba(255, 255, 255, .62);
-  box-shadow: 0 8px 22px rgba(35, 54, 46, .08), inset 0 1px 0 rgba(255, 255, 255, .72);
+  background: var(--q-surface);
+  box-shadow: 0 8px 22px rgba(35, 54, 46, .08), inset 0 1px 0 var(--q-border);
   transition: transform @transition-fast, box-shadow @transition-fast, opacity @transition-fast;
 
   :global(.svg-icon) { width: 17px; height: 17px; }
@@ -1102,7 +1102,7 @@ void refreshAccountStatus().then(() => {
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 26px rgba(35, 54, 46, .13), inset 0 1px 0 rgba(255, 255, 255, .8);
+    box-shadow: 0 12px 26px rgba(35, 54, 46, .13), inset 0 1px 0 var(--q-border);
   }
 
   &:active {
@@ -1122,7 +1122,7 @@ void refreshAccountStatus().then(() => {
 
   > * {
     overflow: hidden;
-    border: 2px solid rgba(255, 255, 255, .88);
+    border: 2px solid var(--q-border);
     border-radius: 50%;
     background: #fff;
   }
@@ -1157,7 +1157,7 @@ void refreshAccountStatus().then(() => {
   border: 1px solid rgba(54, 83, 70, .12);
   border-radius: 13px;
   color: var(--color-font);
-  background: rgba(255, 255, 255, .58);
+  background: var(--q-surface);
   cursor: pointer;
   font: inherit;
   font-size: 29px;
@@ -1208,7 +1208,7 @@ void refreshAccountStatus().then(() => {
   border: 1px solid rgba(54, 83, 70, .11);
   border-radius: 22px;
   background: rgb(from var(--color-main-background) r g b / .46);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .68), 0 14px 36px rgba(35, 54, 46, .08);
+  box-shadow: inset 0 1px 0 var(--q-border), 0 14px 36px rgba(35, 54, 46, .08);
   backdrop-filter: blur(18px) saturate(1.12);
 }
 .detailTableHeader, .detailTracks li {
@@ -1240,7 +1240,7 @@ void refreshAccountStatus().then(() => {
     font-size: 13px;
     transition: background-color @transition-fast;
 
-    &:hover { background: var(--color-primary-alpha-1000); }
+    &:hover { background: transparent; }
     > strong, > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     > strong { font-weight: 650; }
     > span:not(.trackNumber) { color: var(--color-font-label); }
@@ -1258,7 +1258,7 @@ void refreshAccountStatus().then(() => {
 }
 .trackNumber { color: var(--color-font-label); font-variant-numeric: tabular-nums; }
 .detailTracks li.currentTrack {
-  background: var(--color-primary-alpha-1000);
+  background: transparent;
 
   > strong { color: var(--color-primary-dark-100); }
   > button { color: #fff; background: var(--color-primary); }
@@ -1327,7 +1327,7 @@ void refreshAccountStatus().then(() => {
 
   > * {
     overflow: hidden;
-    border: 3px solid rgba(255, 255, 255, .92);
+    border: 3px solid var(--q-border);
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 6px 16px rgba(35, 54, 46, .13);
@@ -1495,7 +1495,7 @@ void refreshAccountStatus().then(() => {
   padding: 15px;
   border: 1px solid rgba(54, 83, 70, .12);
   border-radius: 15px;
-  background: var(--color-primary-alpha-1000);
+  background: transparent;
 
   > summary {
     cursor: pointer;
@@ -1533,7 +1533,7 @@ void refreshAccountStatus().then(() => {
     border: 1px solid rgba(54, 83, 70, .14);
     border-radius: 10px;
     color: var(--color-font);
-    background: rgba(255, 255, 255, .72);
+    background: var(--q-surface-strong);
     outline: none;
     font: inherit;
     font-size: 11px;
@@ -1598,7 +1598,7 @@ void refreshAccountStatus().then(() => {
 .skeletonBlock() {
   display: block;
   border-radius: 6px;
-  background: linear-gradient(100deg, rgba(255, 255, 255, .28) 20%, rgba(255, 255, 255, .68) 45%, rgba(255, 255, 255, .28) 70%);
+  background: linear-gradient(100deg, var(--q-surface-soft) 20%, var(--q-surface-strong) 45%, var(--q-surface-soft) 70%);
   background-size: 220% 100%;
   animation: q-search-skeleton 1.4s ease-in-out infinite;
 }

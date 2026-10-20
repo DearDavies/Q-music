@@ -231,8 +231,8 @@ export default {
     padding: 7px;
     border-radius: 12px;
     color: var(--color-nav-font);
-    background: rgba(255, 255, 255, .4);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55);
+    background: var(--q-surface-soft);
+    box-shadow: inset 0 0 0 1px var(--q-border);
     transition: @transition-fast;
     transition-property: background, color, box-shadow, transform;
   }
@@ -253,7 +253,7 @@ export default {
     svg {
       color: #fff;
       background: linear-gradient(145deg, #555957, #242625);
-      box-shadow: 0 7px 16px rgba(22, 24, 23, .24), inset 0 1px 0 rgba(255, 255, 255, .28);
+      box-shadow: 0 7px 16px rgba(22, 24, 23, .24), inset 0 1px 0 var(--q-border);
     }
 
     &:hover {
@@ -267,10 +267,10 @@ export default {
 
     &:not(.active) {
       opacity: 1;
-      background-color: rgba(255, 255, 255, .42);
+      background-color: var(--q-surface);
       transform: translateX(2px);
       svg {
-        background: rgba(255, 255, 255, .62);
+        background: var(--q-surface);
       }
     }
   }

@@ -6,6 +6,7 @@
 //   return listId == 'download' ? downloadList : getListFromState(listId)
 // }
 import { encodePath, isUrl } from '@common/utils/common'
+import { buildThemeMaterial } from '@common/theme/material'
 import { joinPath } from '@common/utils/nodejs'
 import { markRaw, shallowReactive } from '@common/utils/vueTools'
 import { getThemes as getTheme } from '@renderer/utils/ipc'
@@ -42,6 +43,7 @@ export const buildThemeColors = (theme: LX.Theme, dataPath: string) => {
   }
   const colors: Record<string, string> = {
     ...theme.config.themeColors,
+    ...buildThemeMaterial(theme.isDark),
     ...theme.config.extInfo,
   }
 

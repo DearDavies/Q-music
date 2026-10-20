@@ -140,7 +140,7 @@ export default {
         &:after {
           border-color: var(--color-primary);
           background: var(--color-primary-alpha-900);
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 0 0 0 3px var(--color-primary-alpha-900);
+          box-shadow: inset 0 0 0 1px var(--q-border), 0 0 0 3px var(--color-primary-alpha-900);
         }
       }
       .icon {
@@ -151,7 +151,7 @@ export default {
   }
   &:not([disabled]) + .content:hover .container:after {
     border-color: var(--color-primary);
-    background: rgba(255, 255, 255, .72);
+    background: var(--q-surface-strong);
   }
   &:not([disabled]):checked + .content:hover .container:after {
     background: var(--color-primary-alpha-800);
@@ -189,8 +189,8 @@ export default {
     left: 0;
     right: 0;
     border: 1px solid var(--color-primary-alpha-700);
-    background: rgba(255, 255, 255, .58);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55);
+    background: var(--q-surface);
+    box-shadow: inset 0 0 0 1px var(--q-border);
     transition: @transition-fast;
     transition-property: border-color, background-color, box-shadow;
     border-radius: 7px;

@@ -17,10 +17,14 @@ export default () => {
     tools.destroy()
     tools = null
   }
+  const setFontColor = (color: string) => {
+    tools?.setColor(color)
+  }
 
   return {
     font_color_ref,
     initFontColor,
     destroyFontColor,
+    setFontColor,
   }
 }

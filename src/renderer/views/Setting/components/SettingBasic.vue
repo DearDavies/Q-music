@@ -474,7 +474,7 @@ export default {
   height: 52px;
   border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 2px 8px var(--color-primary-light-100-alpha-300), inset 0 0 0 1px rgba(255, 255, 255, .5);
+  box-shadow: 0 2px 8px var(--color-primary-light-100-alpha-300), inset 0 0 0 1px var(--q-border);
 }
 .glassTip {
   font-size: 12px;
@@ -500,8 +500,8 @@ export default {
   border: 1px solid rgba(54, 83, 70, .12);
   border-radius: 10px;
   color: var(--color-font-label);
-  background: rgba(255, 255, 255, .34);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+  background: var(--q-surface-soft);
+  box-shadow: inset 0 1px 0 var(--q-border);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -518,7 +518,7 @@ export default {
     color: #fff;
     border-color: transparent;
     background: linear-gradient(145deg, var(--color-primary-light-100), var(--color-primary));
-    box-shadow: 0 5px 14px var(--color-primary-alpha-700), inset 0 1px 0 rgba(255, 255, 255, .32);
+    box-shadow: 0 5px 14px var(--color-primary-alpha-700), inset 0 1px 0 var(--q-border);
   }
 }
 .glassLabel {
@@ -558,7 +558,7 @@ export default {
     &:hover {
       transform: translateY(-3px);
       .bg {
-        box-shadow: 0 10px 22px rgba(24, 34, 45, .18), inset 0 0 0 1px rgba(255, 255, 255, .5);
+        box-shadow: 0 10px 22px rgba(24, 34, 45, .18), inset 0 0 0 1px var(--q-border);
       }
     }
 
@@ -588,7 +588,7 @@ export default {
       padding: 2Px;
       transition: border-color .28s ease, box-shadow .28s ease;
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(24, 34, 45, .1), inset 0 0 0 1px rgba(255, 255, 255, .38);
+      box-shadow: 0 4px 12px rgba(24, 34, 45, .1), inset 0 0 0 1px var(--q-border);
       &:after {
         display: block;
         content: ' ';
@@ -610,8 +610,8 @@ export default {
         bottom: 8px;
         height: 17px;
         border-radius: 7px;
-        background: rgba(255, 255, 255, .6);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), 0 2px 6px rgba(24, 34, 45, .12);
+        background: var(--q-surface);
+        box-shadow: inset 0 0 0 1px var(--q-border), 0 2px 6px rgba(24, 34, 45, .12);
         backdrop-filter: blur(3px);
       }
     }

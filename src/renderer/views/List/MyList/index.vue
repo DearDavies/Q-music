@@ -9,6 +9,10 @@
           </svg>
         </button>
       </div>
+      <button type="button" :class="[$style.listsAdd, $style.importBtn]" @click="isShowLocalMusicModal = true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+        <span>{{ $t('local_import_title') }}</span>
+      </button>
       <div :class="$style.headerBtns">
         <button type="button" :class="[$style.listsAdd, $style.importBtn]" :aria-label="$t('playlist_import_modal__title')" :title="$t('playlist_import_modal__title')" @click="isShowExternalImportModal = true">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 425.2 425.2" space="preserve">
@@ -79,6 +83,7 @@
     <ListSortModal v-model:visible="isShowListSortModal" :list-info="sortListInfo" />
     <ListUpdateModal v-model:visible="isShowListUpdateModal" />
     <ExternalImportModal v-model:visible="isShowExternalImportModal" :list-id="listId" />
+    <LocalMusicModal v-model:visible="isShowLocalMusicModal" @open-list="handleListToggle" />
   </div>
 </template>
 
@@ -88,6 +93,7 @@ import { openUrl } from '@common/utils/electron'
 import musicSdk from '@renderer/utils/musicSdk'
 import DuplicateMusicModal from './components/DuplicateMusicModal.vue'
 import ExternalImportModal from './components/ExternalImportModal.vue'
+import LocalMusicModal from './components/LocalMusicModal.vue'
 import ListSortModal from './components/ListSortModal.vue'
 import ListUpdateModal from './components/ListUpdateModal.vue'
 import PlaylistIdentity from '@renderer/components/common/PlaylistIdentity.vue'
@@ -121,6 +127,7 @@ export default {
     PlaylistIdentity,
     DuplicateMusicModal,
     ExternalImportModal,
+    LocalMusicModal,
     ListSortModal,
     ListUpdateModal,
   },
@@ -138,6 +145,7 @@ export default {
     const dom_lists_list = ref(null)
     const rightClickItemIndex = ref(-10)
     const isShowExternalImportModal = ref(false)
+    const isShowLocalMusicModal = ref(false)
 
     const { handleImportList, handleExportList } = useShare()
     const { isShowListUpdateModal, handleUpdateSourceList } = useListUpdate()
@@ -245,6 +253,7 @@ export default {
       fetchingListStatus,
       dom_lists_list,
       isShowExternalImportModal,
+      isShowLocalMusicModal,
       isShowListUpdateModal,
       isShowListSortModal,
       sortListInfo,

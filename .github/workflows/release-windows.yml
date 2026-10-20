@@ -1,4 +1,4 @@
-name: Release Windows Setup
+name: Release Windows
 
 on:
   workflow_dispatch:
@@ -169,16 +169,24 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npm test
+        run: |
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed.' }
+          npm run test:local-music
 
       - name: Build Windows x64 installer
         run: npm run pack
 
-      - name: Print installer SHA256
+      - name: Build Windows x64 portable archive
+        run: npm run pack:win:7z:x64
+
+      - name: Print Windows SHA256
         run: |
-          $installer = "build/Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe"
-          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $(Split-Path $installer -Leaf)" |
+          $packages = @("build/Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe", "build/Q-music-v$env:PACKAGE_VERSION-win_x64-green.7z")
+          $packages | ForEach-Object {
+            $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path $_ -Leaf)"
+          } |
             Set-Content "build/SHA256SUMS-windows.txt" -Encoding ascii
           Get-Content "build/SHA256SUMS-windows.txt"
 
@@ -189,6 +197,7 @@ jobs:
           $assets = @(
             "build/Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe",
             "build/Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe.blockmap",
+            "build/Q-music-v$env:PACKAGE_VERSION-win_x64-green.7z",
             "build/latest.yml",
             "build/SHA256SUMS-windows.txt"
           )
@@ -277,6 +286,7 @@ jobs:
             $requiredAssets = @(
               "Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe",
               "Q-music-v$env:PACKAGE_VERSION-x64-Setup.exe.blockmap",
+              "Q-music-v$env:PACKAGE_VERSION-win_x64-green.7z",
               'latest.yml',
               'SHA256SUMS-windows.txt',
               'SHA256SUMS-arch.txt',

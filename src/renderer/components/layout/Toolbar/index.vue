@@ -42,13 +42,13 @@ watch(() => route.fullPath, () => {
   -webkit-app-region: no-drag;
   z-index: 2;
   background:
-    linear-gradient(180deg, rgba(248, 253, 250, .82), rgba(236, 249, 243, .54)),
-    rgba(255, 255, 255, .34);
+    linear-gradient(180deg, var(--q-surface-strong), var(--q-surface)),
+    var(--q-surface-soft);
   border-bottom: 1px solid rgba(54, 83, 70, .16);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .74),
+    inset 0 1px 0 var(--q-border),
     inset 0 -1px 0 rgba(54, 83, 70, .055),
-    0 1px 0 rgba(255, 255, 255, .62),
+    0 1px 0 var(--q-border),
     0 12px 28px rgba(54, 83, 70, .055);
   backdrop-filter: blur(20px) saturate(1.18);
 
@@ -121,7 +121,7 @@ watch(() => route.fullPath, () => {
   color: var(--color-font);
   font-size: 12px;
   svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
-  &:hover { background: var(--color-primary-alpha-100); }
+  &:hover { background: var(--color-primary-alpha-800); }
   &:focus-visible { outline: 2px solid var(--color-primary); }
 }
 @media (max-width: 1000px) {

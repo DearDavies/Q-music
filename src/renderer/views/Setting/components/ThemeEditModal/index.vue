@@ -200,7 +200,7 @@ export default {
     // '--color-badge-secondary': string
     // '--color-badge-tertiary': string
     const { primary_color_ref, initMainColor, destroyMainColor } = useMainColor()
-    const { font_color_ref, initFontColor, destroyFontColor } = useFontColor()
+    const { font_color_ref, initFontColor, destroyFontColor, setFontColor } = useFontColor()
     const { app_bg_color_ref, initAppBgColor, destroyAppBgColor, setAppBgColor } = useAppBgColor()
     const { aside_font_color_ref, initAsideFontColor, destroyAsideFontColor, setAsideFontColor } = useAsideFontColor()
     const { main_bg_color_ref, initMainBgColor, destroyMainBgColor, setMainBgColor } = useMainBgColor()
@@ -229,6 +229,7 @@ export default {
     let minBtnColor
     let hideBtnColorOrigin
     let hideBtnColor
+    let fontColors = {}
 
     const applyPrimaryColor = (color, fontColor, isDark, isDarkFont) => {
       theme.config.themeColors = createThemeColors(color, fontColor, isDark, isDarkFont)
@@ -251,6 +252,7 @@ export default {
       themeName.value = theme.name
       isDark.value = theme.isDark
       isDarkFont.value = theme.isDarkFont ?? false
+      fontColors = { [theme.isDark]: theme.config.themeColors['--color-1000'] }
       currentBgPath = ''
       if (theme.config.extInfo['--background-image'] == 'none') {
         bgImg.value = ''
@@ -285,7 +287,8 @@ export default {
       initMainColor(theme.config.themeColors['--color-primary'], (color) => {
         applyPrimaryColor(color, theme.config.themeColors['--color-1000'], theme.isDark, theme.isDarkFont)
       })
-      initFontColor(theme.config.themeColors['--color-1000'] ?? (isDark ? 'rgb(229, 229, 229)' : 'rgb(33, 33, 33)'), (color) => {
+      initFontColor(theme.config.themeColors['--color-1000'] ?? (theme.isDark ? 'rgb(229, 229, 229)' : 'rgb(33, 33, 33)'), (color) => {
+        fontColors[theme.isDark] = color
         applyPrimaryColor(theme.config.themeColors['--color-primary'], color, theme.isDark, theme.isDarkFont)
       })
       initAppBgColor(appBgColor, (color) => {
@@ -405,8 +408,12 @@ export default {
       createPreview()
     }
     const handleDark = (val) => {
+      // 明暗切换使用各自的字体色；切回时保留用户在该模式下选过的颜色。
+      fontColors[theme.isDark] = theme.config.themeColors['--color-1000']
       theme.isDark = val
-      applyPrimaryColor(theme.config.themeColors['--color-primary'], theme.config.themeColors['--color-1000'], theme.isDark, theme.isDarkFont)
+      const fontColor = fontColors[val] ?? (val ? 'rgb(229, 229, 229)' : 'rgb(33, 33, 33)')
+      setFontColor(fontColor)
+      applyPrimaryColor(theme.config.themeColors['--color-primary'], fontColor, theme.isDark, theme.isDarkFont)
     }
     const handleDarkFont = (val) => {
       theme.isDarkFont = val

@@ -11,7 +11,9 @@ export const isQQSyncList = (list: LX.List.UserListInfo) => list.source == 'tx' 
 
 export const syncErrorKey = (error: unknown) => {
   const code = error instanceof Error ? error.message : ''
-  return code == 'account_changed' ? 'list_sync_account_changed' : 'list_sync_failed'
+  if (code == 'verification_required') return 'kugou__verification_required'
+  if (code == 'playlist_incomplete' || code == 'incomplete') return 'list_sync_incomplete'
+  return code == 'account_changed' ? 'list_sync_account_changed' : code == 'login_required' ? 'list_sync_login_required' : 'list_sync_failed'
 }
 
 const performSync = async(target: LX.List.UserListInfo, automatic: boolean) => {
@@ -29,7 +31,7 @@ const performSync = async(target: LX.List.UserListInfo, automatic: boolean) => {
     let accountId: string | undefined
     if (sourceListId.startsWith('board__')) {
       list = await getBoardListAll(sourceListId.replace(/^board__/, ''), true)
-    } else if (source == 'tx' || (source == 'kg' && /^account:\d+:\d+$/.test(sourceListId))) {
+    } else if (source == 'tx' || source == 'wy' || (source == 'kg' && /^account:\d+:\d+$/.test(sourceListId))) {
       const { loadAccountPlaylistMusic } = await import('@renderer/views/List/MyList/importPlaylist')
       list = await loadAccountPlaylistMusic(source, sourceListId, progress => {
         listSyncStates[id] = { ...progress, phase: 'fetch' }
@@ -37,6 +39,10 @@ const performSync = async(target: LX.List.UserListInfo, automatic: boolean) => {
         existingMusic: await getListMusics(id),
         accountId: settings?.sourceAccountId,
         onAccount: value => { accountId = value },
+      }).catch(async(error: Error) => {
+        // 旧的网易云公开歌单没有账号绑定，未登录时仍允许按公开链接同步。
+        if (source == 'wy' && !settings?.sourceAccountId && error.message == 'login_required') return getListDetailAll(sourceListId, source, true)
+        throw error
       })
     } else {
       list = await getListDetailAll(sourceListId, source, true)

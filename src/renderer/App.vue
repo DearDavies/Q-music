@@ -275,8 +275,8 @@ body {
   border: 1px solid rgba(40, 50, 66, .12);
   overflow: hidden;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .55),
-    inset 0 0 0 1px rgba(255, 255, 255, .24),
+    inset 0 1px 0 var(--q-highlight),
+    inset 0 0 0 1px var(--q-border),
     0 18px 44px rgba(24, 34, 45, 0.16);
   backdrop-filter: blur(var(--q-glass-blur, 20px)) saturate(1.9);
   box-sizing: border-box;
@@ -288,7 +288,7 @@ body {
     z-index: 0;
     pointer-events: none;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04) 40%, rgba(255, 255, 255, .12)),
+      linear-gradient(180deg, var(--q-highlight), transparent 40%, transparent),
       radial-gradient(circle at 56% 30%, var(--color-primary-alpha-900), transparent 34%);
   }
 
@@ -342,11 +342,11 @@ body {
     // 播放栏比内容面板略实一点，保证控件清晰（在滑块透明度基础上 +0.18）
     background: var(--color-main-background);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .12) 42%, rgba(255, 255, 255, .18)),
+      linear-gradient(180deg, transparent, var(--q-highlight)),
       rgb(from var(--color-main-background) r g b / calc(var(--q-glass-opacity, .22) + .18));
     border-top: 1px solid rgba(40, 50, 66, .1);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, .7),
+      inset 0 1px 0 var(--q-highlight),
       inset 0 -1px 0 rgba(40, 50, 66, .08);
     backdrop-filter: blur(calc(var(--q-glass-blur, 20px) + 8px)) saturate(1.7);
   }

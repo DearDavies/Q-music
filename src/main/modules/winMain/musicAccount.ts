@@ -75,10 +75,12 @@ export interface MusicAccountPlaylistsResult {
 
 export interface MusicAccountPlaylistDetailResult {
   accountId?: string
+  tracks?: Array<Record<string, any>>
+  privileges?: Array<Record<string, any>>
   provider: MusicAccountProvider
   id: string
   ids: string[]
-  status: 'available' | 'login_required' | 'unavailable' | 'verification_required'
+  status: 'available' | 'login_required' | 'unavailable' | 'verification_required' | 'account_changed' | 'playlist_incomplete'
 }
 
 export interface MusicAccountMusicUrlRequest {
@@ -817,6 +819,7 @@ const requestNeteaseWeapi = async<T>(path: string, data: Record<string, unknown>
     },
     body: buildNeteaseWeapiForm({ ...data, csrf_token: csrfToken }),
   })
+  if (response.status == 401 || response.status == 403) throw new Error('login_required')
   if (!response.ok) throw new Error(`NetEase request failed (${path}): ${response.status}`)
   return response.json() as Promise<T>
 }
@@ -1138,7 +1141,7 @@ const validateMusicAccount = async(provider: MusicAccountProvider, force = false
     }
     state = connected ? 'connected' : 'expired'
   } catch (error) {
-    state = isQQMusicLoginRequiredError(error) ? 'expired' : 'unavailable'
+    state = isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required') ? 'expired' : 'unavailable'
     console.warn(`[musicAccount] ${provider} session validation failed`, error)
   }
   const result = { connected, state, expiresAt: Date.now() + (connected ? 15_000 : 2_000) }
@@ -1195,7 +1198,8 @@ export const getMusicAccountStatus = async(): Promise<MusicAccountStatus> => {
 }
 
 export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): Promise<MusicAccountPlaylistsResult> => {
-  if (!await verifyMusicAccount(provider)) return { provider, playlists: [], status: 'login_required' }
+  const validation = await validateMusicAccount(provider)
+  if (!validation.connected) return { provider, playlists: [], status: validation.state == 'unavailable' ? 'unavailable' : 'login_required' }
   try {
     if (provider == 'kg') return { provider, playlists: await getKugouPlaylists(), status: 'available' }
     if (provider == 'tx') {
@@ -1352,7 +1356,8 @@ export const getMusicAccountPlaylistDetail = async(
   provider: MusicAccountProvider,
   id: string,
 ): Promise<MusicAccountPlaylistDetailResult> => {
-  if (!await verifyMusicAccount(provider)) return { provider, id, ids: [], status: 'login_required' }
+  const validation = await validateMusicAccount(provider)
+  if (!validation.connected) return { provider, id, ids: [], status: validation.state == 'unavailable' ? 'unavailable' : 'login_required' }
   try {
     if (provider == 'kg') return { provider, id, ids: await getKugouPlaylistHashes(id), status: 'available' }
     if (provider == 'tx') {
@@ -1367,6 +1372,7 @@ export const getMusicAccountPlaylistDetail = async(
       if (dirId && !encryptedUin) {
         return { provider, id, ids: [], status: await resolveQQAccountFailureStatus() }
       }
+      const tracks: Array<Record<string, unknown>> = []
       const ids = await collectQQPlaylistIds(async offset => {
         const result = await requestQQMusicU<{
           detail?: { data?: {
@@ -1397,6 +1403,7 @@ export const getMusicAccountPlaylistDetail = async(
         const data = result.detail?.data
         const songs = data?.songlist ?? data?.songList ?? data?.track_list
         if (!data || !Array.isArray(songs)) throw new Error('playlist_incomplete')
+        tracks.push(...songs.map(item => (item.track_info ?? item) as Record<string, unknown>))
         const total = data.total_song_num ?? data.songnum ?? data.totalnum
         return {
           ids: songs.map(item => {
@@ -1408,18 +1415,35 @@ export const getMusicAccountPlaylistDetail = async(
         }
       })
       if (qqAccountIdentity((await getQQAccountCredentials()).cookies) != account) throw new Error('account_changed')
-      return { provider, id, ids, status: 'available', accountId: qqAccountId(cookies) }
+      return { provider, id, ids, tracks, status: 'available', accountId: qqAccountId(cookies) }
     }
 
     const result = await requestNeteaseWeapi<{
       code?: number
-      playlist?: { trackIds?: Array<{ id?: string | number }> }
+      playlist?: { trackIds?: Array<{ id?: string | number }>, trackCount?: number }
     }>('/weapi/v6/playlist/detail', { id, n: 100000, s: 8 })
-    const ids = (result.playlist?.trackIds ?? []).map(item => String(item.id ?? '')).filter(Boolean)
-    return { provider, id, ids, status: ids.length ? 'available' : 'unavailable' }
+    if (result.code == 301) throw new Error('login_required')
+    if (result.code != 200 || !Array.isArray(result.playlist?.trackIds)) throw new Error('playlist_incomplete')
+    const ids = result.playlist.trackIds.map(item => String(item.id ?? ''))
+    if (ids.some(songId => !/^\d+$/.test(songId)) || (result.playlist.trackCount != null && result.playlist.trackCount != ids.length)) throw new Error('playlist_incomplete')
+    const tracks: Array<Record<string, any>> = []
+    const privileges: Array<Record<string, any>> = []
+    for (let offset = 0; offset < ids.length; offset += 200) {
+      const batch = ids.slice(offset, offset + 200)
+      const detail = await requestNeteaseWeapi<{ code?: number, songs?: Array<Record<string, any>>, privileges?: Array<Record<string, any>> }>(
+        '/weapi/v3/song/detail', { c: JSON.stringify(batch.map(songId => ({ id: songId }))) },
+      )
+      if (detail.code == 301) throw new Error('login_required')
+      if (detail.code != 200 || !Array.isArray(detail.songs) || !Array.isArray(detail.privileges)) throw new Error('playlist_incomplete')
+      tracks.push(...detail.songs)
+      privileges.push(...detail.privileges)
+    }
+    return { provider, id, ids, tracks, privileges, status: 'available' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlist detail unavailable`, error)
-    return { provider, id, ids: [], status: error instanceof Error && error.message == 'verification_required' ? 'verification_required' : (isQQMusicLoginRequiredError(error) || (error instanceof Error && error.message == 'login_required')) ? 'login_required' : 'unavailable' }
+    const code = error instanceof Error ? error.message : ''
+    const status = code == 'verification_required' || code == 'account_changed' || code == 'playlist_incomplete' ? code : code == 'incomplete' ? 'playlist_incomplete' : isQQMusicLoginRequiredError(error) || code == 'login_required' ? 'login_required' : 'unavailable'
+    return { provider, id, ids: [], status }
   }
 }
 

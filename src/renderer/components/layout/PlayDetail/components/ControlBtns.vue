@@ -43,6 +43,9 @@ div(:class="[$style.footerLeftControlBtns, { [$style.detail]: detail }]")
   common-volume-btn
   common-toggle-play-mode-btn
   span(:class="$style.toolDivider" aria-hidden="true")
+  button(:class="$style.footerLeftControlBtn" :aria-label="downloadTitle" :title="downloadTitle" :disabled="isDownloadDisabled || downloadOpening" @click.stop="showCurrentDownload")
+    svg(viewBox="0 0 24 24" aria-hidden="true")
+      path(d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4")
   button(
     :class="[$style.footerLeftControlBtn, $style.loveBtn, { [$style.loved]: isLoveMusic, [$style.active]: favoriteMenuVisible }]"
     :aria-label="$t('player_favorite_title')"
@@ -58,6 +61,7 @@ div(:class="[$style.footerLeftControlBtns, { [$style.detail]: detail }]")
       path(v-if="!isLoveMusic" d="M16 19h4")
   PlayerFavoriteMenu(v-if="favoriteMenuVisible" ref="favoriteMenu" :music-info="favoriteMusicInfo" :dark="detail" :anchor="favoriteMenuAnchor" @close="closeFavoriteMenu" @more="showFavoriteLists")
   common-list-add-modal(v-model:show="isShowAddMusicTo" :music-info="listMusicInfo")
+  common-download-modal(v-if="downloadMusicInfo" v-model:show="downloadVisible" :music-info="downloadMusicInfo")
   PlayerAppearanceMenu(
     v-model="appearanceMenuVisible"
     :dark="detail"
@@ -161,6 +165,26 @@ export default {
       return 'progress' in info ? info.metadata.musicInfo : info
     })
     const isLoveDisabled = computed(() => !currentMusicInfo.value)
+    const downloadVisible = ref(false)
+    const downloadOpening = ref(false)
+    const downloadMusicInfo = ref(null)
+    const isLocalPlayback = computed(() => currentMusicInfo.value?.source == 'local' || (!!playMusicInfo.musicInfo && 'progress' in playMusicInfo.musicInfo))
+    const isDownloadDisabled = computed(() => !currentMusicInfo.value || isLocalPlayback.value)
+    const downloadTitle = computed(() => t(isLocalPlayback.value ? 'player_download_local' : 'player_download_current'))
+    const showCurrentDownload = async() => {
+      if (isDownloadDisabled.value || downloadOpening.value) return
+      // 保留点击时的歌曲，弹窗期间切歌不会改变待下载对象。
+      const selected = JSON.parse(JSON.stringify(currentMusicInfo.value))
+      downloadOpening.value = true
+      try {
+        if (!appSetting['download.enable']) {
+          if (!await dialog.confirm({ message: t('player_download_enable'), confirmButtonText: t('player_download_enable_confirm') })) return
+          updateSetting({ 'download.enable': true })
+        }
+        downloadMusicInfo.value = selected
+        downloadVisible.value = true
+      } finally { downloadOpening.value = false }
+    }
 
     const refreshLoveStatus = async() => {
       const musicInfo = currentMusicInfo.value
@@ -322,6 +346,12 @@ export default {
 
     return {
       appSetting,
+      downloadVisible,
+      downloadOpening,
+      downloadMusicInfo,
+      isDownloadDisabled,
+      downloadTitle,
+      showCurrentDownload,
       isShowLrcSelectContent,
       toggleVisibleLrc,
       toggleTranslation,
@@ -574,6 +604,10 @@ export default {
       }
     }
   }
+}
+
+@media (max-width: 1100px) {
+  .footerLeftControlBtns:not(.detail) .toolDivider { display: none; }
 }
 
 @media (max-width: 980px) {

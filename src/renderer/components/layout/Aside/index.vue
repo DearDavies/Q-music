@@ -71,7 +71,7 @@ import NavBar from './NavBar.vue'
   font-size: 17px;
   font-weight: 650;
   letter-spacing: 0;
-  color: var(--color-font);
+  color: var(--color-nav-font);
   .mixin-ellipsis-1();
 }
 

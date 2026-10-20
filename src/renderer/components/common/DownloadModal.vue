@@ -2,7 +2,9 @@
   <material-modal :show="show" :bg-close="bgClose" :teleport="teleport" @close="handleClose">
     <main :class="$style.main">
       <h2>{{ info.name }}<br>{{ info.singer }}</h2>
-      <base-btn v-for="quality in qualitys" :key="quality.type" :class="$style.btn" @click="handleClick(quality.type)">
+      <p v-if="!qualitys.length" :class="$style.message">{{ $t('player_download_unavailable') }}</p>
+      <p v-if="error" role="status" :class="$style.message">{{ $t('player_download_failed') }}</p>
+      <base-btn v-for="quality in qualitys" :key="quality.type" :disabled="working" :class="$style.btn" @click="handleClick(quality.type)">
         {{ getTypeName(quality.type) }}{{ quality.size && ` - ${quality.size.toUpperCase()}` }}
       </base-btn>
     </main>
@@ -42,23 +44,31 @@ export default {
       qualityList,
     }
   },
+  data: () => ({ working: false, error: false }),
   computed: {
     info() {
       return this.musicInfo || {}
     },
     sourceQualityList() {
-      return this.qualityList[this.musicInfo.source] || []
+      return this.qualityList[this.info.source] || []
     },
     qualitys() {
       return this.info.meta?.qualitys?.filter(quality => this.checkSource(quality.type)) || []
     },
   },
+  watch: { show() { this.error = false } },
   methods: {
-    handleClick(quality) {
-      void createDownloadTasks([this.musicInfo], quality, this.listId)
-      this.handleClose()
+    async handleClick(quality) {
+      if (this.working) return
+      this.working = true
+      this.error = false
+      try {
+        await createDownloadTasks([this.musicInfo], quality, this.listId)
+        this.$emit('update:show', false)
+      } catch { this.error = true } finally { this.working = false }
     },
     handleClose() {
+      if (this.working) return
       this.$emit('update:show', false)
     },
     getTypeName(quality) {
@@ -110,5 +120,6 @@ export default {
     margin-bottom: 0;
   }
 }
+.message { font-size: 13px; line-height: 1.6; margin-bottom: 14px; color: var(--color-font-label); }
 
 </style>

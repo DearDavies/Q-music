@@ -306,6 +306,8 @@ export const createSortedList = (list: LX.Music.MusicInfo[], position: number, i
  * 创建本地列表音乐信息
  * @param filePaths 文件路径
  */
+export { scanLocalMusicFolders } from '@common/utils/localMusicFiles'
+
 export const createLocalMusicInfos = async(filePaths: string[]): Promise<LX.Music.MusicInfoLocal[]> => {
   const list: LX.Music.MusicInfoLocal[] = []
   for await (const path of filePaths) {
