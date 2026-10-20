@@ -41,12 +41,18 @@ export const createKugouApi = (fetcher: Fetch, md5: (value: string) => string) =
       })
       if (!response.ok) fail(response.status == 401 || response.status == 403 ? 'login_required' : 'unavailable')
       const result = await response.json()
-      if (Number(result.status) != 1 || (result.error_code != null && Number(result.error_code) != 0) || !result.data) fail()
+      if (Number(result.error_code) == 20028) fail('verification_required')
+      if (Number(result.status) != 1 || (result.error_code != null && Number(result.error_code) != 0) || !result.data) {
+        // 部分接口以 HTTP 200 返回登录过期，只提取状态，不将原始响应或凭证交给界面。
+        const message = String(result.error_msg ?? result.errmsg ?? result.msg ?? result.message ?? '')
+        if (/未登录|未登陆|重新登[录陆]|登[录陆].*(?:失效|过期)|(?:token|session).*(?:expired|invalid)|(?:expired|invalid).*(?:token|session)/i.test(message)) fail('login_required')
+        fail()
+      }
       return result.data
     } catch (error) {
       // 底层异常可能携带含 token 的请求 URL，不透传给日志或 UI。
       if (signal?.aborted) fail('cancelled')
-      if (error instanceof Error && error.message == 'login_required') fail('login_required')
+      if (error instanceof Error && ['login_required', 'verification_required'].includes(error.message)) fail(error.message)
       return fail()
     } finally {
       clearTimeout(timer)

@@ -11,7 +11,10 @@ import { useMyList } from '@/store/list/hook'
 import { getListUpdateInfo, setListAutoUpdate } from '@/utils/data'
 import { isQQSyncList, refreshQQList } from '@/core/musicAccount/autoSync'
 import syncSourceList from '@/core/syncSourceList'
-import { getPlaylistSyncState, subscribePlaylistSync } from '@/core/musicAccount/syncState'
+import { getPlaylistSyncState, subscribePlaylistSync, playlistSyncErrorKey } from '@/core/musicAccount/syncState'
+import { pushMusicAccountScreen } from '@/navigation/navigation'
+import commonState from '@/store/common/state'
+import { logoutMusicAccount } from '@/core/musicAccount'
 import { toast } from '@/utils/tools'
 
 export interface PlaylistSyncModalType { show: () => void }
@@ -42,7 +45,7 @@ export default forwardRef<PlaylistSyncModalType>((props, ref) => {
     if (running.current) return
     running.current = true
     setBusy(true)
-    const targets = lists.filter(isQQSyncList)
+    const targets = [...lists]
     let failed = 0
     try {
       for (const [index, list] of targets.entries()) {
@@ -52,20 +55,32 @@ export default forwardRef<PlaylistSyncModalType>((props, ref) => {
       setResult(t('list_sync_batch_done', { current: targets.length, total: targets.length, failed }))
     } finally { running.current = false; setBusy(false) }
   }
+  const relogin = async(list: LX.List.UserListInfo) => {
+    const provider = list.source
+    if (busy || !commonState.componentIds.home || (provider != 'tx' && provider != 'wy' && provider != 'kg')) return
+    setBusy(true)
+    try {
+      // 用户明确点击重新登录后清除失效会话，避免账号页仅凭旧 Cookie 又显示已登录。
+      await logoutMusicAccount(provider)
+      dialog.current?.setVisible(false)
+      pushMusicAccountScreen(commonState.componentIds.home, provider)
+    } catch { toast(t('list_sync_login_required')) } finally { setBusy(false) }
+  }
   return <Dialog ref={dialog} title={t('list_update_modal__title')} closeBtn keyHide bgHide onHide={() => { setVisible(false) }}>
     <ScrollView contentContainerStyle={styles.content}>
-      <Button disabled={busy || !lists.some(isQQSyncList)} style={[styles.batch, { backgroundColor: theme['q-surface-tint'] }]} onPress={() => { void syncAll() }}>
-        <Icon name="available_updates" size={18} color={theme['q-accent-text']} /><Text size={13} color={theme['q-accent-text']}>{t(busy ? 'list_sync_working' : 'list_sync_all_qq')}</Text>
+      <Button disabled={busy || !lists.length} style={[styles.batch, { backgroundColor: theme['q-surface-tint'] }]} onPress={() => { void syncAll() }}>
+        <Icon name="available_updates" size={18} color={theme['q-accent-text']} /><Text size={13} color={theme['q-accent-text']}>{t(busy ? 'list_sync_working' : 'list_sync_all')}</Text>
       </Button>
       {result ? <Text size={12} accessibilityLiveRegion="polite" style={styles.feedback}>{result}</Text> : null}
       {lists.map(list => {
         const state = states[list.id]
         const fetching = state?.phase == 'fetch' || state?.phase == 'save'
         return <View key={list.id} style={[styles.row, { borderColor: theme['q-outline'] }]}>
-          <View style={styles.heading}><PlaylistIdentity list={list} subtitle /><Button disabled={fetching || busy} accessibilityLabel={`${t('list_update_modal__update')} ${getPlaylistLabel(list)}`} style={styles.refresh} onPress={() => { void update(list).then(ok => { if (!ok) toast(t('list_sync_failed')) }) }}><Icon name="available_updates" size={20} color={theme['q-accent-text']} /></Button></View>
+          <View style={styles.heading}><PlaylistIdentity list={list} subtitle /><Button disabled={fetching || busy} accessibilityLabel={`${t('list_update_modal__update')} ${getPlaylistLabel(list)}`} style={styles.refresh} onPress={() => { void update(list).then(ok => { if (!ok) toast(t(playlistSyncErrorKey(getPlaylistSyncState()[list.id]?.error))) }) }}><Icon name="available_updates" size={20} color={theme['q-accent-text']} /></Button></View>
+          {state?.phase == 'error' && state.error == 'login_required' && (list.source == 'tx' || list.source == 'wy' || list.source == 'kg') ? <Button disabled={busy} onPress={() => { void relogin(list) }}><Text color={theme['q-accent-text']}>{t('list_sync_relogin')}</Text></Button> : null}
           {isQQSyncList(list) ? <View style={styles.heading}><Text size={12} style={{ flex: 1 }}>{t('list_update_modal__auto_update')}</Text><Switch accessibilityLabel={`${list.name} ${t('list_update_modal__auto_update')}`} value={settings[list.id]?.isAutoUpdate} onValueChange={enable => { void setListAutoUpdate(list.id, enable).then(loadSettings).catch(() => { toast(t('list_sync_failed')) }) }} trackColor={{ true: theme['q-accent'] }} /></View> : null}
           <Text size={11} color={theme['q-text-secondary']}>{settings[list.id]?.updateTime ? new Date(settings[list.id].updateTime).toLocaleString() : t('list_sync_never')}</Text>
-          {state ? <Text size={12} style={styles.feedback} accessibilityLiveRegion="polite" color={theme['q-text-secondary']}>{state.phase == 'error' ? t(state.error == 'account_changed' ? 'list_sync_account_changed' : 'list_sync_failed') : t(state.phase == 'success' ? 'list_sync_success' : state.phase == 'save' ? 'list_sync_save' : state.total ? 'list_sync_fetch' : 'list_sync_working', { current: state.current, total: state.total })}</Text> : isQQSyncList(list) && !settings[list.id]?.sourceAccountId ? <Text size={11} style={styles.feedback} color={theme['q-text-secondary']}>{t('list_sync_binding_required')}</Text> : null}
+          {state ? <Text size={12} style={styles.feedback} accessibilityLiveRegion="polite" color={theme['q-text-secondary']}>{state.phase == 'error' ? t(playlistSyncErrorKey(state.error)) : t(state.phase == 'success' ? 'list_sync_success' : state.phase == 'save' ? 'list_sync_save' : state.total ? 'list_sync_fetch' : 'list_sync_working', { current: state.current, total: state.total })}</Text> : isQQSyncList(list) && !settings[list.id]?.sourceAccountId ? <Text size={11} style={styles.feedback} color={theme['q-text-secondary']}>{t('list_sync_binding_required')}</Text> : null}
         </View>
       })}
       <Text size={12} color={theme['q-text-secondary']} style={styles.feedback}>{t('list_update_modal__tips')}</Text>

@@ -25,7 +25,7 @@ const performSync = async(session: PlaylistSession, playlist: Pick<AccountPlayli
   setPlaylistSyncState(id, { phase: 'fetch', current: 0, total: 0 })
   try {
     if (binding && settings?.sourceAccountId && settings.sourceAccountId != binding) throw new Error('account_changed')
-    if (automatic && (!settings?.isAutoUpdate || !settings.sourceAccountId)) throw new Error('cancelled')
+    if (automatic && (!settings?.isAutoUpdate || (session.provider == 'tx' && !settings.sourceAccountId))) throw new Error('cancelled')
     await assertPlaylistSession(session)
     const tracks = await getAccountPlaylistTracks(session, playlist.id, signal, (current, total) => {
       setPlaylistSyncState(id, { phase: 'fetch', current, total })

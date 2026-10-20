@@ -257,3 +257,31 @@ test('收藏后等旧会话同步结束再读，等待中关闭自动更新就�
   assert.equal((await skipped).total, 0)
   assert.equal(h.calls.length, 1)
 })
+const syncState = load("src/core/musicAccount/syncState.ts")
+test("安卓同步错误区分掉登录、验证、缺曲和网络故障", () => {
+  assert.equal(syncState.playlistSyncErrorKey("login_required"), "list_sync_login_required")
+  assert.equal(syncState.playlistSyncErrorKey("verification_required"), "list_sync_verification_required")
+  assert.equal(syncState.playlistSyncErrorKey("incomplete"), "list_sync_incomplete")
+  assert.equal(syncState.playlistSyncErrorKey("unavailable"), "list_sync_failed")
+})
+test("安卓打开会话就掉登录时覆盖旧成功状态，公共歌单被删后不接受迟到结果", async () => {
+  const states = {}; const userList = [{ id: "local", source: "wy", sourceListId: "account:123:7" }]
+  let failSession = true; const writes = []
+  const api = load("src/core/syncSourceList.ts", {
+    "@/utils/data": { getListUpdateInfo: async () => ({}), setListUpdateTime: async () => {} },
+    "@/store/list/state": { userList },
+    "./musicAccount/syncState": { setPlaylistSyncState: (id,state) => {states[id]=state} },
+    "./list": { setFetchingListStatus() {}, overwriteListMusics: async (...args) => {writes.push(args)} },
+    "@/core/songlist": { getListDetailAll: async () => { userList.length=0; return [{id:"song"}]} },
+    "@/core/leaderboard": {},
+    "./musicAccount/playlists": { openPlaylistSession: async () => {if(failSession) throw Error("login_required"); return {owner:"123"}} },
+    "./musicAccount/playlistSync": { parseAccountSourceId: id => id.startsWith("account:") ? {owner:"123",id:"7"} : null, syncAccountPlaylist: async () => {} },
+  })
+  states.local={phase:"success"}
+  await assert.rejects(api.default(userList[0]),/login_required/)
+  assert.equal(states.local.error,"login_required")
+  failSession=false
+  userList[0].sourceListId="7"
+  await api.default(userList[0])
+  assert.equal(writes.length,0)
+})

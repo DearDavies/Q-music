@@ -4,6 +4,13 @@ export interface PlaylistSyncState {
   total: number
   error?: string
 }
+export const playlistSyncErrorKey = (code?: string) => {
+  if (code == 'login_required') return 'list_sync_login_required'
+  if (code == 'account_changed') return 'list_sync_account_changed'
+  if (code == 'verification_required') return 'list_sync_verification_required'
+  if (code == 'incomplete' || code == 'playlist_incomplete') return 'list_sync_incomplete'
+  return 'list_sync_failed'
+}
 let state: Record<string, PlaylistSyncState> = {}
 const listeners = new Set<() => void>()
 export const getPlaylistSyncState = () => state

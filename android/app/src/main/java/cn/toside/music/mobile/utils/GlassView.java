@@ -44,6 +44,8 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
   private final int[] rootLocation = new int[2];
   private Bitmap backdrop;
   private Bitmap lensBackdrop;
+  private Bitmap captureBitmap;
+  private float backdropPad;
   private LensShader lensShader;
   private boolean shaderUnavailable;
   private int[] pixels;
@@ -75,12 +77,12 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
     });
   }
 
-  public void setSelection(boolean value) { selectionEnabled = value; selectionView = null; releaseBackdrop(); invalidate(); }
-  public void setGlassEnabled(boolean value) { glassEnabled = value; releaseBackdrop(); invalidate(); }
+  public void setSelection(boolean value) { if (selectionEnabled == value) return; selectionEnabled = value; selectionView = null; invalidate(); }
+  public void setGlassEnabled(boolean value) { if (glassEnabled == value) return; glassEnabled = value; if (!value) releaseBackdrop(); invalidate(); }
   public void setDark(boolean value) { dark = value; invalidate(); }
   public void setMotionEnabled(boolean value) { motionEnabled = value; if (touchAnimator != null) touchAnimator.cancel(); touchLight = 0; invalidate(); }
   public void setCorner(float value) { radius = value; updateClip(); invalidateOutline(); invalidate(); }
-  public void setBlur(float value) { blur = value; releaseBackdrop(); invalidate(); }
+  public void setBlur(float value) { if (blur == value) return; blur = value; lastCapture = 0; skipCapture = false; invalidate(); }
 
   private void updateClip() {
     bounds.set(0, 0, getWidth(), getHeight());
@@ -92,7 +94,9 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
   @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
     super.onSizeChanged(w, h, oldw, oldh);
     updateClip();
-    releaseBackdrop();
+    // 尺寸变化时保留上一张完整底图，下一次采样完成后再替换，避免闪成实色。
+    lastCapture = 0;
+    skipCapture = false;
   }
 
   @Override protected void onAttachedToWindow() {
@@ -114,6 +118,7 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
     // 交给 GC 释放，避免 RenderThread 仍引用上一帧位图时被提前 recycle。
     backdrop = null;
     lensBackdrop = null;
+    captureBitmap = null;
     lensShader = null;
     pixels = null;
     scratch = null;
@@ -140,31 +145,34 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
     int w = Math.max(1, (int) Math.ceil((getWidth() + pad * 2) / SCALE));
     int h = Math.max(1, (int) Math.ceil((getHeight() + pad * 2) / SCALE));
     try {
-      if (backdrop == null || backdrop.getWidth() != w || backdrop.getHeight() != h) {
-        releaseBackdrop();
-        backdrop = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        lensBackdrop = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+      if (captureBitmap == null || captureBitmap.getWidth() != w || captureBitmap.getHeight() != h) {
+        captureBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         pixels = new int[w * h];
         scratch = new int[w * h];
       }
-      backdrop.eraseColor(dark ? Color.rgb(24, 28, 30) : Color.rgb(246, 249, 248));
+      captureBitmap.eraseColor(dark ? Color.rgb(24, 28, 30) : Color.rgb(246, 249, 248));
       View root = getRootView();
       root.getLocationOnScreen(rootLocation);
       getLocationOnScreen(location);
-      Canvas sample = new Canvas(backdrop);
+      Canvas sample = new Canvas(captureBitmap);
       sample.scale(1 / SCALE, 1 / SCALE);
       sample.translate(rootLocation[0] - location[0] + pad, rootLocation[1] - location[1] + pad);
       sampling = true;
       root.draw(sample);
       sampling = false;
-      backdrop.getPixels(pixels, 0, w, 0, 0, w, h);
+      captureBitmap.getPixels(pixels, 0, w, 0, 0, w, h);
       int boxRadius = Math.max(1, Math.round(blur / SCALE * 0.58f));
+      Bitmap nextLens = null;
       for (int pass = 0; pass < 3; pass++) {
         blurPass(pixels, scratch, w, h, boxRadius, true);
         blurPass(scratch, pixels, w, h, boxRadius, false);
-        if (pass == 0 && lensBackdrop != null) lensBackdrop.setPixels(pixels, 0, w, 0, 0, w, h);
+        if (pass == 0) nextLens = Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888);
       }
-      backdrop.setPixels(pixels, 0, w, 0, 0, w, h);
+      // RenderThread 可能仍在使用上一帧；只发布完整且不再修改的快照。
+      Bitmap nextBackdrop = Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888);
+      backdrop = nextBackdrop;
+      lensBackdrop = nextLens;
+      backdropPad = pad;
       lastCapture = now;
       skipCapture = true;
       invalidate();
@@ -212,7 +220,7 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
     paint.setColor(Color.WHITE);
     if (glassEnabled && backdrop != null) {
       if (!drawShaderLens(canvas, bounds, radius, 10 * getResources().getDisplayMetrics().density, true)) {
-        float pad = (float) Math.ceil(blur * 2);
+        float pad = backdropPad;
         canvas.drawBitmap(backdrop, null, new RectF(-pad, -pad, getWidth() + pad, getHeight() + pad), paint);
         drawLens(canvas, lensBackdrop, bounds, radius, 10 * getResources().getDisplayMetrics().density);
       }
@@ -258,7 +266,7 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
   // 旧系统回退到网格折射，仍复用本次采样的背景，不额外抓屏。
   private void drawLens(Canvas canvas, Bitmap source, RectF rect, float corner, float depth) {
     if (source == null || !glassEnabled) return;
-    float pad = (float) Math.ceil(blur * 2);
+    float pad = backdropPad;
     float halfW = rect.width() / 2, halfH = rect.height() / 2;
     float edge = Math.min(corner, Math.max(8 * getResources().getDisplayMetrics().density, depth));
     int offset = 0;
@@ -342,7 +350,8 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
     if (Build.VERSION.SDK_INT < 33 || shaderUnavailable || !canvas.isHardwareAccelerated() || lensBackdrop == null) return false;
     try {
       if (lensShader == null) lensShader = new LensShader(lensBackdrop);
-      lensShader.draw(canvas, paint, rect, (float) Math.ceil(blur * 2), SCALE, corner, depth,
+      else lensShader.setImage(lensBackdrop);
+      lensShader.draw(canvas, paint, rect, backdropPad, SCALE, corner, depth,
         touchX, touchY, surface ? touchLight : 0, getHeight() * 1.5f, dark, surface,
         surface ? null : selectionClip);
       return true;
@@ -387,9 +396,16 @@ public class GlassView extends ReactViewGroup implements ViewTreeObserver.OnPreD
       "  return half4(min(color.rgb + half3(gleam), half3(1.0)), 1.0);\n" +
       "}\n";
     private final RuntimeShader shader = new RuntimeShader(SOURCE);
+    private Bitmap currentImage;
 
     LensShader(Bitmap image) {
+      setImage(image);
+    }
+
+    void setImage(Bitmap image) {
+      if (currentImage == image) return;
       shader.setInputShader("image", new BitmapShader(image, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+      currentImage = image;
     }
 
     void draw(Canvas canvas, Paint paint, RectF rect, float pad, float scale, float corner, float bend,
