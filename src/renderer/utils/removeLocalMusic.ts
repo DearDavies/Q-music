@@ -1,20 +1,22 @@
-import { shell } from 'electron'
-import { lstat } from 'node:fs/promises'
-import { isAbsolute, extname } from 'node:path'
-import { localAudioExtensions } from '@common/utils/localMusicFiles'
+import { normalize } from 'node:path'
+import { trashLocalMusicFile } from '@renderer/utils/ipc'
+import { defaultList, loveList, tempList, userLists } from '@renderer/store/list/state'
+import { getListMusics, removeListMusics } from '@renderer/store/list/action'
+
+export { trashLocalMusicFile }
+
+export const removeLocalMusicReferences = async(files: string[]) => {
+  const key = (file: string) => process.platform == 'win32' ? normalize(file).toLowerCase() : normalize(file)
+  const paths = new Set(files.map(key))
+  if (!paths.size) return
+  for (const list of [defaultList, loveList, tempList, ...userLists]) {
+    const songs = await getListMusics(list.id)
+    const ids = songs.filter(song => song.source == 'local' && paths.has(key(song.meta.filePath))).map(song => song.id)
+    if (ids.length) await removeListMusics({ listId: list.id, ids })
+  }
+}
 
 export const trashLocalMusic = async(music: LX.Music.MusicInfoLocal) => {
-  const file = music.meta.filePath
-  const extension = extname(file)
-  if (!isAbsolute(file) || !localAudioExtensions.includes(extension.slice(1).toLowerCase())) throw new Error('Invalid local audio path')
-  const stem = file.slice(0, -extension.length)
-  const files: string[] = []
-  // 仅处理所选音频及同名歌词，不递归删除目录，也不跟随链接。
-  for (const target of [`${stem}.lrc`, `${stem}.tlrc`, `${stem}.rlrc`, `${file}.lrc`, file]) {
-    let stat
-    try { stat = await lstat(target) } catch (err: any) { if (err.code == 'ENOENT') continue; throw err }
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Not a regular audio or lyric file')
-    files.push(target)
-  }
-  for (const target of files) await shell.trashItem(target)
+  await trashLocalMusicFile(music.meta.filePath)
+  await removeLocalMusicReferences([music.meta.filePath])
 }

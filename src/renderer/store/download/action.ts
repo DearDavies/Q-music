@@ -259,6 +259,7 @@ const handleStartTask = async(downloadInfo: LX.Download.ListItem) => {
   if (!downloadInfo.metadata.url) {
     setStatusText(downloadInfo, window.i18n.t('download_status_url_getting'))
     const url = await getUrl(downloadInfo)
+    if (downloadInfo.status != DOWNLOAD_STATUS.RUN || !runingTask.has(downloadInfo.id)) return
     if (!url) {
       handleError(downloadInfo, window.i18n.t('download_status_error_url_failed'))
       return
@@ -274,6 +275,7 @@ const handleStartTask = async(downloadInfo: LX.Download.ListItem) => {
   setStatusText(downloadInfo, window.i18n.t('download_status_start'))
 
   await window.lx.worker.download.startTask(toRaw(downloadInfo), savePath, appSetting['download.skipExistFile'], proxyCallback((event: LX.Download.DownloadTaskActions) => {
+    if (!runingTask.has(downloadInfo.id)) return
     // console.log(event)
     switch (event.action) {
       case 'start':
@@ -393,8 +395,10 @@ export const pauseDownloadTasks = async(list: LX.Download.ListItem[]) => {
   for (const downloadInfo of list) {
     switch (downloadInfo.status) {
       case DOWNLOAD_STATUS.RUN:
-        void window.lx.worker.download.pauseTask(downloadInfo.id)
         runingTask.delete(downloadInfo.id)
+        setStatus(downloadInfo, DOWNLOAD_STATUS.PAUSE)
+        await window.lx.worker.download.pauseTask(downloadInfo.id)
+        break
       case DOWNLOAD_STATUS.WAITING:
       case DOWNLOAD_STATUS.ERROR:
         setStatus(downloadInfo, DOWNLOAD_STATUS.PAUSE)
@@ -410,16 +414,11 @@ export const pauseDownloadTasks = async(list: LX.Download.ListItem[]) => {
  * @param ids 要移除的任务Id
  */
 export const removeDownloadTasks = async(ids: string[]) => {
+  await pauseDownloadTasks(downloadList.filter(task => ids.includes(task.id)))
   await downloadTasksRemove(ids)
 
   const idsSet = new Set<string>(ids)
-  const newList = downloadList.filter(task => {
-    if (idsSet.has(task.id) && runingTask.has(task.id)) {
-      void window.lx.worker.download.removeTask(task.id)
-      runingTask.delete(task.id)
-    }
-    return !idsSet.has(task.id)
-  })
+  const newList = downloadList.filter(task => !idsSet.has(task.id))
   downloadList.splice(0, downloadList.length)
   arrPush(downloadList, newList)
 

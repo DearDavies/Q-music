@@ -280,7 +280,7 @@ export const getTheme = () => {
     }
   }
 
-  theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(global.lx.appSetting, theme.isDark), shouldUseDarkColors))
+  theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(global.lx.appSetting, theme.isDark), shouldUseDarkColors, new Date(), global.lx.appSetting))
   const colors: Record<string, string> = {
     ...theme.config.themeColors,
     ...buildThemeMaterial(theme.isDark),

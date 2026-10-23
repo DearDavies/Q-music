@@ -28,7 +28,7 @@
         </button>
       </div>
     </div>
-    <ul ref="dom_lists_list" class="scroll" :class="[$style.listsContent, { [$style.sortable]: isModDown }]">
+    <ul ref="dom_lists_list" class="scroll" :class="[$style.listsContent, { [$style.sortable]: isDragging }]">
       <li
         class="default-list" :class="[$style.listsItem, {[$style.active]: defaultList.id == listId}, {[$style.clicked]: rightClickItemIndex == -2}, {[$style.fetching]: fetchingListStatus[defaultList.id]}]"
         role="button" tabindex="0" :aria-label="$t(defaultList.name)" :aria-pressed="defaultList.id == listId"
@@ -51,13 +51,14 @@
       </li>
       <li
         v-for="(item, index) in userLists"
-        :key="item.id" class="user-list"
+        :key="item.id" class="user-list" :data-list-id="item.id"
         :class="[$style.listsItem, {[$style.active]: item.id == listId}, {[$style.clicked]: rightClickItemIndex == index}, {[$style.fetching]: fetchingListStatus[item.id]}]"
         role="button" tabindex="0" :data-index="index" :aria-pressed="item.id == listId" @contextmenu="handleListsItemRigthClick($event, index)"
         @keydown.enter.self="handleListToggle(item.id)" @keydown.space.self.prevent="handleListToggle(item.id)"
       >
         <span :class="$style.listsLabel" :title="item.name" @click="handleListToggle(item.id, index + 2)">
           <PlaylistIdentity :list="item" subtitle />
+          <svg :class="$style.dragHandle" viewBox="0 0 16 24" aria-hidden="true"><title>{{ $t('lists__drag_sort') }}</title><g fill="currentColor"><circle cx="5" cy="6" r="1.3" /><circle cx="11" cy="6" r="1.3" /><circle cx="5" cy="12" r="1.3" /><circle cx="11" cy="12" r="1.3" /><circle cx="5" cy="18" r="1.3" /><circle cx="11" cy="18" r="1.3" /></g></svg>
         </span>
         <base-input
           :class="$style.listsInput" type="text" :value="item.name"
@@ -210,7 +211,7 @@ export default {
     }
 
     const handleListToggle = (id) => {
-      if (id == props.listId) return
+      if (suppressDragClick() || id == props.listId) return
       router.replace({
         path: '/list',
         query: { id },
@@ -228,7 +229,7 @@ export default {
       menuClick(action, index)
     }
 
-    const { isModDown } = useDarg({ dom_lists_list, handleMenuClick, handleSaveListName })
+    const { isDragging, suppressDragClick } = useDarg({ dom_lists_list, handleMenuClick })
 
 
     watch(() => props.listId, (listId) => {
@@ -270,7 +271,7 @@ export default {
       menuLocation,
       handleListToggle,
       openCloudLibrary,
-      isModDown,
+      isDragging,
       hideMenu: handleMenuClick,
     }
   },
@@ -429,29 +430,34 @@ export default {
   // border-right: 1px solid rgba(0, 0, 0, 0.12);
 
   &.sortable {
-    * {
-      -webkit-user-drag: element;
-    }
-
-    .listsItem {
-      &:hover, &.active, &.selected, &.clicked {
-        background-color: transparent !important;
-      }
-
-      &.dragingItem {
-        background-color: var(--color-primary-background-hover) !important;
-        box-shadow: inset 0 0 0 1.5px var(--color-primary-alpha-600), 0 10px 24px rgba(72, 91, 112, .16);
-        opacity: .9;
-      }
+    .listsItem.dragingItem {
+      background-color: var(--color-primary-alpha-900) !important;
+      box-shadow: inset 0 0 0 1px var(--color-primary-alpha-700);
+      opacity: .35;
+      .listsLabel { opacity: .35; }
     }
   }
 }
+.dragHandle { flex: none; width: 14px; height: 22px; margin-left: auto; padding-left: 6px; color: var(--color-font-label); opacity: .55; cursor: grab; }
+.dragChosen, .dragChosen .dragHandle { cursor: grabbing !important; }
+.listsItem.dragFloating {
+  list-style: none;
+  color: var(--color-font) !important;
+  opacity: .98 !important;
+  background: var(--color-content-background) !important;
+  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-600), 0 12px 30px rgba(0, 0, 0, .20), 0 3px 8px rgba(0, 0, 0, .09);
+  transform-origin: center;
+  pointer-events: none;
+  &[data-drag-motion='true'] { scale: 1.035; rotate: -.6deg; animation: q-list-lift .22s cubic-bezier(.22, 1.4, .36, 1); }
+}
+@keyframes q-list-lift { from { scale: .985; rotate: 0deg; } to { scale: 1.035; rotate: -.6deg; } }
+@media (prefers-reduced-motion: reduce) { .listsItem.dragFloating[data-drag-motion='true'] { animation: none; scale: 1; rotate: 0deg; } }
 .listsItem {
   position: relative;
   margin-bottom: 4px;
   border-radius: 12px;
   transition: .3s ease;
-  transition-property: color, background-color, opacity, box-shadow, transform;
+  transition-property: color, background-color, opacity, box-shadow;
   background-color: transparent;
   &:focus-visible {
     outline: 2px solid var(--color-primary);

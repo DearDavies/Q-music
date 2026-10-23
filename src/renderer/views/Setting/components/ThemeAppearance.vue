@@ -11,14 +11,38 @@
         <span :class="$style.label">{{ $t(`theme_appearance_${mode}`) }}</span>
       </button>
     </div>
+    <form v-if="modelValue == 'time'" :class="$style.schedule" @submit.prevent="saveSchedule">
+      <label>{{ $t('theme_schedule_day') }}<input v-model="dayStart" type="time" required :aria-invalid="invalid" @input="saved = false"></label>
+      <label>{{ $t('theme_schedule_night') }}<input v-model="nightStart" type="time" required :aria-invalid="invalid" @input="saved = false"></label>
+      <button type="submit" :disabled="invalid || !changed">{{ $t('theme_schedule_save') }}</button>
+      <span v-if="invalid || saved" :class="$style.feedback" role="status">{{ $t(invalid ? 'theme_schedule_invalid' : 'theme_schedule_saved') }}</span>
+    </form>
     <p :class="$style.tip">{{ $t(modelValue == 'time' ? 'theme_appearance_time_tip' : 'theme_appearance_tip') }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { ThemeAppearance } from '@common/theme/appearance'
+import { computed, ref, watch } from '@common/utils/vueTools'
+import { getThemeSchedule, isValidSchedule } from '@common/theme/schedule'
+import { appSetting, updateSetting } from '@renderer/store/setting'
 defineProps<{ modelValue: ThemeAppearance }>()
 const emit = defineEmits<{ change: [mode: ThemeAppearance] }>()
+const dayStart = ref(getThemeSchedule(appSetting).dayStart)
+const nightStart = ref(getThemeSchedule(appSetting).nightStart)
+const saved = ref(false)
+const invalid = computed(() => !isValidSchedule(dayStart.value, nightStart.value))
+const changed = computed(() => dayStart.value != appSetting['theme.dayStart'] || nightStart.value != appSetting['theme.nightStart'])
+watch(() => [appSetting['theme.dayStart'], appSetting['theme.nightStart']], () => {
+  const schedule = getThemeSchedule(appSetting)
+  dayStart.value = schedule.dayStart
+  nightStart.value = schedule.nightStart
+})
+const saveSchedule = () => {
+  if (invalid.value) return
+  updateSetting({ 'theme.dayStart': dayStart.value, 'theme.nightStart': nightStart.value })
+  saved.value = true
+}
 const modes: ThemeAppearance[] = ['light', 'dark', 'system', 'time']
 const onKeydown = (event: KeyboardEvent, mode: ThemeAppearance) => {
   const index = modes.indexOf(mode)
@@ -52,5 +76,14 @@ const onKeydown = (event: KeyboardEvent, mode: ThemeAppearance) => {
 .option:hover .preview { transform: translateY(-1px); }
 .option:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 7px; }
 .tip { margin: 17px 0 0; font-size: 12px; line-height: 1.65; color: var(--color-font-label); max-width: 560px; }
+.schedule { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 22px; max-width: 560px; }
+.schedule label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--color-font-label); }
+.schedule input, .schedule button { box-sizing: border-box; height: 36px; border: 1px solid var(--color-primary-alpha-600); border-radius: 8px; padding: 0 12px; font: inherit; color: var(--color-font); background: var(--color-content-background); }
+.schedule input { color-scheme: light dark; min-width: 115px; }
+.schedule input::-webkit-calendar-picker-indicator { filter: invert(.5); }
+.schedule button { cursor: pointer; color: var(--color-primary); }
+.schedule button:disabled { opacity: .45; cursor: default; }
+.schedule input:focus-visible, .schedule button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.feedback { flex-basis: 100%; color: var(--color-font-label); font-size: 12px; line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) { .preview { transition: none; } }
 </style>

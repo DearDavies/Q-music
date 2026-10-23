@@ -4,6 +4,9 @@ import { useI18n } from '@renderer/plugins/i18n'
 import { hasDislike } from '@renderer/core/dislikeList'
 
 export default ({
+  isSelectionMode,
+  selectedList,
+  selectFromMenu,
   assertApiSupport,
   emit,
 
@@ -34,12 +37,17 @@ export default ({
     remove: true,
     sourceDetail: true,
   })
+  const menuMusic = ref(null)
   const t = useI18n()
   const menuLocation = shallowReactive({ x: 0, y: 0 })
   const isShowItemMenu = ref(false)
 
   const menus = computed(() => {
     return [
+      {
+        name: t(!isSelectionMode.value ? 'list__multi_select' : selectedList.value.includes(menuMusic.value) ? 'list__unselect_item' : 'list__select_item'),
+        action: 'select',
+      },
       {
         name: t('list__play'),
         action: 'play',
@@ -104,6 +112,8 @@ export default ({
   })
 
   const showMenu = (event, musicInfo) => {
+    if (!musicInfo) return
+    menuMusic.value = musicInfo
     itemMenuControl.sourceDetail = !!musicSdk[musicInfo.source]?.getMusicDetailPageUrl
     // itemMenuControl.play =
     //   itemMenuControl.playLater =
@@ -131,6 +141,9 @@ export default ({
     hideMenu()
     if (!action) return
     switch (action.action) {
+      case 'select':
+        selectFromMenu(index)
+        break
       case 'play':
         handlePlayMusic(index)
         break

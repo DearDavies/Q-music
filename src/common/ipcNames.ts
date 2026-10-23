@@ -174,6 +174,7 @@ const modules = {
     remove_theme: 'remove_theme',
 
     download_list_get: 'download_list_get',
+    trash_local_music_file: 'trash_local_music_file',
     download_list_add: 'download_list_add',
     download_list_update: 'download_list_update',
     download_list_remove: 'download_list_remove',

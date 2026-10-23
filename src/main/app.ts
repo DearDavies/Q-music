@@ -285,7 +285,7 @@ export const listenerAppEvent = (startApp: () => void) => {
 
 const initTheme = () => {
   global.lx.theme = getTheme()
-  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'theme.appearance']
+  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'theme.appearance', 'theme.dayStart', 'theme.nightStart']
   const refreshScheduledTheme = () => {
     if (getThemeAppearance(global.lx.appSetting) != 'time') return
     const next = getTheme()

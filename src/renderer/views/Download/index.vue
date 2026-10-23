@@ -3,12 +3,12 @@
     <div :class="$style.header">
       <base-tab v-model="activeTab" :class="$style.tab" :list="tabs" />
     </div>
-    <div :class="[$style.downloadPanel, $style.listColumns]">
-      <material-list-toolbar :count="list.length" :selected-count="selectedList.length" @clear="removeAllSelect" @select-all="handleSelectAllData">
+    <div :class="[$style.downloadPanel, $style.listColumns, { [$style.selecting]: isSelectionMode }]">
+      <material-list-toolbar :count="list.length" :selected-count="selectedList.length" :selecting="isSelectionMode" @select="startSelection" @invert="invertSelection" @clear="removeAllSelect" @select-all="handleSelectAllData">
         <template #selected-actions>
-          <button type="button" :disabled="isBusy" @click="handleStartTask(-1)">{{ $t('list__start') }}</button>
-          <button type="button" :disabled="isBusy" @click="handlePauseTask(-1)">{{ $t('list__pause') }}</button>
-          <button type="button" :disabled="isBusy" @click="handleRemoveTask(-1)">{{ $t('list__remove') }}</button>
+          <button type="button" :disabled="isBusy || !selectedList.length" @click="handleStartTask(-1)">{{ $t('list__start') }}</button>
+          <button type="button" :disabled="isBusy || !selectedList.length" @click="handlePauseTask(-1)">{{ $t('list__pause') }}</button>
+          <button type="button" :disabled="isBusy || !selectedList.length" @click="handleRemoveTask(-1)">{{ $t('download__remove_records') }}</button>
         </template>
       </material-list-toolbar>
       <div class="thead" :class="$style.thead">
@@ -36,7 +36,7 @@
             @click="handleListItemClick($event, index)" @contextmenu="handleListItemRightClick($event, index)"
           >
             <div class="list-item-cell no-select" :class="[$style.num, $style.numberColumn, $style.selectColumn]">
-              <input type="checkbox" :checked="selectedList.includes(item)" :aria-label="$t('list__select_music', { name: getName(item) })" @click.stop @change="toggleSelect(index)">
+              <input type="checkbox" :checked="selectedList.includes(item)" :aria-label="$t('list__select_song', { name: getName(item) })" @click.stop @change="toggleSelect(index)">
               <transition name="play-active">
                 <div v-if="playTaskId == item.id" :class="$style.playIcon">
                   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="50%" viewBox="0 0 512 512" space="preserve">
@@ -54,7 +54,7 @@
             <div class="list-item-cell" :class="$style.qualityColumn" style="flex: 0 0 10%;">{{ getTypeName(item.metadata.quality) }}</div>
             <div class="list-item-cell" :class="$style.actionColumn" style="padding-left: 0; padding-right: 0;">
               <material-list-buttons
-                :index="index" :disabled="isBusy" :download-btn="false" :file-btn="item.status == downloadStatus.COMPLETED" remove-btn="remove-btn"
+                :index="index" :disabled="isBusy" :download-btn="false" :file-btn="item.status == downloadStatus.COMPLETED" remove-btn="remove-btn" :remove-label="$t('download__remove_records')"
                 :start-btn="!item.isComplate && item.status != downloadStatus.WAITING && (item.status != downloadStatus.RUN)"
                 :pause-btn="!item.isComplate && (item.status == downloadStatus.RUN || item.status == downloadStatus.WAITING)"
                 :list-add-btn="false" :play-btn="item.status == downloadStatus.COMPLETED"
@@ -114,6 +114,10 @@ export default {
 
     const {
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
+      selectFromMenu,
       listItemHeight,
       removeAllSelect,
       handleSelectData,
@@ -151,6 +155,9 @@ export default {
       showMenu,
       menuClick,
     } = useMenu({
+      isSelectionMode,
+      selectedList,
+      selectFromMenu,
       list,
       activeTab,
       handleStartTask,
@@ -189,8 +196,7 @@ export default {
 
     const handleListItemClick = (event, index) => {
       if (rightClickSelectedIndex.value > -1) return
-      handleSelectData(index)
-      if (event.shiftKey || event.ctrlKey || event.metaKey) { clickIndex = -1; return }
+      if (handleSelectData(index, event)) { clickIndex = -1; return }
       doubleClickPlay(index)
     }
     const handleListItemRightClick = (event, index) => {
@@ -238,6 +244,9 @@ export default {
       tabs,
       activeTab,
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
       listItemHeight,
       playTaskId,
       isPlay,

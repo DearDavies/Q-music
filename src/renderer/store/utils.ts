@@ -83,7 +83,7 @@ export const applyTheme = (id: string, lightId: string, darkId: string, dataPath
       theme = themeInfo.themes.find(theme => theme.id == 'green') ?? themeInfo.themes[0]
     }
     if (!theme) return
-    theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(settings, theme.isDark), themeShouldUseDarkColors.value))
+    theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(settings, theme.isDark), themeShouldUseDarkColors.value, new Date(), settings))
     window.setTheme(buildThemeColors(theme, dataPath))
   })
 }

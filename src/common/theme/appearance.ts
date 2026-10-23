@@ -16,7 +16,7 @@ export const getBaseThemeId = (setting: Settings): string => setting['theme.id']
   ? setting['theme.lightId'] ?? 'green'
   : setting['theme.id'] ?? 'green'
 
-export const isDarkAppearance = (mode: ThemeAppearance, systemDark: boolean, date = new Date()) => mode == 'dark' || (mode == 'system' && systemDark) || (mode == 'time' && isNightTime(date))
+export const isDarkAppearance = (mode: ThemeAppearance, systemDark: boolean, date = new Date(), setting: Settings = {}) => mode == 'dark' || (mode == 'system' && systemDark) || (mode == 'time' && isNightTime(date, setting))
 
 const parseRgb = (color: string): number[] => {
   const hex = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(color)?.[1]

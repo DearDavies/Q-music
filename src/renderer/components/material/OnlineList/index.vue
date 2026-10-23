@@ -1,11 +1,11 @@
 <template>
-  <div :class="[$style.songList, $style.listColumns, { [$style.searchResults]: searchResults }]">
+  <div :class="[$style.songList, $style.listColumns, { [$style.selecting]: isSelectionMode }, { [$style.searchResults]: searchResults }]">
     <!-- <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut"> -->
     <div :class="$style.list">
       <material-list-toolbar
-        v-if="!noItem" :count="list.length" :selected-count="selectedList.length" page-only
+        v-if="!noItem" :count="list.length" :selected-count="selectedList.length" :selecting="isSelectionMode" page-only
         :download-visible="appSetting['download.enable']" :download-enabled="canDownloadSelection"
-        @select-all="handleSelectAllData" @clear="removeAllSelect"
+        @select="startSelection" @invert="invertSelection" @select-all="handleSelectAllData" @clear="removeAllSelect"
         @add="handleShowMusicAddModal(0)" @download="handleShowDownloadModal(0)"
       />
       <div class="thead">
@@ -223,6 +223,10 @@ export default {
 
     const {
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
+      selectFromMenu,
       listItemHeight,
       handleSelectData,
       removeAllSelect,
@@ -265,6 +269,9 @@ export default {
       showMenu,
       menuClick,
     } = useMenu({
+      isSelectionMode,
+      selectedList,
+      selectFromMenu,
       props,
       assertApiSupport,
       emit,
@@ -280,8 +287,7 @@ export default {
 
     const handleListItemClick = (event, index) => {
       if (rightClickSelectedIndex.value > -1) return
-      handleSelectData(index)
-      if (event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (handleSelectData(index, event)) return
       doubleClickPlay(index)
     }
     const handleListItemRightClick = (event, index) => {
@@ -337,6 +343,9 @@ export default {
       isPlay,
       handleListItemClick,
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
       handleSelectAllData,
       toggleSelectData,
       handleShowMusicAddModal,

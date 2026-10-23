@@ -1,21 +1,23 @@
 <template>
   <div :class="$style.toolbar">
     <slot name="heading" />
-    <span :class="[$style.count, { [$style.selected]: selectedCount }]" role="status">
-      {{ $t(selectedCount ? 'list__selected_count' : pageOnly ? 'list__page_count' : 'list__count', { count: selectedCount || count }) }}
+    <span :class="[$style.count, { [$style.selected]: selecting }]" role="status">
+      {{ $t(selecting ? 'list__selected_count' : pageOnly ? 'list__page_count' : 'list__count', { count: selecting ? selectedCount : count }) }}
     </span>
     <div :class="$style.actions">
-      <button v-if="showPlay && !selectedCount" type="button" :class="$style.primary" :disabled="!count" @click="$emit('play')">
+      <button v-if="showPlay && !selecting" type="button" :class="$style.primary" :disabled="!count" @click="$emit('play')">
         <svg-icon name="play-outline" />{{ $t('list__play_all') }}
       </button>
-      <template v-if="selectedCount">
+      <button v-if="count && !selecting" type="button" @click="$emit('select')">{{ $t('list__multi_select') }}</button>
+      <button v-if="count" type="button" :disabled="selectedCount == count" @click="$emit('select-all')">{{ $t(pageOnly ? 'list__select_page' : 'list__select_all') }}</button>
+      <template v-if="selecting">
+        <button type="button" :disabled="!count" @click="$emit('invert')">{{ $t(pageOnly ? 'list__invert_page' : 'list__invert_selection') }}</button>
         <slot name="selected-actions">
-          <button type="button" @click="$emit('add')">{{ $t('list__add_to') }}</button>
-          <button v-if="downloadVisible" type="button" :disabled="!downloadEnabled" @click="$emit('download')">{{ $t('list__download') }}</button>
+          <button type="button" :disabled="!selectedCount" @click="$emit('add')">{{ $t('list__add_to') }}</button>
+          <button v-if="downloadVisible" type="button" :disabled="!selectedCount || !downloadEnabled" @click="$emit('download')">{{ $t('list__download') }}</button>
         </slot>
         <button type="button" @click="$emit('clear')">{{ $t('list__clear_selection') }}</button>
       </template>
-      <button v-if="count && selectedCount != count" type="button" @click="$emit('select-all')">{{ $t(pageOnly ? 'list__select_page' : 'list__select_all') }}</button>
     </div>
   </div>
 </template>
@@ -24,12 +26,13 @@
 defineProps({
   count: { type: Number, required: true },
   selectedCount: { type: Number, default: 0 },
+  selecting: Boolean,
   pageOnly: Boolean,
   showPlay: Boolean,
   downloadVisible: Boolean,
   downloadEnabled: Boolean,
 })
-defineEmits(['play', 'add', 'download', 'clear', 'select-all'])
+defineEmits(['play', 'add', 'download', 'clear', 'select', 'select-all', 'invert'])
 </script>
 
 <style lang="less" module>

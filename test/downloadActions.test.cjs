@@ -67,10 +67,11 @@ test('全为本地歌曲时不创建无意义的下载任务', async() => {
 function menuFixture() {
   const vue = require('vue')
   const scope = vue.effectScope()
-  const list = vue.ref([
+  const items = vue.ref([
     { id: 'first', status: 'run', metadata: { musicInfo: { source: 'tx' } } },
     { id: 'second', status: 'run', metadata: { musicInfo: { source: 'tx' } } },
   ])
+  const list = vue.computed(() => [...items.value])
   const activeTab = vue.ref('runing')
   const calls = []
   const context = { exports: {}, require: id => {
@@ -82,8 +83,8 @@ function menuFixture() {
   } }
   const source = fs.readFileSync(path.join(__dirname, '../src/renderer/views/Download/useMenu.js'), 'utf8')
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context)
-  const menu = scope.run(() => context.exports.default({ list, activeTab, handleRemoveTask: index => calls.push(list.value[index]?.id) }))
-  return { menu, list, activeTab, calls, tick: vue.nextTick, stop: () => scope.stop() }
+  const menu = scope.run(() => context.exports.default({ list, activeTab, isSelectionMode: vue.ref(false), selectedList: vue.ref([]), selectFromMenu: index => calls.push('select:' + list.value[index]?.id), handleRemoveTask: index => calls.push(list.value[index]?.id) }))
+  return { menu, list: items, activeTab, calls, tick: vue.nextTick, stop: () => scope.stop() }
 }
 
 test('右键菜单操作当前任务，列表重排后旧菜单不能操作另一首歌', async() => {
@@ -92,6 +93,7 @@ test('右键菜单操作当前任务，列表重排后旧菜单不能操作另�
     f.menu.showMenu({ pageX: 0, pageY: 0 }, f.list.value[0])
     await f.tick()
     assert.equal(f.menu.isShowItemMenu.value, true)
+    assert.equal(f.menu.menus.value[0].action, 'select')
     f.menu.menuClick({ action: 'remove' })
     assert.deepEqual(f.calls, ['first'])
     f.menu.showMenu({ pageX: 0, pageY: 0 }, f.list.value[0])
@@ -119,5 +121,16 @@ test('下载状态变化或切换分类会取消尚未显示的菜单', async() 
     assert.equal(f.menu.rightClickSelectedIndex.value, -1)
     f.menu.menuClick({ action: 'remove' })
     assert.deepEqual(f.calls, [])
+  } finally { f.stop() }
+})
+
+test('移除全部下载时，同步菜单监听不读取删除中的数组空位', async() => {
+  const f = menuFixture()
+  try {
+    f.menu.showMenu({ pageX: 0, pageY: 0 }, f.list.value[0])
+    await f.tick()
+    assert.doesNotThrow(() => f.list.value.splice(0, f.list.value.length))
+    assert.equal(f.menu.isShowItemMenu.value, false)
+    assert.equal(f.menu.rightClickSelectedIndex.value, -1)
   } finally { f.stop() }
 })

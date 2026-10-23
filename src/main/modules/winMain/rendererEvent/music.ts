@@ -1,8 +1,12 @@
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
 import { mainHandle } from '@common/mainIpc'
+import { trashLocalMusicFile } from '@main/utils/trashLocalMusic'
 
 
 export default () => {
+  mainHandle<string>(WIN_MAIN_RENDERER_EVENT_NAME.trash_local_music_file, async({ params: file }) => {
+    await trashLocalMusicFile(file)
+  })
   // =========================歌词=========================
   mainHandle<string, LX.Player.LyricInfo>(WIN_MAIN_RENDERER_EVENT_NAME.get_palyer_lyric, async({ params: id }) => {
     // return (getStore(LRC_EDITED, true, false).get(id) as LX.Music.LyricInfo | undefined) ??

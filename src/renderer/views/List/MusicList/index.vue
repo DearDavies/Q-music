@@ -1,5 +1,5 @@
 <template>
-  <div :class="[$style.list, $style.listColumns]">
+  <div :class="[$style.list, $style.listColumns, { [$style.selecting]: isSelectionMode }]">
     <div v-if="route.query.from == 'cloud-library'" :class="$style.cloudReturnBar">
       <button type="button" :class="$style.cloudBack" @click="returnToCloud">
         <svg-icon name="angle-right-solid" />
@@ -8,9 +8,9 @@
       <button type="button" :class="$style.cloudClose" aria-label="关闭导入结果" title="关闭导入结果" @click="closeImportResult">×</button>
     </div>
     <material-list-toolbar
-      :count="list.length" :selected-count="selectedList.length" show-play
+      :count="list.length" :selected-count="selectedList.length" :selecting="isSelectionMode" show-play
       :download-visible="appSetting['download.enable']" :download-enabled="canDownloadSelection"
-      @play="handlePlayMusic(0)" @select-all="handleSelectAllData" @clear="removeAllSelect"
+      @select="startSelection" @invert="invertSelection" @play="handlePlayMusic(0)" @select-all="handleSelectAllData" @clear="removeAllSelect"
       @add="handleShowMusicAddModal(0)" @download="handleShowDownloadModal(0)"
     >
       <template #heading><span v-if="currentPlaylist" :class="$style.playlistHeading"><PlaylistIdentity :list="currentPlaylist" :name="['default', 'love'].includes(currentPlaylist.id) ? $t(currentPlaylist.name) : currentPlaylist.name" /></span></template>
@@ -197,6 +197,10 @@ export default {
 
     const {
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
+      selectFromMenu,
       listItemHeight,
       handleSelectData,
       removeAllSelect,
@@ -258,6 +262,9 @@ export default {
       showMenu,
       menuClick,
     } = useMenu({
+      isSelectionMode,
+      selectedList,
+      selectFromMenu,
       assertApiSupport,
       emit,
 
@@ -290,8 +297,7 @@ export default {
 
     const handleListItemClick = (event, index) => {
       if (rightClickSelectedIndex.value > -1) return
-      handleSelectData(index)
-      if (event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (handleSelectData(index, event)) return
       doubleClickPlay(index)
     }
     const handleListItemRightClick = (event, index) => {
@@ -345,6 +351,9 @@ export default {
       listItemHeight,
       handleListItemClick,
       selectedList,
+      isSelectionMode,
+      startSelection,
+      invertSelection,
       handleSelectAllData,
       toggleSelectData,
       handlePlayMusic,

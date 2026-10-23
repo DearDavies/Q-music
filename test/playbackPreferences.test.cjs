@@ -10,7 +10,7 @@ const file = {
   match: mobile ? 'src/utils/localTrackMatch.ts' : 'src/common/utils/localTrackMatch.ts',
   selection: mobile ? 'src/core/player/selection.ts' : 'src/renderer/core/player/selection.ts',
   local: mobile ? 'src/core/music/preferLocal.ts' : 'src/renderer/core/music/preferLocal.ts',
-  remove: mobile ? 'src/utils/removeLocalMusic.ts' : 'src/renderer/utils/removeLocalMusic.ts',
+  remove: mobile ? 'src/utils/removeLocalMusic.ts' : 'src/main/utils/trashLocalMusic.ts',
 }
 function load(file, dependencies = {}) {
   const context = { exports: {}, require: id => {
@@ -136,7 +136,7 @@ function removalFixture(directory = '', permitted = true) {
     '@common/utils/localMusicFiles': { localAudioExtensions: ['mp3'] },
   }
   const api = load(file.remove, deps)
-  return { remove: mobile ? api.deleteLocalMusicFiles : api.trashLocalMusic, removed }
+  return { remove: mobile ? api.deleteLocalMusicFiles : musicInfo => api.trashLocalMusicFile(musicInfo.meta.filePath), removed }
 }
 test('删除仅处理所选音频和同名歌词，拒绝目录并在预检失败时不删任何文件', async() => {
   const local = track('local', { source: 'local', meta: { filePath: '/music/song.mp3' } })

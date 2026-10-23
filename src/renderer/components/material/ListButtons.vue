@@ -27,7 +27,7 @@
     <button v-if="searchBtn" type="button" :disabled="disabled" :aria-label="$t('list__search')" @contextmenu.capture.stop @click.stop="handleClick('search')">
       <svg viewBox="0 0 24 24" :class="$style.outlineIcon" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
     </button>
-    <button v-if="removeBtn" type="button" :disabled="disabled" :aria-label="$t('list__remove')" @click.stop="handleClick('remove')">
+    <button v-if="removeBtn" type="button" :disabled="disabled" :aria-label="removeLabel || $t('list__remove')" @click.stop="handleClick('remove')">
       <svg viewBox="0 0 24 24" :class="$style.outlineIcon" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
     </button>
   </div>
@@ -47,6 +47,7 @@ export default {
       default: false,
     },
     disabled: Boolean,
+    removeLabel: { type: String, default: '' },
     startBtn: {
       type: Boolean,
       default: false,

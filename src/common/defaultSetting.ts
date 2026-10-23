@@ -163,6 +163,8 @@ const defaultSetting: LX.AppSetting = {
   'theme.darkId': 'black',
   'theme.autoByTime': false,
   'theme.appearance': null,
+  'theme.dayStart': '07:00',
+  'theme.nightStart': '19:00',
   'theme.glassOpacity': 22,
   'theme.glassBlur': 20,
   'theme.customBgImage': '',

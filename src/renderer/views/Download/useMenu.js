@@ -4,6 +4,9 @@ import { useI18n } from '@renderer/plugins/i18n'
 import { DOWNLOAD_STATUS } from '@common/constants'
 
 export default ({
+  isSelectionMode,
+  selectedList,
+  selectFromMenu,
   list,
   activeTab,
   handleStartTask,
@@ -31,16 +34,21 @@ export default ({
   const menuLocation = shallowReactive({ x: 0, y: 0 })
   const isShowItemMenu = ref(false)
   const menuTask = shallowReactive({ current: null })
-  const rightClickSelectedIndex = computed(() => menuTask.current ? list.value.findIndex(task => task.id == menuTask.current.id) : -1)
+  const rightClickSelectedIndex = computed(() => menuTask.current ? list.value.findIndex(task => task?.id == menuTask.current.id) : -1)
 
   const hideMenu = () => {
     isShowItemMenu.value = false
     menuTask.current = null
   }
-  watch([activeTab, () => list.value.map(task => `${task.id}:${task.status}`).join('\n')], hideMenu, { flush: 'sync' })
+  // 数组删除期间，同步侦听可能读到展开后的空位；不能在移除成功后再抛异常。
+  watch([activeTab, () => list.value.filter(Boolean).map(task => `${task.id}:${task.status}`).join('\n')], hideMenu, { flush: 'sync' })
 
   const menus = computed(() => {
     return [
+      {
+        name: t(!isSelectionMode.value ? 'list__multi_select' : selectedList.value.includes(menuTask.current) ? 'list__unselect_item' : 'list__select_item'),
+        action: 'select',
+      },
       {
         name: t('list__play'),
         action: 'play',
@@ -82,7 +90,7 @@ export default ({
         hide: !itemMenuControl.search,
       },
       {
-        name: t('list__remove'),
+        name: t('download__remove_records'),
         action: 'remove',
         hide: !itemMenuControl.remove,
       },
@@ -130,6 +138,9 @@ export default ({
     hideMenu()
     if (!action || index < 0) return
     switch (action.action) {
+      case 'select':
+        selectFromMenu(index)
+        break
       case 'start':
         handleStartTask(index)
         break
