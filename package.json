@@ -1,7 +1,7 @@
 {
   "name": "q-music-mobile",
-  "version": "0.4.21",
-  "versionCode": 49,
+  "version": "0.4.22",
+  "versionCode": 50,
   "private": true,
   "scripts": {
     "test:account-transfer": "node --test scripts/verify-account-transfer.cjs",
@@ -33,7 +33,8 @@
     "test:downloads": "node --test scripts/verify-download-actions.cjs",
     "test:playback-preferences": "node --test scripts/verify-playback-preferences.cjs",
     "test:playlist-merge": "node --test scripts/verify-playlist-merge.cjs",
-    "test:download-selection": "node --test scripts/verify-download-selection.cjs"
+    "test:download-selection": "node --test scripts/verify-download-selection.cjs",
+    "test:theme-appearance": "node --test scripts/verify-theme-appearance.cjs"
   },
   "engines": {
     "node": ">= 18",

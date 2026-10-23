@@ -70,13 +70,13 @@ const ThemeItem = ({ id, name, color, image, setTheme, showAll }: {
             ...styles.colorContent,
             ...qSurfaceShadow,
             width: scaleSizeH(PREVIEW_WIDTH),
-            borderColor: isActive ? color : theme['q-outline'],
+            borderColor: isActive ? theme['q-accent'] : theme['q-outline'],
             backgroundColor: theme['q-surface-base'],
           }}
         >
           {preview}
         </View>
-        <Text style={[styles.name, isActive ? styles.nameActive : null]} size={12} color={isActive ? color : theme['q-text-primary']} numberOfLines={1}>{name}</Text>
+        <Text style={[styles.name, isActive ? styles.nameActive : null]} size={12} color={isActive ? theme['q-accent-text'] : theme['q-text-primary']} numberOfLines={1}>{name}</Text>
       </Button>
     ) : null
   )

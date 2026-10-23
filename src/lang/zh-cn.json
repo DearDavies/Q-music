@@ -806,5 +806,13 @@
   "list_sync_preserve_local_tip": "平台曲目按云端更新；手动添加的其他歌曲会保留在列表末尾，不会上传到平台。",
   "download_selection_local": "所选歌曲已是本地文件，无需重复下载。",
   "download_selection_added": "已提交下载任务，可在下载页查看；已有任务会自动跳过。",
-  "download_selection_failed": "未能添加下载任务，请检查权限和音源设置后重试。"
+  "download_selection_failed": "未能添加下载任务，请检查权限和音源设置后重试。",
+  "theme_appearance": "外观模式",
+  "theme_appearance_light": "白天",
+  "theme_appearance_dark": "夜间",
+  "theme_appearance_system": "跟随系统",
+  "theme_appearance_time": "按时间",
+  "theme_appearance_tip": "只切换界面明暗，保留当前主题的配色和背景。",
+  "theme_appearance_time_tip": "07:00–19:00 为白天，其余时间为夜间。配色与背景保持不变。",
+  "theme_palette_collapse": "收起主题"
 }

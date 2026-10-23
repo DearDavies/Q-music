@@ -92,6 +92,7 @@ declare global {
        */
       'theme.darkId': string
       'theme.autoByTime': boolean
+      'theme.appearance': 'light' | 'dark' | 'system' | 'time' | null
 
       /**
        * 隐藏黑色主题背景

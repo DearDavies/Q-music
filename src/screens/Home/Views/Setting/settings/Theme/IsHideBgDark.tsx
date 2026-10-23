@@ -6,19 +6,12 @@ import { createStyle } from '@/utils/tools'
 import { useI18n } from '@/lang'
 import { updateSetting } from '@/core/common'
 import { useSettingValue } from '@/store/setting/hook'
-import { getTheme } from '@/theme/themes'
-import { applyTheme } from '@/core/theme'
-import settingState from '@/store/setting/state'
 
 export default memo(() => {
   const t = useI18n()
   const isHideBgDark = useSettingValue('theme.hideBgDark')
   const setIsAutoTheme = (isHideBgDark: boolean) => {
     updateSetting({ 'theme.hideBgDark': isHideBgDark })
-    void getTheme().then(theme => {
-      if (!theme.isDark && !settingState.setting['common.isAutoTheme'] && !settingState.setting['theme.autoByTime']) return
-      applyTheme(theme)
-    })
   }
 
 

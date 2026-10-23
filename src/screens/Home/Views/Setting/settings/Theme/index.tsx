@@ -13,8 +13,8 @@ import PerformanceMode from './PerformanceMode'
 export default memo(() => {
   return (
     <>
-      <Theme />
       <IsAutoTheme />
+      <Theme />
       <IsHideBgDark />
       <IsDynamicBg />
       <BlurLevel />

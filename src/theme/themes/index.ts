@@ -2,7 +2,7 @@
 import { getUserTheme, saveUserTheme } from '@/utils/data'
 import themes from '@/theme/themes/themes'
 import settingState from '@/store/setting/state'
-import { isNightTime } from '@/theme/schedule'
+import { adaptThemeAppearance, getBaseThemeId, getThemeAppearance, isDarkAppearance } from '@/theme/appearance'
 import themeState from '@/store/theme/state'
 import { isUrl } from '@/utils'
 import { privateStorageDirectoryPath } from '@/utils/fs'
@@ -159,43 +159,11 @@ export const buildActiveThemeColors = (theme: LX.Theme): LX.ActiveTheme => {
 }
 
 
-// const copyTheme = (theme: LX.Theme): LX.Theme => {
-//   return {
-//     ...theme,
-//     config: {
-//       ...theme.config,
-//       extInfo: { ...theme.config.extInfo },
-//       themeColors: { ...theme.config.themeColors },
-//     },
-//   }
-// }
-// type IDS = LocalTheme['id']
+// 明暗是当前配色的外观，不再切换到另一套黑色主题。
 export const getTheme = async() => {
-  // fs.promises.readdir()
-  const shouldUseDarkColors = themeState.shouldUseDarkColors
-  // let themeId = settingState.setting['theme.id'] == 'auto'
-  //   ? shouldUseDarkColors
-  //     ? settingState.setting['theme.darkId']
-  //     : settingState.setting['theme.lightId']
-  //   // : 'china_ink'
-  //   : settingState.setting['theme.id']
-  let themeId = settingState.setting['theme.autoByTime']
-    ? isNightTime() ? settingState.setting['theme.darkId'] : settingState.setting['theme.lightId']
-    : settingState.setting['common.isAutoTheme'] && shouldUseDarkColors
-      ? 'black'
-      : settingState.setting['theme.id']
-  // themeId = 'naruto'
-  // themeId = 'pink'
-  // themeId = 'black'
-  let theme: LocalTheme | LX.Theme | undefined = themes.find(theme => theme.id == themeId)
-  if (!theme) {
-    userThemes = await getUserTheme()
-    theme = userThemes.find(theme => theme.id == themeId)
-    if (!theme) {
-      themeId = (settingState.setting['theme.autoByTime'] ? isNightTime() : settingState.setting['common.isAutoTheme'] && shouldUseDarkColors) ? 'black' : 'green'
-      theme = themes.find(theme => theme.id == themeId) as LX.Theme
-    }
-  }
-
-  return theme
+  const setting = settingState.setting
+  const id = getBaseThemeId(setting)
+  const info = await getAllThemes()
+  const theme = info.themes.find(theme => theme.id == id) ?? info.userThemes.find(theme => theme.id == id) ?? themes[0]
+  return adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(setting, theme.isDark), themeState.shouldUseDarkColors))
 }

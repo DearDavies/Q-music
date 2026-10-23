@@ -806,5 +806,13 @@
   "list_sync_preserve_local_tip": "Platform tracks follow the remote playlist. Extra songs added locally stay at the end and are not uploaded.",
   "download_selection_local": "The selected songs are already local files.",
   "download_selection_added": "Downloads submitted. View them on the Downloads page; existing tasks are skipped.",
-  "download_selection_failed": "Could not add downloads. Check permissions and music source settings, then retry."
+  "download_selection_failed": "Could not add downloads. Check permissions and music source settings, then retry.",
+  "theme_appearance": "Appearance",
+  "theme_appearance_light": "Light",
+  "theme_appearance_dark": "Dark",
+  "theme_appearance_system": "System",
+  "theme_appearance_time": "Scheduled",
+  "theme_appearance_tip": "Change the brightness while keeping your theme colors and background.",
+  "theme_appearance_time_tip": "Light from 07:00 to 19:00, dark otherwise. Your colors and background stay the same.",
+  "theme_palette_collapse": "Show less"
 }
