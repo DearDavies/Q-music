@@ -5,6 +5,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 function load(file, dependencies = {}, extra = {}) {
+  if (file != 'src/common/utils/playlistMerge.ts') dependencies['@common/utils/playlistMerge'] = load('src/common/utils/playlistMerge.ts')
   const context = { exports: {}, Error, console, ...extra, require: id => {
     if (!(id in dependencies)) throw Error(id)
     return dependencies[id]
@@ -76,6 +77,7 @@ const harness = (options = {}) => {
     '@renderer/utils/data': {
       getListUpdateInfo: async () => settings,
       setListSourceAccount: async (id, account) => { settings[id].sourceAccountId = account },
+      setListSourceSnapshot: async (id, snapshot) => { settings[id].sourceSnapshot = snapshot },
       setListUpdateTime: async (id, value) => { settings[id].updateTime = value },
     },
     './state': { userLists: lists },
@@ -176,9 +178,26 @@ test('收藏后的本地同步失败单独返回，不会推翻云端成功结�
   assert.equal(h.saved.length, 0)
 })
 
+test('同步期间手动追加的异源歌曲在覆盖后保留，失败时不提前推进来源快照', async () => {
+  const gate = deferred()
+  const previous = { sourceKey: 'tx:dir:201', musicKeys: ['tx:removed'] }
+  const h = harness({ fetchGate: gate, settings: { sourceSnapshot: previous } })
+  h.cached.splice(0, h.cached.length, { id: 'removed', source: 'tx' })
+  const task = h.default(h.target)
+  await tick()
+  const manual = { id: 'extra', source: 'kg' }
+  h.cached.push(manual)
+  gate.resolve(); await task
+  assert.deepEqual(plain(h.saved[0].musicInfos), [{ id: 'new' }, { id: 'old' }, manual])
+  assert.equal(h.settings.local.sourceSnapshot.musicKeys.includes('kg:extra'), false)
+  const failed = harness({ saveError: true, settings: { sourceSnapshot: previous } })
+  await assert.rejects(failed.default(failed.target), /disk/)
+  assert.equal(failed.settings.local.sourceSnapshot, previous)
+})
+
 const importHarness = (options = {}) => {
   const lists = options.existing ? [{ id: 'local', source: 'tx', sourceListId: 'dir:201' }] : []
-  const settings = options.existing ? { local: { updateTime: 123, isAutoUpdate: false, sourceAccountId: 'account-a' } } : {}
+  const settings = options.existing ? { local: { updateTime: 123, isAutoUpdate: false, sourceAccountId: 'account-a', sourceSnapshot: { sourceKey: 'tx:dir:201', musicKeys: ['tx:old'] } } } : {}
   const saved = []; const fetched = []
   const api = load('src/renderer/views/List/MyList/importPlaylist.ts', {
     '@common/constants': { LIST_IDS: { LOVE: 'love' } },
@@ -186,13 +205,14 @@ const importHarness = (options = {}) => {
     '@renderer/utils/request': {}, '@renderer/utils/musicSdk': { tx: { songList: { filterListDetail: rows => rows } } }, '@renderer/store/songList/action': {},
     '@renderer/store/list/state': { userLists: lists },
     '@renderer/store/list/action': {
-      getListMusics: async () => [{ source: 'tx', meta: { songId: 'old' }, name: 'cached' }],
+      getListMusics: async () => [{ id: 'old', source: 'tx', meta: { songId: 'old' }, name: 'cached' }],
       overwriteListMusics: async data => { saved.push(data) },
       createUserList: async data => { saved.push(data) },
     },
     '@renderer/utils/data': {
       getListUpdateInfo: async () => settings,
       setListSourceAccount: async (id, value) => { settings[id] ??= {}; settings[id].sourceAccountId = value },
+      setListSourceSnapshot: async (id, snapshot) => { settings[id] ??= {}; settings[id].sourceSnapshot = snapshot },
       setListAutoUpdate: async (id, value) => { settings[id].isAutoUpdate = value },
       setListUpdateTime: async (id, value) => { settings[id].updateTime = value },
     },
@@ -202,7 +222,7 @@ const importHarness = (options = {}) => {
     '@renderer/utils/musicSdk/tx/musicInfo': async id => {
       fetched.push(id)
       if (id == options.missing) return null
-      return { source: 'tx', meta: { songId: id }, name: id }
+      return { id, source: 'tx', meta: { songId: id }, name: id }
     },
   })
   return { ...api, settings, saved, fetched, run: () => api.importAccountPlaylist({ provider: 'tx', playlist: { id: 'dir:201', name: '我喜欢', accountId: 'account-a', trackCount: 2 }, target: 'new' }) }

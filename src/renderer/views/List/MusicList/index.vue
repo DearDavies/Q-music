@@ -323,7 +323,7 @@ export default {
           break
         case 'play':
           if (isCurrentMusic(list.value[index])) togglePlay()
-          else handlePlayMusic(index, true)
+          else void handlePlayMusic(index, true)
           break
         case 'search':
           handleSearch(index)

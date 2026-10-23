@@ -1,7 +1,7 @@
 <template>
   <material-modal :show="modelValue" bg-close="bg-close" teleport="#view" @close="$emit('update:modelValue', false)">
     <main :class="$style.main">
-      <h2>{{ $t('theme_selector_modal__title') }}</h2>
+      <h2>{{ $t(appSetting['theme.autoByTime'] ? 'setting_theme_time_colors' : 'theme_selector_modal__title') }}</h2>
       <div class="scroll" :class="$style.content">
         <div>
           <h3>{{ $t('theme_selector_modal__light_title') }}</h3>
@@ -31,7 +31,7 @@
         </div>
       </div>
       <div :class="$style.note">
-        <p>{{ $t('theme_selector_modal__title_tip') }}</p>
+        <p>{{ $t(appSetting['theme.autoByTime'] ? 'setting_theme_time_tip' : 'theme_selector_modal__title_tip') }}</p>
       </div>
     </main>
   </material-modal>

@@ -12,7 +12,7 @@ const defaultOptions = {
 }
 
 export const dialog = function(options) {
-  const { message, showCancel, cancelButtonText, confirmButtonText, teleport, selection } =
+  const { message, showCancel, cancelButtonText, confirmButtonText, teleport, selection, checkboxLabel = '', onCheckboxChange } =
     Object.assign({}, defaultOptions, typeof options == 'string' ? { message: options } : options || {})
   return new Promise((resolve, reject) => {
     let app = createApp(Dialog, {
@@ -32,6 +32,11 @@ export const dialog = function(options) {
     instance.confirmButtonText = confirmButtonText
     instance.teleport = teleport
     instance.selection = selection
+    instance.checkboxLabel = checkboxLabel
+    instance.handleCheckboxChange = checked => {
+      instance.checkboxChecked = checked
+      onCheckboxChange?.(checked)
+    }
 
     // 挂载
     document.getElementById('container').appendChild(instance.$el)

@@ -1,5 +1,6 @@
 import { reactive } from '@common/utils/vueTools'
-import { getListUpdateInfo, setListSourceAccount, setListUpdateTime } from '@renderer/utils/data'
+import { getListUpdateInfo, setListSourceAccount, setListSourceSnapshot, setListUpdateTime } from '@renderer/utils/data'
+import { createSourceSnapshot, mergeSourcePlaylist } from '@common/utils/playlistMerge'
 import { setFetchingListStatus, overwriteListMusics, getListMusics } from './action'
 import { userLists } from './state'
 import { getListDetailAll } from '@renderer/store/songList/action'
@@ -51,7 +52,12 @@ const performSync = async(target: LX.List.UserListInfo, automatic: boolean) => {
     // 自动更新在保存前再次检查开关，用户中途关闭后不再覆盖本地。
     if (automatic && !(await getListUpdateInfo())[id]?.isAutoUpdate) return false
     listSyncStates[id] = { phase: 'save', current: list.length, total: list.length }
-    await overwriteListMusics({ listId: id, musicInfos: list })
+    // 保存前重新读本地列表，保留抓取期间手动追加的歌曲。
+    const sourceKey = `${source}:${sourceListId}`
+    const current = await getListMusics(id)
+    if (!stillLinked()) return false
+    await overwriteListMusics({ listId: id, musicInfos: mergeSourcePlaylist(current, list, sourceKey, settings?.sourceSnapshot) })
+    await setListSourceSnapshot(id, createSourceSnapshot(sourceKey, list))
     if (accountId) await setListSourceAccount(id, accountId)
     await setListUpdateTime(id, Date.now())
     listSyncStates[id] = { phase: 'success', current: list.length, total: list.length }

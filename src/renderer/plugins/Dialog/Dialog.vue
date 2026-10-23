@@ -1,6 +1,7 @@
 <template>
   <Modal :show="visible" :close-btn="false" :esc-close="true" :teleport="teleport" @close="handleCancel" @after-leave="afterLeave">
     <main class="scroll" :class="[$style.main, { 'select': selection }]">{{ message }}</main>
+    <div v-if="checkboxLabel" :class="$style.checkbox"><Checkbox :id="checkboxId" :model-value="checkboxChecked" :label="checkboxLabel" @update:model-value="handleCheckboxChange" /></div>
     <footer :class="$style.footer">
       <Btn v-if="showCancel" :class="$style.btn" @click="handleCancel">{{ cancelBtnText }}</Btn>
       <Btn :class="$style.btn" @click="handleComfirm">{{ confirmBtnText }}</Btn>
@@ -11,12 +12,15 @@
 <script>
 import Modal from '@renderer/components/material/Modal.vue'
 import Btn from '@renderer/components/base/Btn.vue'
+import Checkbox from '@renderer/components/base/Checkbox.vue'
 import { useI18n } from '@renderer/plugins/i18n'
 import { computed } from '@common/utils/vueTools'
+let checkboxSequence = 0
 export default {
   components: {
     Modal,
     Btn,
+    Checkbox,
   },
   props: {
     afterLeave: {
@@ -47,6 +51,9 @@ export default {
       confirmButtonText: '',
       teleport: '#root',
       selection: false,
+      checkboxLabel: '',
+      checkboxChecked: false,
+      checkboxId: `dialog-checkbox-${++checkboxSequence}`,
     }
   },
   computed: {
@@ -62,6 +69,7 @@ export default {
     el.parentNode.removeChild(el)
   },
   methods: {
+    handleCheckboxChange() {},
     handleCancel() {
     },
     handleComfirm() {
@@ -91,4 +99,5 @@ export default {
   justify-content: flex-end;
   gap: 15px;
 }
+.checkbox { padding: 12px 15px 0; font-size: 12px; }
 </style>

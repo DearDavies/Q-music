@@ -90,6 +90,7 @@ import {
   isShowPlayerDetail,
   musicInfo,
   playMusicInfo,
+  playbackSourceInfo,
   isPlay,
 } from '@renderer/store/player/state'
 import {
@@ -307,7 +308,7 @@ export default {
       setMusicUrl(musicInfo, true, quality)
     }
     const selectQuality = quality => {
-      if (appSetting['player.playQuality'] == quality) return
+      if (appSetting['player.playQuality'] == quality && (!playbackSourceInfo.value || playbackSourceInfo.value.quality == quality)) return
       updateSetting({ 'player.playQuality': quality })
       reloadCurrentMusic(quality)
     }
@@ -321,10 +322,10 @@ export default {
       // 选择原始平台（或再次点当前平台）应清掉显式覆盖；不能只比较
       // source，否则同一平台的不同歌曲会被误判为“无需切换”。
       if (!selected || isOriginalSelection) {
-        if (!currentToggle) return
+        if (!currentToggle && (!playbackSourceInfo.value || playbackSourceInfo.value.resolvedSource == original.source)) return
         current.meta.toggleMusicInfo = null
       } else {
-        if (currentToggle?.source == selected.source && currentToggle?.id == selected.id) return
+        if (currentToggle?.source == selected.source && currentToggle?.id == selected.id && playbackSourceInfo.value?.resolvedSource == selected.source) return
         current.meta.toggleMusicInfo = selected
       }
       reloadCurrentMusic(appSetting['player.playQuality'])

@@ -165,6 +165,13 @@ jobs:
         working-directory: mobile
         run: npm run test:downloads
 
+      - name: Verify playback preferences and playlist preservation
+        working-directory: mobile
+        run: |
+          npm run test:playback-preferences
+          npm run test:playlist-merge
+          npm run test:download-selection
+
       - name: Verify background playback and lyrics
         working-directory: mobile
         run: npm run test:background

@@ -4,6 +4,7 @@ import { ref } from '@common/utils/vueTools'
 import { getAndSetListDetail } from '@renderer/store/leaderboard/action'
 import { listDetailInfo } from '@renderer/store/leaderboard/state'
 import { playSongListDetail } from '../action'
+import { playFromPage } from '@renderer/core/player/selection'
 
 export default () => {
   const listRef = ref<any>(null)
@@ -17,7 +18,8 @@ export default () => {
     queueLoading.value = true
     queueError.value = false
     try {
-      await playSongListDetail(listDetailInfo.id, fromStart ? undefined : [...listDetailInfo.list], fromStart ? 0 : index)
+      if (fromStart) await playSongListDetail(listDetailInfo.id)
+      else await playFromPage(`board_${listDetailInfo.id}`, listDetailInfo.list, index)
     } catch {
       if (requestId == playRequestId) queueError.value = true
     } finally {

@@ -11,6 +11,8 @@ import {
 } from '@renderer/store/list/listManage'
 import { toRaw } from '@common/utils/vueTools'
 import { LIST_IDS } from '@common/constants'
+import { createSourceSnapshot } from '@common/utils/playlistMerge'
+import { setListSourceSnapshot } from '@renderer/utils/data'
 
 export const registerAction = (onListChanged: (listIds: string[]) => void) => {
   return registerListAction(appSetting, onListChanged)
@@ -73,10 +75,11 @@ export const createUserList = async({ name, id = `userlist_${Date.now()}`, list 
     ],
   })
   if (list) await addListMusics(id, list)
+  if (source && sourceListId) await setListSourceSnapshot(id, createSourceSnapshot(`${source}:${sourceListId}`, list))
 }
 
 
-export const setTempList = async(id: string, list: LX.Music.MusicInfoOnline[]) => {
+export const setTempList = async(id: string, list: LX.Music.MusicInfo[]) => {
   tempListMeta.id = id
   await overwriteListMusics({
     listId: LIST_IDS.TEMP,

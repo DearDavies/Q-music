@@ -110,6 +110,8 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.isFontWeightExtended': true,
 
   'list.isClickPlayList': false,
+  'list.singlePlayMode': 'replace',
+  'player.preferLocal': true,
   'list.isShowSource': true,
   'list.isSaveScrollLocation': true,
   'list.addMusicLocationType': 'top',
@@ -159,6 +161,7 @@ const defaultSetting: LX.AppSetting = {
   'theme.id': 'green',
   'theme.lightId': 'green',
   'theme.darkId': 'black',
+  'theme.autoByTime': false,
   'theme.glassOpacity': 22,
   'theme.glassBlur': 20,
   'theme.customBgImage': '',

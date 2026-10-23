@@ -3,7 +3,7 @@ import { ref } from '@common/utils/vueTools'
 // import { } from '@renderer/store/search/state'
 import { getAndSetListDetail } from '@renderer/store/songList/action'
 import { listDetailInfo } from '@renderer/store/songList/state'
-import { playSongListDetail } from './action'
+import { playFromPage } from '@renderer/core/player/selection'
 
 export default () => {
   const listRef = ref<any>(null)
@@ -19,7 +19,7 @@ export default () => {
   }
 
   const handlePlayList = (index: number) => {
-    void playSongListDetail(listDetailInfo.id, listDetailInfo.source, listDetailInfo.list, index)
+    void playFromPage(`songlist_${listDetailInfo.source}_${listDetailInfo.id}`, listDetailInfo.list, index)
   }
 
 

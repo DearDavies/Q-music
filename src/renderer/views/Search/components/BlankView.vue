@@ -294,6 +294,7 @@ import { getDailyRecommend } from '@renderer/core/dailyRecommend'
 import { setTempList } from '@renderer/store/list/action'
 import { playList, togglePlay } from '@renderer/core/player/action'
 import { isPlay, playMusicInfo } from '@renderer/store/player/state'
+import { playFromPage } from '@renderer/core/player/selection'
 import { getPicPath } from '@renderer/core/music'
 import { LIST_IDS } from '@common/constants'
 import { getMusicAccountDaily, getMusicAccountPlaylistDetail, getMusicAccountPlaylists, getMusicAccountStatus, getQQDailyKeyStatus, loginMusicAccount, logoutMusicAccount, openQQDailyKeyPage, saveQQDailyApiKey } from '@renderer/utils/ipc'
@@ -496,10 +497,11 @@ watch(
   { immediate: true },
 )
 
-const playDailyRecommend = async(index = 0) => {
+const playDailyRecommend = async(index) => {
   if (!dailyRecommendList.value.length) return
+  if (typeof index == 'number') { await playFromPage('daily_selection', dailyRecommendList.value, index); return }
   await setTempList(`q_daily_${new Date().toISOString().slice(0, 10)}`, [...dailyRecommendList.value])
-  playList(LIST_IDS.TEMP, index)
+  playList(LIST_IDS.TEMP, 0)
 }
 
 const openDailyDetail = () => {
@@ -592,7 +594,7 @@ const openAccountPlaylist = async(playlist) => {
 }
 
 const isCurrentTrack = item => playMusicInfo.musicInfo?.id == item.id
-const playDetailList = async(index = 0) => {
+const playDetailList = async(index) => {
   const list = detailMusicList.value
   if (!list.length) return
   if (list[index] && isCurrentTrack(list[index])) {
@@ -600,8 +602,9 @@ const playDetailList = async(index = 0) => {
     return
   }
   const listId = detailKind.value == 'playlist' ? `q_playlist_${selectedAccountPlaylistProvider.value}_${selectedAccountPlaylist.value?.id ?? 'unknown'}` : `q_daily_${new Date().toISOString().slice(0, 10)}`
+  if (typeof index == 'number') { await playFromPage(listId, list, index); return }
   await setTempList(listId, [...list])
-  playList(LIST_IDS.TEMP, index)
+  playList(LIST_IDS.TEMP, 0)
 }
 
 const refreshAccountStatus = async() => {

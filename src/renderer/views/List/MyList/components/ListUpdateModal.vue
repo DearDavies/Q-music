@@ -38,6 +38,7 @@
     </main>
     <div :class="$style.footer">
       <div :class="$style.tips">{{ $t('list_update_modal__tips') }}</div>
+      <div :class="$style.tips">{{ $t('list_sync_preserve_local_tip') }}</div>
     </div>
   </material-modal>
 </template>

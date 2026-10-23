@@ -29,11 +29,15 @@ dd
 dd
   h3#basic_theme {{ $t('setting__basic_theme') }}
   div
+    .gap-top
+      base-checkbox(id="setting_theme_time" :model-value="appSetting['theme.autoByTime']" :label="$t('setting_theme_time')" @update:model-value="updateSetting({'theme.autoByTime': $event})")
+      p {{ $t('setting_theme_time_tip') }}
+      base-btn.btn(v-if="appSetting['theme.autoByTime']" min @click="isShowThemeSelectorModal = true") {{ $t('setting_theme_time_colors') }}
     ul(:class="$style.theme")
-      li(v-for="theme in themeList" :key="theme.id" :aria-label="theme.name" :style="theme.styles" :class="[$style.themeItem, {[$style.active]: themeId == theme.id}]" @click="toggleTheme(theme)" @contextmenu="handleEditTheme(theme)")
+      li(v-for="theme in themeList" :key="theme.id" :aria-label="theme.name" :style="theme.styles" :class="[$style.themeItem, {[$style.active]: !appSetting['theme.autoByTime'] && themeId == theme.id}]" @click="toggleTheme(theme)" @contextmenu="handleEditTheme(theme)")
         div(:class="$style.bg")
         span(:class="$style.label") {{ theme.name }}
-      li(v-if="showAllTheme || themeId == 'auto'" :aria-label="$t('theme_auto_tip')" :style="autoTheme" :class="[$style.themeItem, $style.auto, {[$style.active]: themeId == 'auto'}]" @click="handleSetThemeAuto" @contextmenu="isShowThemeSelectorModal = true")
+      li(v-if="showAllTheme || themeId == 'auto'" :aria-label="$t('theme_auto_tip')" :style="autoTheme" :class="[$style.themeItem, $style.auto, {[$style.active]: !appSetting['theme.autoByTime'] && themeId == 'auto'}]" @click="handleSetThemeAuto" @contextmenu="isShowThemeSelectorModal = true")
         div(:class="$style.bg")
           div(:class="$style.bgContent")
             div(:class="$style.light")
@@ -263,10 +267,10 @@ export default {
       updateSetting({ 'tray.enable': action == 'tray' })
     }
     const toggleTheme = (theme) => {
-      if (themeId.value == theme.id) return
+      if (themeId.value == theme.id && !appSetting['theme.autoByTime']) return
       themeId.value = theme.id
+      updateSetting({ 'theme.id': theme.id, 'theme.autoByTime': false })
       applyTheme(theme.id, appSetting['theme.lightId'], appSetting['theme.darkId'], dataPath)
-      updateSetting({ 'theme.id': theme.id })
     }
 
     watch(() => [appSetting['theme.lightId'], appSetting['theme.darkId']], () => {
@@ -274,7 +278,7 @@ export default {
     })
     const isShowThemeSelectorModal = ref(false)
     const handleSetThemeAuto = () => {
-      if (themeId.value == 'auto') return
+      if (themeId.value == 'auto' && !appSetting['theme.autoByTime']) return
       if (window.localStorage.getItem('theme-auto-tip') != 'true') {
         window.localStorage.setItem('theme-auto-tip', 'true')
         void dialog({

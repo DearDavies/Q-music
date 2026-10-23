@@ -18,6 +18,9 @@ import {
   getLyricInfo as getLocalLyricInfo,
 } from './local'
 
+import { findLocalPlayback } from './preferLocal'
+import { appSetting } from '@renderer/store/setting'
+import { requestMsg } from '@renderer/utils/message'
 export { isCustomApiSource } from './utils'
 
 export interface MusicUrlResolvedInfo {
@@ -68,6 +71,11 @@ export const getMusicUrl = async({
   } else if (musicInfo.source == 'local') {
     return getLocalMusicUrl({ musicInfo, isRefresh, onToggleSource, onResolved, allowToggleSource, requestOptions })
   } else {
+    if (appSetting['player.preferLocal'] && !isRefresh) {
+      const local = await findLocalPlayback(musicInfo, quality ?? appSetting['player.playQuality'], requestOptions).catch(() => null)
+      if (requestOptions?.signal?.aborted) throw new Error(requestMsg.cancelRequest)
+      if (local) { onResolved?.(local.info); return local.url }
+    }
     return getOnlineMusicUrl({ musicInfo, isRefresh, quality, onToggleSource, onResolved, allowToggleSource, requestOptions })
   }
 }

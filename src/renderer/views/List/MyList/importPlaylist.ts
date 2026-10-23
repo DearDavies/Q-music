@@ -4,7 +4,8 @@ import { httpFetch } from '@renderer/utils/request'
 import musicSdk from '@renderer/utils/musicSdk'
 import { getListDetail } from '@renderer/store/songList/action'
 import { addListMusics, createUserList, overwriteListMusics, getListMusics } from '@renderer/store/list/action'
-import { getListUpdateInfo, setListSourceAccount, setListAutoUpdate, setListUpdateTime } from '@renderer/utils/data'
+import { getListUpdateInfo, setListSourceAccount, setListSourceSnapshot, setListAutoUpdate, setListUpdateTime } from '@renderer/utils/data'
+import { createSourceSnapshot, mergeSourcePlaylist } from '@common/utils/playlistMerge'
 import { resolveQQPlaylistTracks } from '@common/utils/qqPlaylist'
 import { userLists } from '@renderer/store/list/state'
 import { getMusicAccountPlaylistDetail, type MusicAccountPlaylist, type MusicAccountProvider } from '@renderer/utils/ipc'
@@ -436,8 +437,12 @@ export const importAccountPlaylist = async(
 
   if (params.target == 'new') {
     const listId = existing?.id ?? `userlist_${Date.now()}`
+    const sourceKey = `${params.provider}:${params.playlist.id}`
     if (existing) {
-      await overwriteListMusics({ listId: existing.id, musicInfos: list })
+      const current = await getListMusics(existing.id)
+      assertNotCancelled(shouldCancel)
+      if (!userLists.some(item => item.id == existing.id && item.source == params.provider && item.sourceListId == params.playlist.id)) throw new ExternalImportError('cancelled')
+      await overwriteListMusics({ listId: existing.id, musicInfos: mergeSourcePlaylist(current, list, sourceKey, updateInfo?.sourceSnapshot) })
     } else {
       await createUserList({
         id: listId,
@@ -447,6 +452,7 @@ export const importAccountPlaylist = async(
         sourceListId: params.playlist.id,
       })
     }
+    await setListSourceSnapshot(listId, createSourceSnapshot(sourceKey, list))
     if (params.provider == 'tx' && accountId) {
       await setListSourceAccount(listId, accountId)
       if (!existing || updateInfo == null) await setListAutoUpdate(listId, true)

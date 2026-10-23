@@ -9,6 +9,7 @@ import { formatMusicName, toOldMusicInfo } from '@renderer/utils/index'
 import { addDislikeInfo, hasDislike } from '@renderer/core/dislikeList'
 import { playNext } from '@renderer/core/player'
 import { playMusicInfo } from '@renderer/store/player/state'
+import { trashLocalMusic } from '@renderer/utils/removeLocalMusic'
 
 
 export default ({ props, list, selectedList, removeAllSelect }) => {
@@ -52,6 +53,29 @@ export default ({ props, list, selectedList, removeAllSelect }) => {
   }
 
   const handleRemoveMusic = async(index, single) => {
+    const targets = selectedList.value.length && !single ? [...selectedList.value] : [list.value[index]].filter(Boolean)
+    if (targets.some(music => music.source == 'local')) {
+      const listId = props.listId
+      let deleteFiles = false
+      if (!await dialog.confirm({
+        message: t('local_remove_tip', { count: targets.length }),
+        checkboxLabel: t('local_remove_files'),
+        onCheckboxChange: checked => { deleteFiles = checked },
+        confirmButtonText: t('lists__remove_tip_button'),
+      })) return
+      const removed = []
+      let failed = 0
+      for (const music of targets) {
+        try {
+          if (deleteFiles && music.source == 'local') await trashLocalMusic(music)
+          removed.push(music.id)
+        } catch { failed++ }
+      }
+      if (removed.length) await removeListMusics({ listId, ids: removed })
+      removeAllSelect()
+      if (failed) await dialog({ message: t('local_remove_failed', { count: failed }) })
+      return
+    }
     if (selectedList.value.length && !single) {
       const confirm = await (selectedList.value.length > 1
         ? dialog.confirm({

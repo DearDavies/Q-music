@@ -104,6 +104,8 @@ jobs:
         run: |
           npm test
           npm run test:downloads
+          npm run test:playback-preferences
+          npm run test:playlist-merge
 
       - name: Build pacman package
         run: npm run pack:arch

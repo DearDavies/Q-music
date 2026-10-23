@@ -7,6 +7,8 @@
 // }
 import { encodePath, isUrl } from '@common/utils/common'
 import { buildThemeMaterial } from '@common/theme/material'
+import { isNightTime } from '@common/theme/schedule'
+import { appSetting } from './setting'
 import { joinPath } from '@common/utils/nodejs'
 import { markRaw, shallowReactive } from '@common/utils/vueTools'
 import { getThemes as getTheme } from '@renderer/utils/ipc'
@@ -74,15 +76,17 @@ export const applyTheme = (id: string, lightId: string, darkId: string, dataPath
   const currentApplyThemeId = ++applyThemeId
   getThemes((themeInfo) => {
     if (currentApplyThemeId != applyThemeId) return
-    let themeId = id == 'auto'
-      ? themeShouldUseDarkColors.value
+    const isAutomatic = appSetting['theme.autoByTime'] || id == 'auto'
+    const isDark = appSetting['theme.autoByTime'] ? isNightTime() : themeShouldUseDarkColors.value
+    let themeId = isAutomatic
+      ? isDark
         ? darkId
         : lightId
       : id
 
     let theme = findTheme(themeInfo, themeId)
     if (!theme) {
-      themeId = id == 'auto' && themeShouldUseDarkColors.value ? 'black' : 'green'
+      themeId = isAutomatic && isDark ? 'black' : 'green'
       theme = themeInfo.themes.find(theme => theme.id == themeId) ?? themeInfo.themes[0]
     }
     if (!theme) return

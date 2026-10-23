@@ -36,9 +36,9 @@
         </div>
       </div>
       <div :class="$style.options">
-        <button v-for="option in options" :key="option.value" type="button" :class="[$style.option, { [$style.active]: appSetting['player.playQuality'] == option.value }]" @click="selectQuality(option.value)">
+        <button v-for="option in options" :key="option.value" type="button" :class="[$style.option, { [$style.active]: activeQuality == option.value }]" @click="selectQuality(option.value)">
           <span><b><source-icon v-if="resolvedSource" :source="resolvedSource" :size="15" />{{ option.label }}</b><small>{{ option.meta }}</small></span>
-          <svg v-if="appSetting['player.playQuality'] == option.value" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4L19 7" /></svg>
+          <svg v-if="activeQuality == option.value" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4L19 7" /></svg>
         </button>
       </div>
       <p v-if="needsMembershipHint" :class="$style.hint">{{ $t('player__quality_membership_hint') }}</p>
@@ -100,9 +100,6 @@ const formatSize = size => {
 // 请求源是用户选择的平台，解析源是当前实际拿到音频地址的平台。
 // 官方音源不可用时两者可能不同，面板需要同时展示这两个状态。
 const requestedSource = computed(() => props.musicInfo?.meta?.toggleMusicInfo?.source ?? props.musicInfo?.source)
-// 源选择高亮表示用户请求的平台；实际解析到的平台单独在顶部 route 中展示。
-// 保留这个别名供模板复用，避免请求源与解析源混淆。
-const effectiveSource = requestedSource
 const getMusicKey = music => music ? `${music.source}:${music.id}` : ''
 const activePlaybackSourceInfo = computed(() => {
   const info = playbackSourceInfo.value
@@ -110,6 +107,12 @@ const activePlaybackSourceInfo = computed(() => {
   return info
 })
 const resolvedSource = computed(() => activePlaybackSourceInfo.value?.resolvedSource ?? requestedSource.value)
+// 回退后的勾选与实际播放线路一致，请求来源仍由顶部提示保留。
+const effectiveSource = resolvedSource
+const activeQuality = computed(() => {
+  const quality = activePlaybackSourceInfo.value ? activePlaybackSourceInfo.value.quality : appSetting['player.playQuality']
+  return ['ape', 'wav'].includes(quality) ? 'flac' : quality
+})
 const getResolvedMusicInfo = () => {
   const source = resolvedSource.value
   if (!source || !props.musicInfo) return props.musicInfo
@@ -218,7 +221,7 @@ onBeforeUnmount(() => {
 })
 const selectQuality = value => { emit('select', value); close() }
 const selectSource = item => {
-  emit('select-source', item.source == requestedSource.value ? null : item)
+  if (item.source != effectiveSource.value) emit('select-source', item.source == props.musicInfo?.source ? null : item)
   close()
 }
 </script>

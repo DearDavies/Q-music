@@ -9,6 +9,7 @@ const root = path.join(__dirname, '..')
 const mobile = fs.existsSync(path.join(root, 'src/core/musicAccount/kugouApi.ts'))
 const base = mobile ? 'src/core/musicAccount' : 'src/common/utils'
 function load(file, dependencies = {}, extra = {}) {
+  if (file == 'src/renderer/views/List/MyList/importPlaylist.ts') dependencies['@common/utils/playlistMerge'] = load('src/common/utils/playlistMerge.ts')
   const context = { exports: {}, Error, URL, URLSearchParams, AbortController, AbortSignal, setTimeout, clearTimeout, console, ...extra,
     require: id => { if (!(id in dependencies)) throw Error(id); return dependencies[id] },
   }

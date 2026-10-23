@@ -494,6 +494,8 @@ declare global {
        * 是否启用双击列表里的歌曲时自动切换到当前列表播放（仅对歌单、排行榜有效）
        */
       'list.isClickPlayList': boolean
+      'list.singlePlayMode': 'replace' | 'add'
+      'player.preferLocal': boolean
 
       /**
        * 是否显示歌曲来源（仅对我的列表有效）
@@ -614,6 +616,7 @@ declare global {
        * 暗色主题id
        */
       'theme.darkId': string
+      'theme.autoByTime': boolean
 
       /**
        * 毛玻璃面板不透明度（百分比 8-70）

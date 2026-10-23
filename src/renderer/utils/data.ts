@@ -124,6 +124,12 @@ export const setListSourceAccount = async(id: string, accountId: string) => {
   listUpdateInfo[id] = targetInfo
   saveListUpdateInfo()
 }
+export const setListSourceSnapshot = async(id: string, sourceSnapshot: NonNullable<LX.List.ListUpdateInfo[string]['sourceSnapshot']>) => {
+  await initListUpdateInfo()
+  const info = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }
+  listUpdateInfo[id] = { ...info, sourceSnapshot }
+  saveListUpdateInfo()
+}
 export const setListUpdateTime = async(id: string, time: number) => {
   await initListUpdateInfo()
   const targetInfo = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }

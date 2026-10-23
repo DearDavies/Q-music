@@ -2,7 +2,6 @@
 import { defaultList } from '@renderer/store/list/state'
 import { getListMusics, addListMusics } from '@renderer/store/list/action'
 import { addTempPlayList } from '@renderer/store/player/action'
-import { appSetting } from '@renderer/store/setting'
 import { type Ref } from '@common/utils/vueTools'
 import { playList } from '@renderer/core/player'
 import { LIST_IDS } from '@common/constants'
@@ -22,7 +21,7 @@ export default ({ selectedList, props, removeAllSelect, emit }: {
   const handlePlayMusic = async(index: number, single: boolean) => {
     let targetSong = props.list[index]
     if (!targetSong) return
-    if (props.playInContext && (single || !selectedList.value.length)) {
+    if (single || !selectedList.value.length) {
       emit('play-list', index)
       return
     }
@@ -57,11 +56,7 @@ export default ({ selectedList, props, removeAllSelect, emit }: {
       clickIndex = index
       return
     }
-    if (props.playInContext === true || appSetting['list.isClickPlayList']) {
-      emit('play-list', index)
-    } else {
-      void handlePlayMusic(index, true)
-    }
+    void handlePlayMusic(index, true)
     clickTime = 0
     clickIndex = -1
   }

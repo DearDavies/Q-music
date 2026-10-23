@@ -175,6 +175,11 @@ jobs:
           npm run test:local-music
           if ($LASTEXITCODE -ne 0) { throw 'Local music tests failed.' }
           npm run test:downloads
+          if ($LASTEXITCODE -ne 0) { throw 'Download tests failed.' }
+          npm run test:playback-preferences
+          if ($LASTEXITCODE -ne 0) { throw 'Playback preference tests failed.' }
+          npm run test:playlist-merge
+          if ($LASTEXITCODE -ne 0) { throw 'Playlist merge tests failed.' }
 
       - name: Build Windows x64 installer
         run: npm run pack

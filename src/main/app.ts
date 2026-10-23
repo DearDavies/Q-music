@@ -284,7 +284,18 @@ export const listenerAppEvent = (startApp: () => void) => {
 
 const initTheme = () => {
   global.lx.theme = getTheme()
-  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId']
+  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime']
+  const refreshScheduledTheme = () => {
+    if (!global.lx.appSetting['theme.autoByTime']) return
+    const next = getTheme()
+    if (next.theme.isDark == global.lx.theme.theme.isDark && next.theme.name == global.lx.theme.theme.name) return
+    global.lx.theme = next
+    global.lx.event_app.theme_change()
+  }
+  const scheduleTimer = setInterval(refreshScheduledTheme, 60_000)
+  scheduleTimer.unref()
+  app.on('browser-window-focus', refreshScheduledTheme)
+  app.once('before-quit', () => { clearInterval(scheduleTimer) })
   global.lx.event_app.on('updated_config', (keys) => {
     let requireUpdate = false
     for (const key of keys) {

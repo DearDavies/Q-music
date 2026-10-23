@@ -6,6 +6,10 @@ const vm = require('node:vm')
 const ts = require('typescript')
 
 function load(file, dependencies = {}) {
+  if (file == 'src/renderer/store/list/action.ts') {
+    dependencies['@common/utils/playlistMerge'] = load('src/common/utils/playlistMerge.ts')
+    dependencies['@renderer/utils/data'] = {}
+  }
   const context = { exports: {}, setTimeout, clearTimeout, Number, console: { log() {} }, window: { i18n: { t: key => key } }, require: id => {
     if (!(id in dependencies)) throw Error(id)
     return dependencies[id]
@@ -39,6 +43,7 @@ test('离开并返回同一专辑不重新请求或清空曲目，切换专辑�
     '@renderer/store/search/albums': { albumSources: ['tx'], getAlbumTracks: async (_, id) => { calls++; return [{ id, meta: {} }] } },
     '@renderer/store/search/action': {}, '@renderer/store/list/action': {},
     '@renderer/core/player/action': {}, '@common/constants': {},
+    '@renderer/core/player/selection': {},
   }).default
   try {
     const state = scope.run(() => component.setup(vue.reactive({ source: 'tx', page: 1, text: '歌手' }), { expose() {} }))
@@ -193,7 +198,7 @@ test('酷狗专辑按 hash 恢复顺序，详情缺失不会以部分曲目冒�
   await assert.rejects(api.getAlbumTracks('kg', '123'), /Incomplete/)
 })
 
-test('排行榜和专辑行内播放接入上下文队列，普通搜索继续沿用单曲播放', async () => {
+test('排行榜、专辑和搜索的单曲操作统一交给页面队列入口，不再绕过播放偏好', async () => {
   const events = []
   const added = []
   const song = { id: 'tx_1', source: 'tx' }
@@ -209,7 +214,8 @@ test('排行榜和专辑行内播放接入上下文队列，普通搜索继续�
   assert.deepEqual(events, [['play-list', 0]])
   props.playInContext = false
   await api.handlePlayMusic(0, true)
-  assert.equal(added.length, 1)
+  assert.equal(added.length, 0)
+  assert.deepEqual(events, [['play-list', 0], ['play-list', 0]])
 })
 
 test('先后播放两个榜单，同榜单再次播放，旧完整列表均不能覆盖最后一次队列', async () => {

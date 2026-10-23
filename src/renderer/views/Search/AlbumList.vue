@@ -8,7 +8,7 @@
           <h2>{{ album.name || $t('music_album') }}</h2>
           <p><source-icon :source="albumSource" :size="16" /> {{ album.singer }}<span v-if="tracks.length"> · {{ $t('album__tracks', { count: tracks.length }) }}</span></p>
         </div>
-        <base-btn :disabled="loading || !tracks.length || queueLoading" @click="playAlbum(0)">{{ $t('list__play_all') }}</base-btn>
+        <base-btn :disabled="loading || !tracks.length || queueLoading" @click="playAlbum(0, true)">{{ $t('list__play_all') }}</base-btn>
       </header>
       <div v-if="error" :class="$style.message" role="status"><p>{{ $t('list__load_failed') }}</p><base-btn @click="load">{{ $t('search__retry') }}</base-btn></div>
       <material-online-list
@@ -59,6 +59,7 @@ import { albumSources, searchAlbums, getAlbumTracks } from '@renderer/store/sear
 import { addHistoryWord } from '@renderer/store/search/action'
 import { setTempList } from '@renderer/store/list/action'
 import { playList } from '@renderer/core/player/action'
+import { playFromPage } from '@renderer/core/player/selection'
 import { LIST_IDS } from '@common/constants'
 
 const props = defineProps({ source: { type: String, required: true }, page: { type: Number, required: true }, text: { type: String, required: true } })
@@ -145,12 +146,13 @@ const searchQuery = () => {
 const backToAlbums = () => { void router.push({ path: '/search', query: searchQuery() }) }
 const changePage = page => { searchCache.clear(); void router.push({ path: '/search', query: { ...searchQuery(), page } }) }
 const changeSource = source => { void router.replace({ path: '/search', query: { ...searchQuery(), source, page: 1 } }) }
-const playAlbum = async(index) => {
+const playAlbum = async(index, all = false) => {
   if (queueLoading.value || !tracks.value[index]) return
   queueLoading.value = true
   queueError.value = false
   const current = revision
   try {
+    if (!all) { await playFromPage(`album__${albumSource.value}__${albumId.value}`, tracks.value, index); return }
     await setTempList(`album__${albumSource.value}__${albumId.value}`, [...tracks.value])
     if (current == revision) playList(LIST_IDS.TEMP, index)
   } catch {
