@@ -101,7 +101,9 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npm test
+        run: |
+          npm test
+          npm run test:downloads
 
       - name: Build pacman package
         run: npm run pack:arch

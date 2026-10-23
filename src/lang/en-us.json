@@ -1064,5 +1064,12 @@
   "search__account_collapse": "Collapse",
   "search__empty": "No matching songs. Try another keyword or source.",
   "search__page_empty": "No songs on this page. Go back or retry.",
-  "search__retry": "Reload"
+  "search__retry": "Reload",
+  "download_empty_title": "No downloads yet",
+  "download_empty_hint": "Choose Download from a song menu or the player to add music here.",
+  "download_filter_empty": "No downloads in this category",
+  "download_filter_hint": "Switch to all downloads to see tasks with other statuses.",
+  "download_tasks_adding": "Adding downloads…",
+  "download_track_title": "Download song",
+  "download_local_skipped": "Skipped {count} local songs that are already on your device."
 }

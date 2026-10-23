@@ -59,12 +59,12 @@ const displayInfo = computed(() => {
   height: 56px;
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid rgba(54, 83, 70, .08);
+  border-bottom: 1px solid var(--q-outline);
   transition: background-color @transition-fast;
 
   &:hover,
   &:focus-within {
-    background-color: rgba(67, 118, 94, .06);
+    background-color: var(--q-surface-soft);
 
     .remove {
       opacity: .8;
@@ -109,7 +109,7 @@ const displayInfo = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(54, 58, 60, .5);
+  color: var(--color-font-label);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 
@@ -144,13 +144,13 @@ const displayInfo = computed(() => {
 }
 
 .singer {
-  color: rgba(54, 58, 60, .54);
+  color: var(--color-font-label);
   font-size: 11px;
   line-height: 16px;
 }
 
 .duration {
-  color: rgba(54, 58, 60, .48);
+  color: var(--color-font-label);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -168,7 +168,7 @@ const displayInfo = computed(() => {
   justify-content: center;
   border: none;
   border-radius: 50%;
-  color: rgba(54, 58, 60, .58);
+  color: var(--color-font-label);
   background: transparent;
   cursor: pointer;
   opacity: .28;

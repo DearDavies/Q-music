@@ -6,7 +6,6 @@ import { LIST_IDS } from '@common/constants'
 
 
 export default (activeTab) => {
-  const rightClickSelectedIndex = ref(-1)
   const dom_listContent = ref(null)
 
   const listAll = ref([])
@@ -33,7 +32,6 @@ export default (activeTab) => {
 
 
   return {
-    rightClickSelectedIndex,
     dom_listContent,
     listAll,
     list,

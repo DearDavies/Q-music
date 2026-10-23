@@ -54,7 +54,7 @@
             <div class="list-item-cell" :class="$style.qualityColumn" style="flex: 0 0 10%;">{{ getTypeName(item.metadata.quality) }}</div>
             <div class="list-item-cell" :class="$style.actionColumn" style="padding-left: 0; padding-right: 0;">
               <material-list-buttons
-                :index="index" :download-btn="false" :file-btn="item.status != downloadStatus.ERROR" remove-btn="remove-btn"
+                :index="index" :disabled="isBusy" :download-btn="false" :file-btn="item.status == downloadStatus.COMPLETED" remove-btn="remove-btn"
                 :start-btn="!item.isComplate && item.status != downloadStatus.WAITING && (item.status != downloadStatus.RUN)"
                 :pause-btn="!item.isComplate && (item.status == downloadStatus.RUN || item.status == downloadStatus.WAITING)"
                 :list-add-btn="false" :play-btn="item.status == downloadStatus.COMPLETED"
@@ -71,8 +71,9 @@
             <use xlink:href="#icon-download-2" />
           </svg>
         </div>
-        <p v-text="$t('no_item')" />
-        <span>{{ $t('download') }}</span>
+        <p>{{ $t(activeTab == 'all' ? 'download_empty_title' : 'download_filter_empty') }}</p>
+        <span>{{ $t(activeTab == 'all' ? 'download_empty_hint' : 'download_filter_hint') }}</span>
+        <base-btn v-if="activeTab != 'all'" min @click="activeTab = 'all'">{{ $t('download__all') }}</base-btn>
       </div>
       <base-menu v-model="isShowItemMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
       <!-- <base-menu :menus="listItemMenu" :location="listMenu.menuLocation" item-name="name" :is-show="listMenu.isShowItemMenu" @menu-click="handleListItemMenuClick" /> -->
@@ -105,7 +106,6 @@ export default {
     const { tabs, activeTab } = useTab()
 
     const {
-      rightClickSelectedIndex,
       dom_listContent,
       listAll,
       list,
@@ -144,12 +144,15 @@ export default {
     } = useMusicAdd({ selectedList, list })
 
     const {
+      rightClickSelectedIndex,
       menus,
       menuLocation,
       isShowItemMenu,
       showMenu,
       menuClick,
     } = useMenu({
+      list,
+      activeTab,
       handleStartTask,
       handlePauseTask,
       handleRemoveTask,
@@ -191,13 +194,10 @@ export default {
       doubleClickPlay(index)
     }
     const handleListItemRightClick = (event, index) => {
-      rightClickSelectedIndex.value = index
-      showMenu(event, list.value[index], index)
+      showMenu(event, list.value[index])
     }
     const handleMenuClick = (action) => {
-      let index = rightClickSelectedIndex.value
-      rightClickSelectedIndex.value = -1
-      menuClick(action, index)
+      menuClick(action)
     }
 
     const handleListBtnClick = ({ action, index }) => {
@@ -359,7 +359,10 @@ export default {
 
   span {
     font-size: 13px;
-    opacity: .68;
+    max-width: 360px;
+    padding: 0 18px;
+    text-align: center;
+    line-height: 1.6;
   }
 }
 

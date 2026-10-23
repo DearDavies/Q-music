@@ -161,6 +161,10 @@ jobs:
         working-directory: mobile
         run: npm run test:adaptive
 
+      - name: Verify downloaded song playback
+        working-directory: mobile
+        run: npm run test:downloads
+
       - name: Verify background playback and lyrics
         working-directory: mobile
         run: npm run test:background

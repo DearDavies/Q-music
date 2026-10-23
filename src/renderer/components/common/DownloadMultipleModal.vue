@@ -1,19 +1,20 @@
 <template>
-  <material-modal :show="show" :bg-close="bgClose" :teleport="teleport" @close="handleClose">
-    <main :class="$style.main">
-      <h2>{{ $t('download__multiple_tip', { len: list.length }) }}<br>{{ $t('download__multiple_tip2') }}</h2>
-      <base-btn :class="$style.btn" @click="handleClick('128k')">{{ $t('download__normal') }} - 128K</base-btn>
-      <base-btn :class="$style.btn" @click="handleClick('320k')">{{ $t('download__high_quality') }} - 320K</base-btn>
-      <base-btn :class="$style.btn" @click="handleClick('flac')">{{ $t('download__lossless') }} - FLAC</base-btn>
-      <base-btn :class="$style.btn" @click="handleClick('flac24bit')">{{ $t('download__lossless') }} - FLAC Hires</base-btn>
+  <material-modal :show="show" :heading="$t('download__multiple_tip', { len: onlineList.length })" :bg-close="bgClose" :teleport="teleport" @close="handleClose">
+    <main class="scroll" :class="$style.main">
+      <p>{{ $t('download__multiple_tip2') }}</p>
+      <p v-if="list.length != onlineList.length">{{ $t('download_local_skipped', { count: list.length - onlineList.length }) }}</p>
+      <p v-if="error" role="alert">{{ $t('player_download_failed') }}</p>
+      <DownloadQualityOptions v-if="onlineList.length" :qualities="qualities" :working="working" @select="handleClick" />
     </main>
   </material-modal>
 </template>
 
 <script>
 import { createDownloadTasks } from '@renderer/store/download/action'
+import DownloadQualityOptions from './DownloadQualityOptions.vue'
 
 export default {
+  components: { DownloadQualityOptions },
   props: {
     show: {
       type: Boolean,
@@ -39,13 +40,22 @@ export default {
     },
   },
   emits: ['update:show', 'confirm'],
+  data: () => ({ working: false, error: false, qualities: ['128k', '320k', 'flac', 'flac24bit'].map(type => ({ type })) }),
+  computed: { onlineList() { return this.list.filter(item => item.source != 'local') } },
+  watch: { show() { this.error = false } },
   methods: {
-    handleClick(quality) {
-      void createDownloadTasks(this.list.filter(item => item.source != 'local'), quality, this.listId)
-      this.handleClose()
-      this.$emit('confirm')
+    async handleClick(quality) {
+      if (this.working || !this.onlineList.length) return
+      this.working = true
+      this.error = false
+      try {
+        await createDownloadTasks(this.onlineList, quality, this.listId)
+        this.$emit('update:show', false)
+        this.$emit('confirm')
+      } catch { this.error = true } finally { this.working = false }
     },
     handleClose() {
+      if (this.working) return
       this.$emit('update:show', false)
     },
   },
@@ -57,27 +67,16 @@ export default {
 @import '@renderer/assets/styles/layout.less';
 
 .main {
-  padding: 15px;
-  max-width: 400px;
-  min-width: 200px;
+  padding: 0 22px 12px;
+  width: min(304px, calc(100vw - 110px));
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-flow: column nowrap;
-  justify-content: center;
-  h2 {
-    font-size: 13px;
-    color: var(--color-font);
-    line-height: 1.3;
-    text-align: center;
-    margin-bottom: 15px;
-  }
-}
-
-.btn {
-  display: block;
-  margin-bottom: 15px;
-  &:last-child {
-    margin-bottom: 0;
-  }
+  color: var(--color-font);
+  gap: 12px;
+  > * { flex-shrink: 0; }
+  p { font-size: 12px; line-height: 1.6; color: var(--color-font-label); }
 }
 
 </style>

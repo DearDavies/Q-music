@@ -1064,5 +1064,12 @@
   "search__account_collapse": "收起",
   "search__empty": "没有找到匹配的歌曲，试试其他关键词或音源。",
   "search__page_empty": "这一页没有可显示的歌曲，可以返回上一页或重试。",
-  "search__retry": "重新加载"
+  "search__retry": "重新加载",
+  "download_empty_title": "还没有下载任务",
+  "download_empty_hint": "在歌曲菜单或播放栏选择下载，歌曲会显示在这里。",
+  "download_filter_empty": "此分类暂无任务",
+  "download_filter_hint": "可以切换到全部任务，查看其他下载状态。",
+  "download_tasks_adding": "正在添加下载任务…",
+  "download_track_title": "下载歌曲",
+  "download_local_skipped": "已跳过 {count} 首本地歌曲，无需重复下载。"
 }

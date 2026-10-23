@@ -1,9 +1,11 @@
-import { computed, ref, shallowReactive, reactive, nextTick } from '@common/utils/vueTools'
+import { computed, ref, shallowReactive, reactive, nextTick, watch } from '@common/utils/vueTools'
 import musicSdk from '@renderer/utils/musicSdk'
 import { useI18n } from '@renderer/plugins/i18n'
 import { DOWNLOAD_STATUS } from '@common/constants'
 
 export default ({
+  list,
+  activeTab,
   handleStartTask,
   handlePauseTask,
   handleRemoveTask,
@@ -28,6 +30,14 @@ export default ({
   const t = useI18n()
   const menuLocation = shallowReactive({ x: 0, y: 0 })
   const isShowItemMenu = ref(false)
+  const menuTask = shallowReactive({ current: null })
+  const rightClickSelectedIndex = computed(() => menuTask.current ? list.value.findIndex(task => task.id == menuTask.current.id) : -1)
+
+  const hideMenu = () => {
+    isShowItemMenu.value = false
+    menuTask.current = null
+  }
+  watch([activeTab, () => list.value.map(task => `${task.id}:${task.status}`).join('\n')], hideMenu, { flush: 'sync' })
 
   const menus = computed(() => {
     return [
@@ -80,6 +90,8 @@ export default ({
   })
 
   const showMenu = (event, taskInfo) => {
+    if (!taskInfo) return
+    menuTask.current = taskInfo
     itemMenuControl.sourceDetail = !!musicSdk[taskInfo.metadata.musicInfo.source]?.getMusicDetailPageUrl
 
     if (taskInfo.isComplate) {
@@ -108,18 +120,15 @@ export default ({
     if (isShowItemMenu.value) return
 
     nextTick(() => {
-      isShowItemMenu.value = true
+      if (menuTask.current === taskInfo) isShowItemMenu.value = true
     })
   }
 
-  const hideMenu = () => {
-    isShowItemMenu.value = false
-  }
-
-  const menuClick = (action, index) => {
+  const menuClick = (action) => {
+    const index = rightClickSelectedIndex.value
     // console.log(action)
     hideMenu()
-    if (!action) return
+    if (!action || index < 0) return
     switch (action.action) {
       case 'start':
         handleStartTask(index)
@@ -151,6 +160,7 @@ export default ({
   }
 
   return {
+    rightClickSelectedIndex,
     menus,
     menuLocation,
     isShowItemMenu,

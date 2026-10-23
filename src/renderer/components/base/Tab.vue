@@ -2,8 +2,9 @@
   <ul ref="dom_list" :class="[$style.list, $style[align]]" role="tablist">
     <li
       v-for="item in list"
-      :key="item[itemKey]" :class="[$style.listItem, {[$style.active]: modelValue == item[itemKey]}]" tabindex="-1" role="tab"
+      :key="item[itemKey]" :class="[$style.listItem, {[$style.active]: modelValue == item[itemKey]}]" :tabindex="modelValue == item[itemKey] ? 0 : -1" role="tab"
       :aria-label="item[itemLabel]" ignore-tip :aria-selected="modelValue == item[itemKey]" :data-tab-key="item[itemKey]" @click="handleToggle(item[itemKey])"
+      @keydown="handleKey($event, item[itemKey])"
     >
       <span :class="$style.label">{{ item[itemLabel] }}</span>
     </li>
@@ -66,6 +67,23 @@ export default {
       emit('change', id)
     }
 
+    const handleKey = (event, id) => {
+      const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' ']
+      if (!keys.includes(event.key) || !props.list.length) return
+      event.preventDefault()
+      event.lx_handled = true
+      const current = props.list.findIndex(item => item[props.itemKey] == id)
+      if (current < 0) return
+      let index = current
+      if (event.key == 'ArrowLeft') index = (current - 1 + props.list.length) % props.list.length
+      if (event.key == 'ArrowRight') index = (current + 1) % props.list.length
+      if (event.key == 'Home') index = 0
+      if (event.key == 'End') index = props.list.length - 1
+      handleToggle(props.list[index][props.itemKey])
+      dom_list.value?.children[index]?.focus({ preventScroll: true })
+      dom_list.value?.children[index]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+
     watch(() => [props.modelValue, props.list], () => {
       void nextTick(updateIndicator)
     }, { deep: true })
@@ -88,6 +106,7 @@ export default {
       indicator,
       indicatorReady,
       handleToggle,
+      handleKey,
     }
   },
 }
@@ -103,21 +122,26 @@ export default {
   font-size: 12px;
   gap: 25px;
   padding: 0 15px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 
   &.left {
     justify-content: flex-start;
   }
   &.center {
-    justify-content: center;
+    .listItem:first-child { margin-left: auto; }
+    .listItem:nth-last-child(2) { margin-right: auto; }
   }
   &.right {
-    justify-content: flex-end;
+    .listItem:first-child { margin-left: auto; }
   }
 }
 .listItem {
   display: block;
+  flex: none;
   cursor: pointer;
   transition: color @transition-normal;
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: 6px; }
 
   &:hover {
     color: var(--color-primary);

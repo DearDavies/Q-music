@@ -1,12 +1,19 @@
 <template>
-  <material-modal :show="show" :bg-close="bgClose" :teleport="teleport" @close="handleClose">
-    <main :class="$style.main">
-      <h2>{{ info.name }}<br>{{ info.singer }}</h2>
+  <material-modal :show="show" :heading="$t('download_track_title')" :bg-close="bgClose" :teleport="teleport" @close="handleClose">
+    <main class="scroll" :class="$style.main">
+      <div :class="$style.track">
+        <div :class="$style.cover" aria-hidden="true">
+          <img v-if="info.meta?.picUrl && !coverFailed" :src="info.meta.picUrl" alt="" @error="coverFailed = true">
+          <EmptyCoverMark v-else />
+        </div>
+        <div :class="$style.trackInfo">
+          <p :class="$style.song">{{ info.name }}</p>
+          <p :class="$style.singer">{{ info.singer }}</p>
+        </div>
+      </div>
       <p v-if="!qualitys.length" :class="$style.message">{{ $t('player_download_unavailable') }}</p>
       <p v-if="error" role="status" :class="$style.message">{{ $t('player_download_failed') }}</p>
-      <base-btn v-for="quality in qualitys" :key="quality.type" :disabled="working" :class="$style.btn" @click="handleClick(quality.type)">
-        {{ getTypeName(quality.type) }}{{ quality.size && ` - ${quality.size.toUpperCase()}` }}
-      </base-btn>
+      <DownloadQualityOptions :qualities="qualitys" :working="working" @select="handleClick" />
     </main>
   </material-modal>
 </template>
@@ -14,8 +21,11 @@
 <script>
 import { qualityList } from '@renderer/store'
 import { createDownloadTasks } from '@renderer/store/download/action'
+import DownloadQualityOptions from './DownloadQualityOptions.vue'
+import EmptyCoverMark from './EmptyCoverMark.vue'
 
 export default {
+  components: { DownloadQualityOptions, EmptyCoverMark },
   props: {
     show: {
       type: Boolean,
@@ -44,7 +54,7 @@ export default {
       qualityList,
     }
   },
-  data: () => ({ working: false, error: false }),
+  data: () => ({ working: false, error: false, coverFailed: false }),
   computed: {
     info() {
       return this.musicInfo || {}
@@ -56,7 +66,7 @@ export default {
       return this.info.meta?.qualitys?.filter(quality => this.checkSource(quality.type)) || []
     },
   },
-  watch: { show() { this.error = false } },
+  watch: { show() { this.error = false; this.coverFailed = false } },
   methods: {
     async handleClick(quality) {
       if (this.working) return
@@ -71,21 +81,6 @@ export default {
       if (this.working) return
       this.$emit('update:show', false)
     },
-    getTypeName(quality) {
-      switch (quality) {
-        case 'flac24bit':
-          return this.$t('download__lossless') + ' FLAC Hires'
-        case 'flac':
-        case 'ape':
-        case 'wav':
-          return this.$t('download__lossless') + ' ' + quality.toUpperCase()
-        case '320k':
-          return this.$t('download__high_quality') + ' ' + quality.toUpperCase()
-        case '192k':
-        case '128k':
-          return this.$t('download__normal') + ' ' + quality.toUpperCase()
-      }
-    },
     checkSource(quality) {
       return this.sourceQualityList.includes(quality)
     },
@@ -98,28 +93,26 @@ export default {
 @import '@renderer/assets/styles/layout.less';
 
 .main {
-  padding: 15px;
-  max-width: 400px;
-  min-width: 200px;
+  padding: 0 22px 12px;
+  width: min(304px, calc(100vw - 110px));
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-flow: column nowrap;
-  justify-content: center;
-  h2 {
-    font-size: 13px;
-    color: var(--color-font);
-    line-height: 1.3;
-    text-align: center;
-    margin-bottom: 15px;
-  }
+  color: var(--color-font);
+  > * { flex-shrink: 0; }
 }
-
-.btn {
-  display: block;
-  margin-bottom: 15px;
-  &:last-child {
-    margin-bottom: 0;
-  }
+.track { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+.cover {
+  width: 42px; height: 42px; flex: none; overflow: hidden; border-radius: 7px;
+  color: var(--color-font-label);
+  background: rgb(from var(--color-font) r g b / .05);
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  > svg { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
 }
+.trackInfo { flex: 1; min-width: 0; }
+.song { font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.singer { font-size: 12px; line-height: 1.5; color: var(--color-font-label); margin: 3px 0 0; overflow-wrap: anywhere; }
 .message { font-size: 13px; line-height: 1.6; margin-bottom: 14px; color: var(--color-font-label); }
 
 </style>

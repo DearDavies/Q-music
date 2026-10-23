@@ -353,8 +353,8 @@ onBeforeUnmount(() => {
   flex-flow: column nowrap;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid rgba(54, 83, 70, .2);
-  border-radius: 8px;
+  border: 1px solid var(--q-outline);
+  border-radius: 18px;
   color: var(--color-font);
   background:
     linear-gradient(180deg, var(--q-surface-strong), var(--q-surface-strong)),
@@ -486,7 +486,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   box-sizing: border-box;
-  border-bottom: 1px solid rgba(54, 83, 70, .09);
+  border-bottom: 1px solid var(--q-outline);
 }
 
 .heading {
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
 
   h2 {
     margin: 0;
-    color: rgba(35, 42, 39, .94);
+    color: var(--color-font);
     font-size: 17px;
     line-height: 24px;
     font-weight: 700;
@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
     max-width: 320px;
     margin: 4px 0 0;
     overflow: hidden;
-    color: rgba(54, 58, 60, .56);
+    color: var(--color-font-label);
     font-size: 11px;
     line-height: 16px;
     white-space: nowrap;
@@ -526,14 +526,14 @@ onBeforeUnmount(() => {
   justify-content: center;
   border: none;
   border-radius: 50%;
-  color: rgba(54, 58, 60, .58);
+  color: var(--color-font-label);
   background: transparent;
   cursor: pointer;
   transition: color @transition-fast, background-color @transition-fast;
 
   &:hover {
-    color: rgba(35, 42, 39, .9);
-    background-color: rgba(54, 83, 70, .08);
+    color: var(--color-font);
+    background-color: var(--q-outline);
   }
 
   svg {
@@ -577,14 +577,14 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  border-bottom: 1px solid rgba(54, 83, 70, .09);
+  border-bottom: 1px solid var(--q-outline);
 
   button {
     position: relative;
     min-width: 0;
     padding: 0 8px;
     border: none;
-    color: rgba(54, 58, 60, .58);
+    color: var(--color-font-label);
     background: transparent;
     font-size: 13px;
     cursor: pointer;
@@ -632,14 +632,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid rgba(54, 83, 70, .07);
-  color: rgba(54, 58, 60, .48);
+  border-bottom: 1px solid var(--q-outline);
+  color: var(--color-font-label);
   font-size: 11px;
 
   strong {
     min-width: 0;
     overflow: hidden;
-    color: rgba(54, 58, 60, .68);
+    color: var(--color-font-label);
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
@@ -701,7 +701,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: rgba(54, 58, 60, .4);
+  color: var(--color-font-label);
 
   svg {
     width: 34px;

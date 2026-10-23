@@ -4,8 +4,9 @@
       <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
         <div v-show="showContent" :class="[$style.modal, {[$style.filter]: filter, [$style.viewModal]: isViewModal}]" @click="bgClose && close()">
           <transition :enter-active-class="inClass" :leave-active-class="outClass" @after-enter="$emit('after-enter', $event)" @after-leave="handleAfterLeave">
-            <div v-show="showContent" ref="dom_content" :class="$style.content" :style="contentStyle" role="dialog" aria-modal="true" :aria-labelledby="dialogTitleId || undefined" :aria-label="$attrs['aria-label'] || (!dialogTitleId ? 'Q-music' : undefined)" tabindex="-1" @click.stop>
+            <div v-show="showContent" ref="dom_content" :class="[$style.content, { [$style.headed]: heading }]" :style="contentStyle" role="dialog" aria-modal="true" :aria-labelledby="dialogTitleId || undefined" :aria-label="$attrs['aria-label'] || (!dialogTitleId ? 'Q-music' : undefined)" tabindex="-1" @click.stop>
               <header :class="$style.header">
+                <h2 v-if="heading">{{ heading }}</h2>
                 <button v-if="closeBtn" type="button" :aria-label="$t('close')" @click="close">
                   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 212.982 212.982" space="preserve">
                     <use xlink:href="#icon-delete" />
@@ -37,6 +38,10 @@ const focusableSelector = 'button, input, select, textarea, a[href], [tabindex],
 const isFocusable = element => element?.isConnected && !element.matches(':disabled') && !element.closest('[inert], [aria-hidden="true"]') && element.getClientRects().length > 0
 export default {
   props: {
+    heading: {
+      type: String,
+      default: '',
+    },
     show: {
       type: Boolean,
       default: false,
@@ -409,7 +414,8 @@ export default {
   display: flex;
   flex-flow: column nowrap;
   z-index: 100;
-  background: var(--q-surface-strong);
+  // 弹窗承载文字和操作，使用主题实色避免底层列表文字穿透。
+  background: var(--color-content-background);
   backdrop-filter: blur(18px);
 }
 
@@ -480,10 +486,12 @@ export default {
   --color-primary-dark-300: #fff;
   --q-surface: rgba(255, 255, 255, .08);
   --q-surface-strong: rgba(255, 255, 255, .14);
+  --q-surface-soft: rgba(255, 255, 255, .04);
   --q-border: rgba(255, 255, 255, .16);
+  --q-outline: rgba(255, 255, 255, .14);
   color: rgba(255, 255, 255, .9);
   border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(25, 30, 34, .9);
+  background: #222528;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 28px 70px rgba(0, 0, 0, .42);
   backdrop-filter: blur(28px) saturate(1.12);
 }
@@ -500,6 +508,49 @@ export default {
       background: rgba(255, 255, 255, .1);
     }
   }
+}
+
+.headed {
+  border-radius: 18px;
+
+  .header {
+    height: auto;
+    min-height: 28px;
+    padding: 18px 16px 16px 22px;
+    gap: 16px;
+    background: transparent;
+    box-shadow: none;
+
+    h2 {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      color: var(--color-font);
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    button {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      border-radius: 50%;
+      color: var(--color-font-label);
+      &:hover { transform: none; background: rgb(from var(--color-font) r g b / .06); }
+      &:focus-visible { outline: 2px solid var(--color-font); outline-offset: 2px; }
+    }
+  }
+}
+
+:global(body:has(#container.show-player-detail)) .headed {
+  border-color: rgba(255, 255, 255, .08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, .025), transparent 55%), #222528;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035), 0 18px 48px rgba(0, 0, 0, .26);
+
+  .header { background: transparent; box-shadow: none; }
 }
 
 :global(.q-modal-anim) {

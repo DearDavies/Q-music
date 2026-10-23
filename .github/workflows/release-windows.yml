@@ -173,6 +173,8 @@ jobs:
           npm test
           if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed.' }
           npm run test:local-music
+          if ($LASTEXITCODE -ne 0) { throw 'Local music tests failed.' }
+          npm run test:downloads
 
       - name: Build Windows x64 installer
         run: npm run pack
