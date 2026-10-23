@@ -18,6 +18,8 @@ import {
   getPicUrl as getLocalPicUrl,
   getLyricInfo as getLocalLyricInfo,
 } from './local'
+import { findLocalPlayback } from './preferLocal'
+import settingState from '@/store/setting/state'
 
 
 export const getMusicUrl = async({
@@ -38,6 +40,10 @@ export const getMusicUrl = async({
   } else if (musicInfo.source == 'local') {
     return getLocalMusicUrl({ musicInfo, isRefresh, onToggleSource, allowToggleSource })
   } else {
+    if (settingState.setting['player.preferLocal'] && !isRefresh) {
+      const local = await findLocalPlayback(musicInfo, quality ?? settingState.setting['player.playQuality']).catch(() => null)
+      if (local) return local.url
+    }
     return getOnlineMusicUrl({ musicInfo, isRefresh, quality, onToggleSource, allowToggleSource })
   }
 }
@@ -64,6 +70,10 @@ export const getMusicPlayUrlInfo = async({
   } else if (musicInfo.source == 'local') {
     return getLocalMusicUrl({ musicInfo, isRefresh, onToggleSource, allowToggleSource }).then(url => ({ url, quality: '128k' as const }))
   } else {
+    if (settingState.setting['player.preferLocal'] && !isRefresh) {
+      const local = await findLocalPlayback(musicInfo, quality ?? settingState.setting['player.playQuality']).catch(() => null)
+      if (local) return local
+    }
     return getOnlineMusicPlayUrlInfo({ musicInfo, isRefresh, quality, onToggleSource, allowToggleSource })
   }
 }

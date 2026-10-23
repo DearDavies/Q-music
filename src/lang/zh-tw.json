@@ -789,5 +789,22 @@
   "download_play_local": "播放本機檔案",
   "download_retry": "重試下載",
   "download_play_missing": "音樂檔案不存在，可能已被移動或刪除。請重新下載。",
-  "download_play_failed": "無法播放此檔案，請檢查檔案存取權限後重試。"
+  "download_play_failed": "無法播放此檔案，請檢查檔案存取權限後重試。",
+  "setting_theme_time": "按時間自動切換日夜主題",
+  "setting_theme_time_tip": "按本機時間，07:00–19:00 使用日間主題，其餘時間使用夜間主題。選擇固定主題後會停止定時切換。",
+  "setting_theme_time_colors": "選擇日間和夜間主題",
+  "setting_single_play": "點擊單曲時的播放方式",
+  "setting_single_play_replace": "播放目前頁面／列表，取代佇列",
+  "setting_single_play_add": "只插入此歌曲，保留佇列",
+  "setting_single_play_tip": "插入模式會立即播放所選歌曲，之後繼續原佇列；「播放全部」和「稍後播放」仍按各自操作執行。",
+  "setting_prefer_local": "優先播放已下載或已匯入的本機歌曲",
+  "setting_prefer_local_tip": "精確比對下載記錄，或核對本機歌曲的歌名、歌手和時長。檔案無法使用時嘗試線上播放；手動切換音質時重新取得音源。",
+  "local_remove_tip": "移除選取的 {count} 首歌曲？預設僅移除列表記錄。刪除檔案也會處理同目錄的同名歌詞，其他歌單中的參照可能失效。 刪除檔案無法復原。",
+  "local_remove_files": "同時刪除音訊和同名歌詞檔案",
+  "local_remove_only": "僅從列表移除",
+  "local_remove_failed": "{count} 首歌曲的檔案未能全部刪除，已保留對應列表記錄，請檢查檔案權限或占用情況。",
+  "list_sync_preserve_local_tip": "平台曲目依雲端更新；手動加入的其他歌曲會保留在清單末尾，不會上傳到平台。",
+  "download_selection_local": "所選歌曲已是本機檔案，無需重複下載。",
+  "download_selection_added": "已提交下載工作，可在下載頁查看；已有工作會自動略過。",
+  "download_selection_failed": "無法新增下載工作，請檢查權限和音源設定後重試。"
 }

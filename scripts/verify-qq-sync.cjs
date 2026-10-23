@@ -7,6 +7,7 @@ const ts = require('typescript')
 const crypto = require('node:crypto')
 const root = path.join(__dirname, '..')
 function load(file, dependencies = {}, globals = {}) {
+  if (file != 'src/utils/playlistMerge.ts') dependencies['@/utils/playlistMerge'] = load('src/utils/playlistMerge.ts')
   const context = { exports: {}, Error, Buffer, URL, AbortController, setTimeout, clearTimeout,
     require: id => { assert.ok(id in dependencies, `Missing mock: ${id}`); return dependencies[id] }, ...globals }
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {
@@ -120,12 +121,14 @@ function syncHarness(options = {}) {
     getListUpdateInfo: async () => settings,
     setListUpdateTime: async (id, time) => { settings[id] ??= {}; settings[id].updateTime = time; events.push('time') },
     setListSourceAccount: async (id, binding) => { settings[id] ??= {}; settings[id].sourceAccountId = binding },
+    setListSourceSnapshot: async (id, snapshot) => { settings[id] ??= {}; settings[id].sourceSnapshot = snapshot },
     setListAutoUpdate: async (id, enable) => { settings[id] ??= {}; settings[id].isAutoUpdate = enable },
   }
   const api = load('src/core/musicAccount/playlistSync.ts', {
     '@/store/list/state': state, './qqCredentials': qq, '@/utils/data': data,
     './syncState': { setPlaylistSyncState: (_id, status) => events.push(status.phase) },
     '@/core/list': {
+      getListMusics: async () => options.current ?? [],
       setFetchingListStatus() {},
       createList: async list => { writes.push(list); state.userList.push(list) },
       overwriteListMusics: async (id, tracks) => { if (options.saveFailure) throw Error('save_failed'); writes.push({ id, tracks }); events.push('write') },
@@ -155,6 +158,20 @@ test('QQ 新导入绑定账号并默认自动更新，已有关闭状态不被�
   await existing.run()
   assert.equal(existing.settings.local.isAutoUpdate, false)
   assert.ok(existing.events.indexOf('time') > existing.events.indexOf('write'))
+})
+
+test('安卓实际同步写入保留手动曲目；保存失败不推进来源快照', async () => {
+  const current = [{ id: 'removed', source: 'tx' }, { id: 'extra', source: 'kg' }]
+  const previous = { sourceKey: 'tx:account:123:dir:201', musicKeys: ['tx:removed'] }
+  const h = syncHarness({ current })
+  h.settings.local.sourceSnapshot = previous
+  await h.run()
+  assert.deepEqual(JSON.parse(JSON.stringify(h.writes[0].tracks)), [{ id: 'one' }, { id: 'two' }, current[1]])
+  assert.equal(h.settings.local.sourceSnapshot.musicKeys.includes('kg:extra'), false)
+  const failed = syncHarness({ current, saveFailure: true })
+  failed.settings.local.sourceSnapshot = previous
+  await assert.rejects(failed.run(), /save_failed/)
+  assert.equal(failed.settings.local.sourceSnapshot, previous)
 })
 
 test('未绑定旧列表和其他身份不自动覆盖；并发导入只保存一次', async () => {

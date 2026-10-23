@@ -7,6 +7,7 @@ import { useTheme } from '@/store/theme/hook'
 import { useAssertApiSupport } from '@/store/common/hook'
 import Text from '@/components/common/Text'
 import SourceLogo from '@/components/SourceLogo'
+import SongDownloadButton from '@/components/SongDownloadButton'
 import Button, { type BtnType } from '@/components/common/Button'
 
 import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
@@ -102,6 +103,7 @@ export default memo(({ item, index, activeIndex, onPress, onShowMenu, onLongPres
             ) : null
           }
         </Button>
+        {!isMultiSelectMode ? <SongDownloadButton music={item} /> : null}
         <Button accessibilityLabel={`${item.name} · ${global.i18n.t('more_actions')}`} onPress={handleShowMenu} ref={moreButtonRef} style={[styles.moreButton, isCar && { width: 56, height: 64 }]}>
           <Icon accessible={false} name="dots-vertical" style={{ color: theme['q-text-secondary'] }} size={14} />
         </Button>

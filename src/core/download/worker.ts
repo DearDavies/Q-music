@@ -1,6 +1,7 @@
 import RNFS from 'react-native-fs'
 
-import { getMusicPlayUrlInfo } from '@/core/music'
+// 下载只解析在线地址，不能复用播放器的本地文件优先策略。
+import { getMusicPlayUrlInfo } from '@/core/music/online'
 import { requestStoragePermission } from '@/utils/tools'
 import { NativeModules } from 'react-native'
 import {

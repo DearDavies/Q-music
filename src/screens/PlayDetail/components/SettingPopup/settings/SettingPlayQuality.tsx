@@ -8,7 +8,7 @@ import { updateSetting } from '@/core/common'
 import { setMusicUrl } from '@/core/player/player'
 import { getPlayQualityCandidates, isCustomApiSource, TRY_QUALITYS_LIST } from '@/core/music/utils'
 import { useI18n } from '@/lang'
-import { usePlayMusicInfo } from '@/store/player/hook'
+import { usePlayMusicInfo, usePlayerMusicInfo } from '@/store/player/hook'
 import { useSettingValue } from '@/store/setting/hook'
 import { useTheme } from '@/store/theme/hook'
 import { useStatus, useUserApiList } from '@/store/userApi'
@@ -26,11 +26,13 @@ export default memo(() => {
   const apiSource = useSettingValue('common.apiSource')
   const qualitys = useMemo(() => [...TRY_QUALITYS_LIST, '128k'].reverse() as LX.Quality[], [])
   const playMusicInfo = usePlayMusicInfo()
+  const playerMusicInfo = usePlayerMusicInfo()
   const userApiList = useUserApiList()
   const apiStatus = useStatus()
   const theme = useTheme()
   const t = useI18n()
   const currentMusic = playMusicInfo.musicInfo
+  const activeQuality = currentMusic ? playerMusicInfo.quality ?? quality : quality
   const onlineMusic = currentMusic && !('progress' in currentMusic) && currentMusic.source != 'local'
     ? currentMusic
     : null
@@ -43,7 +45,7 @@ export default memo(() => {
       : t('setting_basic_source_status_failed')
 
   const handleChange = (id: LX.Quality, available: boolean) => {
-    if (!available || quality == id) return
+    if (!available || activeQuality == id) return
     updateSetting({ 'player.playQuality': id })
     if (onlineMusic) requestAnimationFrame(() => { setMusicUrl(onlineMusic, true) })
   }
@@ -69,7 +71,7 @@ export default memo(() => {
       <View style={styles.qualityList}>
         {qualitys.map(id => {
           const info = QUALITY_INFO[id]!
-          const active = quality == id
+          const active = activeQuality == id
           const available = !onlineMusic || getPlayQualityCandidates(id, onlineMusic)[0] == id
           return (
             <Button

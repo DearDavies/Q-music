@@ -130,6 +130,12 @@ export const setListSourceAccount = async(id: string, accountId: string) => {
   listUpdateInfo[id] = { ...info, sourceAccountId: accountId }
   saveListUpdateInfoThrottle()
 }
+export const setListSourceSnapshot = async(id: string, sourceSnapshot: NonNullable<LX.List.ListUpdateInfo[string]['sourceSnapshot']>) => {
+  await initListUpdateInfo()
+  const info = listUpdateInfo[id] ?? { updateTime: 0, isAutoUpdate: false }
+  listUpdateInfo[id] = { ...info, sourceSnapshot }
+  saveListUpdateInfoThrottle()
+}
 export const getListUpdateInfo = async() => {
   await initListUpdateInfo()
   return listUpdateInfo

@@ -789,5 +789,22 @@
   "download_play_local": "播放本地文件",
   "download_retry": "重试下载",
   "download_play_missing": "音乐文件不存在，可能已被移动或删除。请重新下载。",
-  "download_play_failed": "无法播放此文件，请检查文件访问权限后重试。"
+  "download_play_failed": "无法播放此文件，请检查文件访问权限后重试。",
+  "setting_theme_time": "按时间自动切换日夜主题",
+  "setting_theme_time_tip": "按本机时间，07:00–19:00 使用日间主题，其余时间使用夜间主题。选择固定主题后会停止定时切换。",
+  "setting_theme_time_colors": "选择日间和夜间主题",
+  "setting_single_play": "点击单曲时的播放方式",
+  "setting_single_play_replace": "播放当前页／列表，替换队列",
+  "setting_single_play_add": "只插入此歌曲，保留队列",
+  "setting_single_play_tip": "插入模式会立即播放所选歌曲，之后继续原队列；“播放全部”和“稍后播放”仍按各自操作执行。",
+  "setting_prefer_local": "优先播放已下载或已导入的本地歌曲",
+  "setting_prefer_local_tip": "精确匹配下载记录，或核对本地歌曲的歌名、歌手和时长。文件不可用时尝试在线播放；手动切换音质时重新获取音源。",
+  "local_remove_tip": "移除选中的 {count} 首歌曲？默认仅移除列表记录。删除文件也会处理同目录的同名歌词，其他歌单中的引用可能失效。 删除文件不可撤销。",
+  "local_remove_files": "同时删除音频和同名歌词文件",
+  "local_remove_only": "仅从列表移除",
+  "local_remove_failed": "{count} 首歌曲的文件未能全部删除，已保留对应列表记录，请检查文件权限或占用情况。",
+  "list_sync_preserve_local_tip": "平台曲目按云端更新；手动添加的其他歌曲会保留在列表末尾，不会上传到平台。",
+  "download_selection_local": "所选歌曲已是本地文件，无需重复下载。",
+  "download_selection_added": "已提交下载任务，可在下载页查看；已有任务会自动跳过。",
+  "download_selection_failed": "未能添加下载任务，请检查权限和音源设置后重试。"
 }

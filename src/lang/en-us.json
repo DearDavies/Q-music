@@ -789,5 +789,22 @@
   "download_play_local": "Play local file",
   "download_retry": "Retry download",
   "download_play_missing": "The music file is missing. It may have been moved or deleted. Please download it again.",
-  "download_play_failed": "Could not play this file. Check file access permissions and try again."
+  "download_play_failed": "Could not play this file. Check file access permissions and try again.",
+  "setting_theme_time": "Switch day/night themes on a schedule",
+  "setting_theme_time_tip": "Use the day theme from 07:00 to 19:00, and the night theme otherwise, using device time. Selecting a fixed theme turns off the schedule.",
+  "setting_theme_time_colors": "Choose day and night themes",
+  "setting_single_play": "When playing a song from a list",
+  "setting_single_play_replace": "Replace queue with this page / list",
+  "setting_single_play_add": "Insert this song and keep the queue",
+  "setting_single_play_tip": "Insert mode plays the song immediately, then continues the original queue. Play all and Play later keep their own behavior.",
+  "setting_prefer_local": "Prefer downloaded or imported local audio",
+  "setting_prefer_local_tip": "Match download IDs, or local title, artist and duration. Fall back to online playback if unavailable. Changing quality explicitly requests a new source.",
+  "local_remove_tip": "Remove {count} selected songs? By default, only list entries are removed. Deleting files also affects matching lyric files in the same folder and references in other playlists. File deletion cannot be undone.",
+  "local_remove_files": "Also delete audio and matching lyric files",
+  "local_remove_only": "Remove from list only",
+  "local_remove_failed": "Files for {count} songs could not be fully deleted. Their list entries were kept. Check file permissions or whether the files are in use.",
+  "list_sync_preserve_local_tip": "Platform tracks follow the remote playlist. Extra songs added locally stay at the end and are not uploaded.",
+  "download_selection_local": "The selected songs are already local files.",
+  "download_selection_added": "Downloads submitted. View them on the Downloads page; existing tasks are skipped.",
+  "download_selection_failed": "Could not add downloads. Check permissions and music source settings, then retry."
 }

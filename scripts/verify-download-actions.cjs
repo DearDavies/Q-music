@@ -66,3 +66,41 @@ test('再次点击当前本地歌曲只切换播放状态，不重复入队', as
     assert.deepEqual(f.calls, ['toggle'])
   }
 })
+
+test('已有本地版本时下载另一音质仍使用在线地址，不把本地路径交给网络下载器', async() => {
+  const tasks = new Map()
+  const requests = []
+  const downloads = []
+  let finished
+  const complete = new Promise(resolve => { finished = resolve })
+  const deps = {
+    'react-native-fs': {
+      ExternalStorageDirectoryPath: '/storage',
+      CachesDirectoryPath: '/cache',
+      exists: async() => false,
+      mkdir: async() => {},
+      moveFile: async() => {},
+      downloadFile: options => { downloads.push(options); return { promise: Promise.resolve({ statusCode: 200 }) } },
+    },
+    'react-native': { NativeModules: { UtilsModule: { scanMediaFile: async() => {} } } },
+    '@/utils/tools': { requestStoragePermission: async() => true },
+    '@/core/music': { getMusicPlayUrlInfo: async() => ({ url: '/existing/song.mp3', quality: '128k' }) },
+    '@/core/music/online': { getMusicPlayUrlInfo: async options => { requests.push(options); return { url: 'https://audio.example/song.flac', quality: 'flac' } } },
+    './store': {
+      getDownloadTask: id => tasks.get(id),
+      removeDownloadTask: id => tasks.delete(id),
+      upsertDownloadTask: task => { tasks.set(task.id, task); if (['completed', 'error'].includes(task.status)) finished(task) },
+    },
+  }
+  const context = { exports: {}, console, require: id => { assert.ok(id in deps, id); return deps[id] } }
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/core/download/worker.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+  }).outputText, context)
+  assert.equal(await context.exports.downloadMusics([{ id: 'song', source: 'tx', name: 'Song', singer: 'Artist' }], 'flac'), true)
+  const task = await complete
+  assert.equal(task.status, 'completed')
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].quality, 'flac')
+  assert.equal(downloads.length, 1)
+  assert.equal(downloads[0].fromUrl, 'https://audio.example/song.flac')
+})

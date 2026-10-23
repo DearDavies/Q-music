@@ -3,7 +3,8 @@ import listAction from '@/store/list/action'
 import listState from '@/store/list/state'
 import settingState from '@/store/setting/state'
 import { fixNewMusicInfoQuality } from '@/utils'
-import { saveListPrevSelectId } from '@/utils/data'
+import { saveListPrevSelectId, setListSourceSnapshot } from '@/utils/data'
+import { createSourceSnapshot } from '@/utils/playlistMerge'
 
 /**
  * 覆盖全部列表数据
@@ -142,6 +143,7 @@ export const createList = async({ name, id = `userlist_${Date.now()}`, list = []
     },
   ])
   if (list) await addListMusics(id, list, settingState.setting['list.addMusicLocationType'])
+  if (source && sourceListId) await setListSourceSnapshot(id, createSourceSnapshot(`${source}:${sourceListId}`, list))
 }
 
 /**

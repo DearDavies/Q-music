@@ -165,11 +165,11 @@ const List = forwardRef<ListType, ListProps>(({
       if (isMultiSelectModeRef.current) {
         handleSelect(item, index)
       } else {
-        if (settingState.setting['list.isClickPlayList'] && onPlayList != null) {
+        if (settingState.setting['list.singlePlayMode'] != 'add' && onPlayList != null) {
           onPlayList(index)
         } else {
           // console.log(currentList[index])
-          handlePlay(currentList[index])
+          handlePlay(currentList[index], currentList)
         }
       }
     })

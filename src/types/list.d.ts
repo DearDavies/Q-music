@@ -48,6 +48,7 @@ declare namespace LX {
       updateTime: number
       isAutoUpdate: boolean
       sourceAccountId?: string
+      sourceSnapshot?: { sourceKey: string, musicKeys: string[] }
     }>
 
     type ListSaveType = 'myList' | 'downloadList'

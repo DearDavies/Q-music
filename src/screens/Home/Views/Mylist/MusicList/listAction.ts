@@ -1,19 +1,22 @@
 import { addListMusics, removeListMusics, updateListMusicPosition, updateListMusics } from '@/core/list'
-import { playList, playListById, playNext } from '@/core/player/player'
+import { playListById, playNext } from '@/core/player/player'
 import { addTempPlayList } from '@/core/player/tempPlayList'
 import settingState from '@/store/setting/state'
 import { similar, sortInsert, toOldMusicInfo } from '@/utils'
 import { confirmDialog, openUrl, shareMusic, toast } from '@/utils/tools'
 import { addDislikeInfo, hasDislike } from '@/core/dislikeList'
 import playerState from '@/store/player/state'
+import { playFromList } from '@/core/player/selection'
 
 import type { SelectInfo } from './ListMenu'
 import { type Metadata } from '@/components/MetadataEditModal'
 import musicSdk from '@/utils/musicSdk'
 import { getListMusicSync } from '@/utils/listManage'
+import { Alert } from 'react-native'
+import { deleteLocalMusicFiles } from '@/utils/removeLocalMusic'
 
 export const handlePlay = (listId: SelectInfo['listId'], index: SelectInfo['index']) => {
-  void playList(listId, index)
+  void playFromList(listId, index)
 }
 export const handlePlayLater = (listId: SelectInfo['listId'], musicInfo: SelectInfo['musicInfo'], selectedList: SelectInfo['selectedList'], onCancelSelect: () => void) => {
   if (selectedList.length) {
@@ -25,6 +28,28 @@ export const handlePlayLater = (listId: SelectInfo['listId'], musicInfo: SelectI
 }
 
 export const handleRemove = (listId: SelectInfo['listId'], musicInfo: SelectInfo['musicInfo'], selectedList: SelectInfo['selectedList'], onCancelSelect: () => void) => {
+  const targets = selectedList.length ? [...selectedList] : [musicInfo]
+  if (targets.some(music => music.source == 'local')) {
+    const remove = async(deleteFiles: boolean) => {
+      const removed: string[] = []
+      let failed = 0
+      for (const music of targets) {
+        try {
+          if (deleteFiles && music.source == 'local') await deleteLocalMusicFiles(music)
+          removed.push(music.id)
+        } catch { failed++ }
+      }
+      if (removed.length) await removeListMusics(listId, removed)
+      onCancelSelect()
+      if (failed) toast(global.i18n.t('local_remove_failed', { count: failed }))
+    }
+    Alert.alert(global.i18n.t('list_remove_tip_button'), global.i18n.t('local_remove_tip', { count: targets.length }), [
+      { text: global.i18n.t('cancel'), style: 'cancel' },
+      { text: global.i18n.t('local_remove_only'), onPress: () => { void remove(false) } },
+      { text: global.i18n.t('local_remove_files'), style: 'destructive', onPress: () => { void remove(true) } },
+    ])
+    return
+  }
   if (selectedList.length) {
     void confirmDialog({
       message: global.i18n.t('list_remove_music_multi_tip', { num: selectedList.length }),

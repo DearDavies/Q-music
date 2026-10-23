@@ -68,6 +68,7 @@ export default forwardRef<PlaylistSyncModalType>((props, ref) => {
   }
   return <Dialog ref={dialog} title={t('list_update_modal__title')} closeBtn keyHide bgHide onHide={() => { setVisible(false) }}>
     <ScrollView contentContainerStyle={styles.content}>
+      <Text size={12} color={theme['q-text-secondary']} style={{ marginBottom: 12 }}>{t('list_sync_preserve_local_tip')}</Text>
       <Button disabled={busy || !lists.length} style={[styles.batch, { backgroundColor: theme['q-surface-tint'] }]} onPress={() => { void syncAll() }}>
         <Icon name="available_updates" size={18} color={theme['q-accent-text']} /><Text size={13} color={theme['q-accent-text']}>{t(busy ? 'list_sync_working' : 'list_sync_all')}</Text>
       </Button>

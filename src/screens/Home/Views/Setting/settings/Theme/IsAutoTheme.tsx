@@ -6,32 +6,28 @@ import { createStyle, getIsSupportedAutoTheme } from '@/utils/tools'
 import { useI18n } from '@/lang'
 import { updateSetting } from '@/core/common'
 import { useSettingValue } from '@/store/setting/hook'
-import { getTheme } from '@/theme/themes'
-import { applyTheme } from '@/core/theme'
 import themeState from '@/store/theme/state'
+import Text from '@/components/common/Text'
 
 const isSupportedAutoTheme = getIsSupportedAutoTheme()
 
 export default memo(() => {
   const t = useI18n()
   const isAutoTheme = useSettingValue('common.isAutoTheme')
+  const autoByTime = useSettingValue('theme.autoByTime')
   const setIsAutoTheme = (isAutoTheme: boolean) => {
-    updateSetting({ 'common.isAutoTheme': isAutoTheme })
-    void getTheme().then(theme => {
-      if (theme.id == themeState.theme.id) return
-      applyTheme(theme)
-    })
+    updateSetting({ 'common.isAutoTheme': isAutoTheme, 'theme.autoByTime': false })
   }
 
 
   return (
-    isSupportedAutoTheme
-      ? (
-          <View style={styles.content}>
-            <CheckBoxItem check={isAutoTheme} label={t('setting_basic_theme_auto_theme')} onChange={setIsAutoTheme} />
-          </View>
-        )
-      : null
+    <View style={styles.content}>
+      {isSupportedAutoTheme ? <CheckBoxItem check={isAutoTheme} label={t('setting_basic_theme_auto_theme')} onChange={setIsAutoTheme} /> : null}
+      <CheckBoxItem check={autoByTime} label={t('setting_theme_time')} onChange={enabled => {
+        updateSetting({ 'theme.autoByTime': enabled, 'common.isAutoTheme': false, ...(enabled && !themeState.theme.isDark ? { 'theme.lightId': themeState.theme.id } : {}) })
+      }} />
+      <Text size={12} style={{ marginTop: 6 }}>{t('setting_theme_time_tip')}</Text>
+    </View>
   )
 })
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react'
-import { View, ScrollView } from 'react-native'
+import { ScrollView } from 'react-native'
+import { useDockInset } from '@/components/common/DockInset'
 
 import { createStyle } from '@/utils/tools'
 import TagGroup, { type TagGroupProps } from './TagGroup'
@@ -18,6 +19,7 @@ export interface ListType {
 }
 
 export default forwardRef<ListType, ListProps>(({ onTagChange }, ref) => {
+  const dockInset = useDockInset()
   // const theme = useTheme()
   const [activeId, setActiveId] = useState('')
   const [list, setList] = useState<TagInfo['tags']>([])
@@ -66,8 +68,7 @@ export default forwardRef<ListType, ListProps>(({ onTagChange }, ref) => {
 
 
   return (
-    <ScrollView style={{ flexShrink: 1, flexGrow: 0 }} keyboardShouldPersistTaps={'always'}>
-      <View style={styles.tagContainer}>
+    <ScrollView style={{ flex: 1, marginBottom: dockInset }} contentContainerStyle={styles.tagContainer} keyboardShouldPersistTaps="always">
         {status == 'loading' ? <ContentState status="loading" /> : null}
         {status == 'error' ? <ContentState status="error" onRetry={() => { loadTag(sourceRef.current, activeId, true) }} /> : null}
         {
@@ -81,7 +82,6 @@ export default forwardRef<ListType, ListProps>(({ onTagChange }, ref) => {
             />
           )) : null
         }
-      </View>
     </ScrollView>
   )
 })

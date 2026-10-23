@@ -18,6 +18,7 @@ import MusicToggleModal, { type MusicToggleModalType } from './MusicToggleModal'
 import ExternalImportModal, { type ExternalImportModalType } from '../ExternalImportModal'
 import { useBackHandler } from '@/utils/hooks/useBackHandler'
 import commonState from '@/store/common/state'
+import { downloadSelection } from '@/core/download/selection'
 
 
 export default () => {
@@ -175,6 +176,7 @@ export default () => {
       <ListMenu
         ref={listMenuRef}
         onPlay={info => { handlePlay(info.listId, info.index) }}
+        onDownload={info => { void downloadSelection(info.selectedList.length ? info.selectedList : [info.musicInfo]).then(ok => { if (ok) hancelExitSelect() }) }}
         onPlayLater={info => { hancelExitSelect(); handlePlayLater(info.listId, info.musicInfo, info.selectedList, hancelExitSelect) }}
         onRemove={info => { hancelExitSelect(); handleRemove(info.listId, info.musicInfo, info.selectedList, hancelExitSelect) }}
         onDislikeMusic={info => { void handleDislikeMusic(info.musicInfo) }}

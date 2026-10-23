@@ -9,6 +9,7 @@ import commonState from '@/store/common/state'
 import DailySettings from './DailySettings'
 import { setTempList } from '@/core/list'
 import { playList, togglePlay } from '@/core/player/player'
+import { playFromPage } from '@/core/player/selection'
 import { useIsPlay, usePlayMusicInfo } from '@/store/player/hook'
 import PlayerBar from '@/components/player/PlayerBar'
 import { useI18n } from '@/lang'
@@ -119,14 +120,15 @@ export default () => {
   const sourceLabel = t(loading && !result ? 'search_daily_recommend_loading' : loadError ? 'load_failed' : result?.kind == 'official_daily' ? 'daily_official_daily' : result?.kind == 'radar' ? 'daily_radar' : result?.kind == 'netease_daily' ? 'daily_netease_daily' : result?.kind == 'kugou_daily' ? 'daily_kugou_daily' : 'daily_local')
   const playingDaily = list.some(item => item.id == playMusicInfo.musicInfo?.id)
 
-  const handlePlay = useCallback(async(index = 0) => {
+  const handlePlay = useCallback(async(index?: number) => {
     if (!list.length || playbackPending.current) return
     playbackPending.current = true
     setStartingPlayback(true)
     try {
       const date = new Date()
+      if (index != null) { await playFromPage('daily_selection', list, index); return }
       await setTempList(`q_daily_${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`, list)
-      await playList(LIST_IDS.TEMP, index)
+      await playList(LIST_IDS.TEMP, 0)
     } catch {
       toast(t('load_failed'))
     } finally {

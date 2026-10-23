@@ -7,6 +7,8 @@ import commonState from '@/store/common/state'
 import StatusBar from '@/components/common/StatusBar'
 import { Navigation, type Options } from 'react-native-navigation'
 import { getStatusBarStyle } from '@/navigation/utils'
+import { AppState } from 'react-native'
+import { isNightTime } from '@/theme/schedule'
 // import { Dimensions, PixelRatio } from 'react-native'
 
 
@@ -30,16 +32,38 @@ const syncNavigationTheme = (theme: LX.ActiveTheme) => {
 
 
 export default async(setting: LX.AppSetting) => {
+  let revision = 0
+  const refreshTheme = async() => {
+    const current = ++revision
+    const theme = await getTheme()
+    if (current == revision) applyTheme(theme)
+  }
   if (getIsSupportedAutoTheme()) {
     setShouldUseDarkColors(getAppearance() == 'dark')
 
     onAppearanceChange(color => {
       setShouldUseDarkColors((color ?? 'light') == 'dark')
-      if (settingState.setting['common.isAutoTheme']) void getTheme().then(applyTheme)
+      if (settingState.setting['common.isAutoTheme'] && !settingState.setting['theme.autoByTime']) void refreshTheme()
     })
   }
 
-  applyTheme(await getTheme())
+  await refreshTheme()
+  let lastTimePeriod = ''
+  const refreshByTime = () => {
+    if (!settingState.setting['theme.autoByTime']) { lastTimePeriod = ''; return }
+    const period = isNightTime() ? 'night' : 'day'
+    if (period == lastTimePeriod) return
+    lastTimePeriod = period
+    void refreshTheme()
+  }
+  setInterval(refreshByTime, 60_000)
+  AppState.addEventListener('change', state => { if (state == 'active') refreshByTime() })
+  global.state_event.on('configUpdated', keys => {
+    if (keys.some(key => ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'common.isAutoTheme'].includes(key))) {
+      lastTimePeriod = ''
+      void refreshTheme()
+    }
+  })
 
   global.state_event.on('themeUpdated', (theme) => {
     StatusBar.setBarStyle(theme.isDark ? 'light-content' : 'dark-content')

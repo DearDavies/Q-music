@@ -1,4 +1,4 @@
-import { playList } from '@/core/player/player'
+import { playFromList } from '@/core/player/selection'
 import { useMemo, useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent, type FlatListProps } from 'react-native'
 
@@ -200,7 +200,7 @@ const List = forwardRef<ListType, ListProps>(({ onShowMenu, onMuiltSelectMode, o
 
   const activeIndex = usePlayIndex()
   const handlePlay = (index: number) => {
-    void playList(listState.activeListId, index)
+    void playFromList(listState.activeListId, index)
   }
 
   const handleUpdateSelectedList = (newList: LX.List.ListMusics) => {

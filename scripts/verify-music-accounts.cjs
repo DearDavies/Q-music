@@ -9,6 +9,7 @@ const root = path.join(__dirname, '..')
 const mobile = fs.existsSync(path.join(root, 'src/core/musicAccount/kugouApi.ts'))
 const base = mobile ? 'src/core/musicAccount' : 'src/common/utils'
 function load(file, dependencies = {}, extra = {}) {
+  if (file == `${base}/playlistSync.ts`) dependencies['@/utils/playlistMerge'] = load('src/utils/playlistMerge.ts')
   const context = { exports: {}, Error, URL, URLSearchParams, AbortController, AbortSignal, setTimeout, clearTimeout, console, ...extra,
     require: id => { if (!(id in dependencies)) throw Error(id); return dependencies[id] },
   }
@@ -305,8 +306,8 @@ if (mobile) {
     const state = { userList: [original] }
     const sync = load(`${base}/playlistSync.ts`, {
       '@/store/list/state': state,
-      '@/core/list': { setFetchingListStatus() {}, createList: async () => { writes++ }, overwriteListMusics: async (_id, tracks) => { writes++; saved = tracks } },
-      '@/utils/data': { getListUpdateInfo: async () => ({}), setListUpdateTime: async () => {} },
+      '@/core/list': { getListMusics: async () => [], setFetchingListStatus() {}, createList: async () => { writes++ }, overwriteListMusics: async (_id, tracks) => { writes++; saved = tracks } },
+      '@/utils/data': { getListUpdateInfo: async () => ({}), setListSourceSnapshot: async () => {}, setListUpdateTime: async () => {} },
       './qqCredentials': qq,
       './syncState': { setPlaylistSyncState() {} },
       './playlists': {

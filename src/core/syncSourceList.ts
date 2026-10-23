@@ -1,6 +1,7 @@
 // import { dateFormat } from '@/utils/common'
-import { getListUpdateInfo, setListUpdateTime } from '@/utils/data'
-import { overwriteListMusics, setFetchingListStatus } from './list'
+import { getListUpdateInfo, setListSourceSnapshot, setListUpdateTime } from '@/utils/data'
+import { getListMusics, overwriteListMusics, setFetchingListStatus } from './list'
+import { createSourceSnapshot, mergeSourcePlaylist } from '@/utils/playlistMerge'
 import { getListDetailAll } from '@/core/songlist'
 import { getListDetailAll as getBoardListAll } from '@/core/leaderboard'
 import { openPlaylistSession } from './musicAccount/playlists'
@@ -40,7 +41,11 @@ const performSync = async(targetListInfo: LX.List.UserListInfo, automatic = fals
   const list = await fetchList(targetListInfo.id, targetListInfo.source, targetListInfo.sourceListId)
   if (!stillLinked() || (automatic && !(await getListUpdateInfo())[targetListInfo.id]?.isAutoUpdate)) return
   // console.log(list)
-  await overwriteListMusics(targetListInfo.id, list)
+  const sourceKey = `${targetListInfo.source}:${targetListInfo.sourceListId}`
+  const current = await getListMusics(targetListInfo.id)
+  if (!stillLinked()) return
+  await overwriteListMusics(targetListInfo.id, mergeSourcePlaylist(current, list, sourceKey, settings?.sourceSnapshot))
+  await setListSourceSnapshot(targetListInfo.id, createSourceSnapshot(sourceKey, list))
   const now = Date.now()
   await setListUpdateTime(targetListInfo.id, now)
   // TODO

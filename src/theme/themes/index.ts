@@ -2,6 +2,7 @@
 import { getUserTheme, saveUserTheme } from '@/utils/data'
 import themes from '@/theme/themes/themes'
 import settingState from '@/store/setting/state'
+import { isNightTime } from '@/theme/schedule'
 import themeState from '@/store/theme/state'
 import { isUrl } from '@/utils'
 import { privateStorageDirectoryPath } from '@/utils/fs'
@@ -178,9 +179,11 @@ export const getTheme = async() => {
   //     : settingState.setting['theme.lightId']
   //   // : 'china_ink'
   //   : settingState.setting['theme.id']
-  let themeId = settingState.setting['common.isAutoTheme'] && shouldUseDarkColors
-    ? 'black'
-    : settingState.setting['theme.id']
+  let themeId = settingState.setting['theme.autoByTime']
+    ? isNightTime() ? settingState.setting['theme.darkId'] : settingState.setting['theme.lightId']
+    : settingState.setting['common.isAutoTheme'] && shouldUseDarkColors
+      ? 'black'
+      : settingState.setting['theme.id']
   // themeId = 'naruto'
   // themeId = 'pink'
   // themeId = 'black'
@@ -189,7 +192,7 @@ export const getTheme = async() => {
     userThemes = await getUserTheme()
     theme = userThemes.find(theme => theme.id == themeId)
     if (!theme) {
-      themeId = settingState.setting['theme.id'] == 'auto' && shouldUseDarkColors ? 'black' : 'green'
+      themeId = (settingState.setting['theme.autoByTime'] ? isNightTime() : settingState.setting['common.isAutoTheme'] && shouldUseDarkColors) ? 'black' : 'green'
       theme = themes.find(theme => theme.id == themeId) as LX.Theme
     }
   }

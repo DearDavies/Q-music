@@ -64,6 +64,8 @@ const defaultSetting: LX.AppSetting = {
   'search.isShowHistorySearch': false,
 
   'list.isClickPlayList': false,
+  'list.singlePlayMode': 'replace',
+  'player.preferLocal': true,
   'list.isShowSource': true,
   'list.isShowAlbumName': false,
   'list.isShowInterval': true,
@@ -78,6 +80,7 @@ const defaultSetting: LX.AppSetting = {
   'theme.id': 'green',
   'theme.lightId': 'green',
   'theme.darkId': 'black',
+  'theme.autoByTime': false,
   'theme.hideBgDark': false,
   'theme.dynamicBg': false,
   'theme.fontShadow': false,

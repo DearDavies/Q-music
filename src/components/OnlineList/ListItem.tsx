@@ -9,6 +9,7 @@ import { useTheme } from '@/store/theme/hook'
 import { usePlayMusicInfo } from '@/store/player/hook'
 import { createStyle, type RowInfo } from '@/utils/tools'
 import SourceLogo from '@/components/SourceLogo'
+import SongDownloadButton from '@/components/SongDownloadButton'
 
 import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
@@ -109,6 +110,7 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
             ) : null
           }
         </Button>
+        <SongDownloadButton music={item} />
         <Button accessibilityLabel={`${item.name} · ${global.i18n.t('more_actions')}`} onPress={handleShowMenu} ref={moreButtonRef} style={[styles.moreButton, isCar && { width: 56, height: 64 }]}>
           <Icon accessible={false} name="dots-vertical" style={{ color: theme['q-text-secondary'] }} size={14} />
         </Button>

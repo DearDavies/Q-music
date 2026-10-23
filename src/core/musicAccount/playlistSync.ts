@@ -1,6 +1,7 @@
 import listState from '@/store/list/state'
-import { createList, overwriteListMusics, setFetchingListStatus } from '@/core/list'
-import { getListUpdateInfo, setListUpdateTime, setListSourceAccount, setListAutoUpdate } from '@/utils/data'
+import { createList, getListMusics, overwriteListMusics, setFetchingListStatus } from '@/core/list'
+import { getListUpdateInfo, setListUpdateTime, setListSourceAccount, setListSourceSnapshot, setListAutoUpdate } from '@/utils/data'
+import { createSourceSnapshot, mergeSourcePlaylist } from '@/utils/playlistMerge'
 import { getQQSyncIdentity } from './qqCredentials'
 import { setPlaylistSyncState } from './syncState'
 import { assertPlaylistSession, getAccountPlaylistTracks, type AccountPlaylist, type PlaylistSession } from './playlists'
@@ -36,8 +37,13 @@ const performSync = async(session: PlaylistSession, playlist: Pick<AccountPlayli
     // 所有分页完整返回后才写入；用户删除或重新关联的歌单不接受迟到结果。
     if (existing && !listState.userList.some(item => item.id == id && item.source == session.provider && item.sourceListId == originalSourceId)) throw new Error('list_removed')
     setPlaylistSyncState(id, { phase: 'save', current: tracks.length, total: tracks.length })
-    if (existing) await overwriteListMusics(id, tracks)
-    else await createList({ id, name: playlist.name, source: session.provider, sourceListId, list: tracks })
+    const sourceKey = `${session.provider}:${originalSourceId ?? sourceListId}`
+    if (existing) {
+      const current = await getListMusics(id)
+      if (signal?.aborted == true || !listState.userList.some(item => item.id == id && item.source == session.provider && item.sourceListId == originalSourceId)) throw new Error('cancelled')
+      await overwriteListMusics(id, mergeSourcePlaylist(current, tracks, sourceKey, settings?.sourceSnapshot))
+    } else await createList({ id, name: playlist.name, source: session.provider, sourceListId, list: tracks })
+    await setListSourceSnapshot(id, createSourceSnapshot(sourceKey, tracks))
     if (binding) {
       await setListSourceAccount(id, binding)
       if (!existing) await setListAutoUpdate(id, true)
