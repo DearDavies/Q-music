@@ -813,6 +813,11 @@
   "theme_appearance_system": "跟随系统",
   "theme_appearance_time": "按时间",
   "theme_appearance_tip": "只切换界面明暗，保留当前主题的配色和背景。",
-  "theme_appearance_time_tip": "07:00–19:00 为白天，其余时间为夜间。配色与背景保持不变。",
-  "theme_palette_collapse": "收起主题"
+  "theme_appearance_time_tip": "按设备本地时间自动切换明暗，保留主题配色和背景。",
+  "theme_palette_collapse": "收起主题",
+  "theme_schedule_day": "白天开始",
+  "theme_schedule_night": "夜间开始",
+  "theme_schedule_save": "保存时间",
+  "theme_schedule_saved": "时间已保存，立即生效",
+  "theme_schedule_invalid": "请输入有效的 24 小时时间（HH:mm），白天与夜间不能相同。"
 }

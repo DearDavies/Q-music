@@ -813,6 +813,11 @@
   "theme_appearance_system": "System",
   "theme_appearance_time": "Scheduled",
   "theme_appearance_tip": "Change the brightness while keeping your theme colors and background.",
-  "theme_appearance_time_tip": "Light from 07:00 to 19:00, dark otherwise. Your colors and background stay the same.",
-  "theme_palette_collapse": "Show less"
+  "theme_appearance_time_tip": "Switch appearance using local device time, keeping your theme colors and background.",
+  "theme_palette_collapse": "Show less",
+  "theme_schedule_day": "Light starts",
+  "theme_schedule_night": "Dark starts",
+  "theme_schedule_save": "Save times",
+  "theme_schedule_saved": "Saved and applied",
+  "theme_schedule_invalid": "Enter valid 24-hour times (HH:mm). Light and dark must start at different times."
 }

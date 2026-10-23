@@ -91,6 +91,8 @@ declare global {
        * 暗色主题id
        */
       'theme.darkId': string
+      'theme.dayStart': string
+      'theme.nightStart': string
       'theme.autoByTime': boolean
       'theme.appearance': 'light' | 'dark' | 'system' | 'time' | null
 

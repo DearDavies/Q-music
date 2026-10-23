@@ -165,5 +165,5 @@ export const getTheme = async() => {
   const id = getBaseThemeId(setting)
   const info = await getAllThemes()
   const theme = info.themes.find(theme => theme.id == id) ?? info.userThemes.find(theme => theme.id == id) ?? themes[0]
-  return adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(setting, theme.isDark), themeState.shouldUseDarkColors))
+  return adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(setting, theme.isDark), themeState.shouldUseDarkColors, new Date(), setting))
 }

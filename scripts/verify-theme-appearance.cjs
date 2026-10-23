@@ -84,3 +84,29 @@ test('夜间彩色和水墨主题保持可读对比度，自定义背景不丢�
   assert.equal(dark.config.extInfo[imageKey], 'my-background.png')
   assert.notEqual(dark.config.themeColors[prefix + 'primary'], themes.find(theme => theme.id == 'black').config.themeColors[prefix + 'primary'])
 })
+
+test('自定义时段按分钟生效，支持跨午夜且不影响固定或系统外观', () => {
+  for (const [day, night, cases] of [
+    ['08:30', '22:15', [[8, 29, true], [8, 30, false], [22, 14, false], [22, 15, true]]],
+    ['22:15', '08:30', [[22, 14, true], [22, 15, false], [0, 0, false], [8, 29, false], [8, 30, true]]],
+  ]) {
+    const settings = { 'theme.dayStart': day, 'theme.nightStart': night }
+    for (const [hour, minute, expected] of cases) {
+      const date = new Date(2026, 9, 23, hour, minute)
+      assert.equal(api.isDarkAppearance('time', false, date, settings), expected)
+      assert.equal(api.isDarkAppearance('light', true, date, settings), false)
+      assert.equal(api.isDarkAppearance('dark', false, date, settings), true)
+      assert.equal(api.isDarkAppearance('system', true, date, settings), true)
+    }
+  }
+})
+
+test('相同或非法时间不接受，损坏的旧配置回退到默认时段', () => {
+  const schedule = load(mobile ? 'src/theme/schedule.ts' : 'src/common/theme/schedule.ts')
+  for (const [day, night] of [['08:00', '08:00'], ['24:00', '19:00'], ['7:00', '19:00'], ['', '19:00'], ['07:60', '19:00']]) {
+    assert.equal(schedule.isValidSchedule(day, night), false)
+    const setting = { 'theme.dayStart': day, 'theme.nightStart': night }
+    assert.equal(api.isDarkAppearance('time', false, new Date(2026, 9, 23, 7, 0), setting), false)
+    assert.equal(api.isDarkAppearance('time', false, new Date(2026, 9, 23, 19, 0), setting), true)
+  }
+})

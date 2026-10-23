@@ -1,7 +1,7 @@
 {
   "name": "q-music-mobile",
-  "version": "0.4.22",
-  "versionCode": 50,
+  "version": "0.4.23",
+  "versionCode": 51,
   "private": true,
   "scripts": {
     "test:account-transfer": "node --test scripts/verify-account-transfer.cjs",

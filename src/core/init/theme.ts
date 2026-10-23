@@ -52,7 +52,7 @@ export default async(setting: LX.AppSetting) => {
   let lastTimePeriod = ''
   const refreshByTime = () => {
     if (getThemeAppearance(settingState.setting) != 'time') { lastTimePeriod = ''; return }
-    const period = isNightTime() ? 'night' : 'day'
+    const period = isNightTime(new Date(), settingState.setting) ? 'night' : 'day'
     if (period == lastTimePeriod) return
     lastTimePeriod = period
     void refreshTheme()
@@ -65,7 +65,7 @@ export default async(setting: LX.AppSetting) => {
     else refreshByTime()
   })
   global.state_event.on('configUpdated', keys => {
-    if (keys.some(key => ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'theme.appearance', 'common.isAutoTheme', 'theme.hideBgDark'].includes(key))) {
+    if (keys.some(key => ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'theme.appearance', 'theme.dayStart', 'theme.nightStart', 'common.isAutoTheme', 'theme.hideBgDark'].includes(key))) {
       lastTimePeriod = ''
       void refreshTheme()
     }
