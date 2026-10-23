@@ -6,6 +6,7 @@ import { isMac, isNativeWayland, log } from '@common/utils'
 import { getProxy, getTheme, initHotKey, initSetting, parseEnvParams } from './utils'
 import { navigationUrlWhiteList } from '@common/config'
 import defaultSetting from '@common/defaultSetting'
+import { getThemeAppearance } from '@common/theme/appearance'
 import { isExistWindow as isExistMainWindow, showWindow as showMainWindow } from './modules/winMain'
 import { createAppEvent, createDislikeEvent, createListEvent } from '@main/event'
 import createWorkers from './worker'
@@ -284,9 +285,9 @@ export const listenerAppEvent = (startApp: () => void) => {
 
 const initTheme = () => {
   global.lx.theme = getTheme()
-  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime']
+  const themeConfigKeys = ['theme.id', 'theme.lightId', 'theme.darkId', 'theme.autoByTime', 'theme.appearance']
   const refreshScheduledTheme = () => {
-    if (!global.lx.appSetting['theme.autoByTime']) return
+    if (getThemeAppearance(global.lx.appSetting) != 'time') return
     const next = getTheme()
     if (next.theme.isDark == global.lx.theme.theme.isDark && next.theme.name == global.lx.theme.theme.name) return
     global.lx.theme = next
@@ -310,7 +311,7 @@ const initTheme = () => {
     }
   })
   global.lx.event_app.on('system_theme_change', () => {
-    if (global.lx.appSetting['theme.id'] == 'auto') {
+    if (getThemeAppearance(global.lx.appSetting) == 'system') {
       global.lx.theme = getTheme()
       global.lx.event_app.theme_change()
     }

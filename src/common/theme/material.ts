@@ -1,5 +1,6 @@
 // 启动、切换主题和主题编辑预览共用材质，避免部分入口退回固定白底。
 export const buildThemeMaterial = (isDark: boolean): Record<string, string> => ({
+  '--q-background-scrim': isDark ? 'rgba(10, 12, 16, .56)' : 'rgba(0, 0, 0, 0)',
   '--color-font-label': 'var(--color-650)',
   '--q-surface': `rgb(from var(--color-content-background) r g b / ${isDark ? '.82' : '.52'})`,
   '--q-surface-strong': `rgb(from var(--color-content-background) r g b / ${isDark ? '.94' : '.78'})`,

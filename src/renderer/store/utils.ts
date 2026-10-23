@@ -7,7 +7,7 @@
 // }
 import { encodePath, isUrl } from '@common/utils/common'
 import { buildThemeMaterial } from '@common/theme/material'
-import { isNightTime } from '@common/theme/schedule'
+import { adaptThemeAppearance, getBaseThemeId, getThemeAppearance, isDarkAppearance } from '@common/theme/appearance'
 import { appSetting } from './setting'
 import { joinPath } from '@common/utils/nodejs'
 import { markRaw, shallowReactive } from '@common/utils/vueTools'
@@ -76,20 +76,14 @@ export const applyTheme = (id: string, lightId: string, darkId: string, dataPath
   const currentApplyThemeId = ++applyThemeId
   getThemes((themeInfo) => {
     if (currentApplyThemeId != applyThemeId) return
-    const isAutomatic = appSetting['theme.autoByTime'] || id == 'auto'
-    const isDark = appSetting['theme.autoByTime'] ? isNightTime() : themeShouldUseDarkColors.value
-    let themeId = isAutomatic
-      ? isDark
-        ? darkId
-        : lightId
-      : id
-
+    const settings = { ...appSetting, 'theme.id': id, 'theme.lightId': lightId }
+    const themeId = getBaseThemeId(settings)
     let theme = findTheme(themeInfo, themeId)
     if (!theme) {
-      themeId = isAutomatic && isDark ? 'black' : 'green'
-      theme = themeInfo.themes.find(theme => theme.id == themeId) ?? themeInfo.themes[0]
+      theme = themeInfo.themes.find(theme => theme.id == 'green') ?? themeInfo.themes[0]
     }
     if (!theme) return
+    theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(settings, theme.isDark), themeShouldUseDarkColors.value))
     window.setTheme(buildThemeColors(theme, dataPath))
   })
 }

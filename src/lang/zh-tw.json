@@ -1085,5 +1085,13 @@
   "local_remove_files": "同時刪除音訊和同名歌詞檔案（移至資源回收筒）",
   "local_remove_only": "僅從列表移除",
   "local_remove_failed": "{count} 首歌曲的檔案未能全部刪除，已保留對應列表記錄，請檢查檔案權限或占用情況。",
-  "list_sync_preserve_local_tip": "平台曲目依雲端更新；手動加入的其他歌曲會保留在清單末尾，不會上傳到平台。"
+  "list_sync_preserve_local_tip": "平台曲目依雲端更新；手動加入的其他歌曲會保留在清單末尾，不會上傳到平台。",
+  "theme_appearance": "外觀模式",
+  "theme_appearance_light": "白天",
+  "theme_appearance_dark": "夜間",
+  "theme_appearance_system": "跟隨系統",
+  "theme_appearance_time": "依時間",
+  "theme_appearance_tip": "只切換介面明暗，保留目前主題的配色與背景。",
+  "theme_appearance_time_tip": "07:00–19:00 為白天，其餘時間為夜間。配色與背景保持不變。",
+  "theme_palette_collapse": "收起主題"
 }

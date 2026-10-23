@@ -1,6 +1,6 @@
 import { encodePath, getEnvProxy, isUrl, parseProxy, throttle, isMac } from '@common/utils'
 import migrateSetting from '@common/utils/migrateSetting'
-import { isNightTime } from '@common/theme/schedule'
+import { adaptThemeAppearance, getBaseThemeId, getThemeAppearance, isDarkAppearance } from '@common/theme/appearance'
 import getStore from '@main/utils/store'
 import { STORE_NAMES, URL_SCHEME_RXP } from '@common/constants'
 import defaultSetting from '@common/defaultSetting'
@@ -257,13 +257,8 @@ const copyTheme = (theme: LX.Theme): LX.Theme => {
 }
 export const getTheme = () => {
   // fs.promises.readdir()
-  const shouldUseDarkColors = global.lx.appSetting['theme.autoByTime'] ? isNightTime() : nativeTheme.shouldUseDarkColors
-  const isAutomatic = global.lx.appSetting['theme.autoByTime'] || global.lx.appSetting['theme.id'] == 'auto'
-  let themeId = isAutomatic
-    ? shouldUseDarkColors
-      ? global.lx.appSetting['theme.darkId']
-      : global.lx.appSetting['theme.lightId']
-    : global.lx.appSetting['theme.id']
+  const shouldUseDarkColors = nativeTheme.shouldUseDarkColors
+  let themeId = getBaseThemeId(global.lx.appSetting)
   // themeId = 'naruto'
   // themeId = 'pink'
   // themeId = 'black'
@@ -280,11 +275,12 @@ export const getTheme = () => {
             : `url(file:///${encodePath(joinPath(global.lxDataPath, 'theme_images', theme.config.extInfo['--background-image']))})`
       }
     } else {
-      themeId = isAutomatic && shouldUseDarkColors ? 'black' : 'green'
+      themeId = 'green'
       theme = themes.find(theme => theme.id == themeId) as LX.Theme
     }
   }
 
+  theme = adaptThemeAppearance(theme, isDarkAppearance(getThemeAppearance(global.lx.appSetting, theme.isDark), shouldUseDarkColors))
   const colors: Record<string, string> = {
     ...theme.config.themeColors,
     ...buildThemeMaterial(theme.isDark),

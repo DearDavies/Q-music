@@ -27,30 +27,22 @@ dd
       base-btn.btn(min @click="isShowPlayTimeoutModal = true") {{ $t('setting__play_timeout')}} {{ timeLabel ? ` (${timeLabel})` : '' }}
 
 dd
-  h3#basic_theme {{ $t('setting__basic_theme') }}
-  div
-    .gap-top
-      base-checkbox(id="setting_theme_time" :model-value="appSetting['theme.autoByTime']" :label="$t('setting_theme_time')" @update:model-value="updateSetting({'theme.autoByTime': $event})")
-      p {{ $t('setting_theme_time_tip') }}
-      base-btn.btn(v-if="appSetting['theme.autoByTime']" min @click="isShowThemeSelectorModal = true") {{ $t('setting_theme_time_colors') }}
+  h3#basic_theme {{ $t('theme_appearance') }}
+  theme-appearance(:model-value="appearance" @change="setAppearance")
+  div(:class="$style.paletteSection")
+    div(:class="$style.paletteHeading")
+      span {{ $t('setting__basic_theme') }}
+      button(type="button" :class="$style.paletteToggle" :aria-expanded="showAllTheme" @click="showAllTheme = !showAllTheme") {{ $t(showAllTheme ? 'theme_palette_collapse' : 'theme_more_btn_show') }}
     ul(:class="$style.theme")
-      li(v-for="theme in themeList" :key="theme.id" :aria-label="theme.name" :style="theme.styles" :class="[$style.themeItem, {[$style.active]: !appSetting['theme.autoByTime'] && themeId == theme.id}]" @click="toggleTheme(theme)" @contextmenu="handleEditTheme(theme)")
+      li(v-for="theme in themeList" :key="theme.id" :aria-label="theme.name" :style="theme.styles" :class="[$style.themeItem, {[$style.active]: selectedThemeId == theme.id}]" role="button" tabindex="0" :aria-pressed="selectedThemeId == theme.id" @click="toggleTheme(theme)" @keydown.enter="toggleTheme(theme)" @keydown.space.prevent="toggleTheme(theme)" @contextmenu.prevent="handleEditTheme(theme)")
         div(:class="$style.bg")
         span(:class="$style.label") {{ theme.name }}
-      li(v-if="showAllTheme || themeId == 'auto'" :aria-label="$t('theme_auto_tip')" :style="autoTheme" :class="[$style.themeItem, $style.auto, {[$style.active]: !appSetting['theme.autoByTime'] && themeId == 'auto'}]" @click="handleSetThemeAuto" @contextmenu="isShowThemeSelectorModal = true")
-        div(:class="$style.bg")
-          div(:class="$style.bgContent")
-            div(:class="$style.light")
-            div(:class="$style.dark")
-        span(:class="$style.label") {{ $t('theme_auto') }}
-      li(v-if="showAllTheme" :aria-label="$t('theme_add')" :class="[$style.themeItem, $style.add]" @click="handleEditTheme()")
+      li(v-if="showAllTheme" :aria-label="$t('theme_add')" :class="[$style.themeItem, $style.add]" role="button" tabindex="0" @click="handleEditTheme()" @keydown.enter="handleEditTheme()" @keydown.space.prevent="handleEditTheme()")
         div(:class="$style.bg")
           div(:class="$style.bgContent")
             svg-icon(:class="$style.icon" name="plus")
         span(:class="$style.label") {{ $t('theme_add') }}
-      li(v-if="!showAllTheme" :aria-label="$t('theme_more_btn_show')" :class="[$style.themeItem, $style.moreThme]" @click="showAllTheme = true")
-        span(:class="$style.label") {{ $t('theme_more_btn_show') }}
-        svg-icon(name="angle-right-solid" :class="$style.activeIcon")
+
 
 dd
   h3#basic_glass {{ $t('setting__basic_glass') }}
@@ -142,14 +134,13 @@ dd
       id="setting_basic_playbar_progress_style_full" name="setting_basic_playbar_progress_style"
       need :model-value="appSetting['common.playBarProgressStyle']" value="full" :label="$t('setting__basic_playbar_progress_style_full')" @update:model-value="updateSetting({'common.playBarProgressStyle': $event})")
 
-ThemeSelectorModal(v-model="isShowThemeSelectorModal")
 ThemeEditModal(v-model="isShowThemeEditModal" :theme-id="editThemeId" @submit="handleRefreshTheme")
 play-timeout-modal(v-model="isShowPlayTimeoutModal")
 user-api-modal(v-model="isShowUserApiModal")
 </template>
 
 <script>
-import { computed, ref, watch, reactive, shallowReactive } from '@common/utils/vueTools'
+import { computed, ref, shallowReactive } from '@common/utils/vueTools'
 import { windowSizeList, userApi, isFullscreen, themeId } from '@renderer/store'
 import { langList, useI18n } from '@root/lang'
 import { getSystemFonts, showSelectDialog } from '@renderer/utils/ipc'
@@ -157,19 +148,20 @@ import apiSourceInfo from '@renderer/utils/musicSdk/api-source-info'
 import { useTimeout } from '@renderer/core/player/timeoutStop'
 import { dialog } from '@renderer/plugins/Dialog'
 
-import ThemeSelectorModal from './ThemeSelectorModal.vue'
+import ThemeAppearance from './ThemeAppearance.vue'
+import { getBaseThemeId, getThemeAppearance } from '@common/theme/appearance'
 import ThemeEditModal from './ThemeEditModal/index.vue'
 import PlayTimeoutModal from './PlayTimeoutModal.vue'
 import UserApiModal from './UserApiModal.vue'
 import SliderBar from '@renderer/components/base/SliderBar.vue'
 import { appSetting, updateSetting } from '@renderer/store/setting'
-import { getThemes, applyTheme, findTheme, buildBgUrl } from '@renderer/store/utils'
+import { getThemes, applyTheme, buildBgUrl } from '@renderer/store/utils'
 import { isUrl, encodePath } from '@common/utils/common'
 
 export default {
   name: 'SettingBasic',
   components: {
-    ThemeSelectorModal,
+    ThemeAppearance,
     ThemeEditModal,
     PlayTimeoutModal,
     UserApiModal,
@@ -187,32 +179,12 @@ export default {
     const allThemes = computed(() => {
       return [...defaultThemes.value, ...userThemes]
     })
-    const themeList = computed(() => {
-      if (!allThemes.value.length) return []
-      return showAllTheme.value
-        ? allThemes.value
-        : themeId.value == 'auto'
-          ? []
-          : [allThemes.value.find(t => t.id == themeId.value) ?? allThemes.value[0]]
-    })
-    const autoTheme = reactive({})
-    const updateAutoTheme = (info) => {
-      let light = findTheme(info, appSetting['theme.lightId'])
-      light ??= info.themes.find(theme => theme.id == 'green')
-      let dark = findTheme(info, appSetting['theme.darkId'])
-      dark ??= info.themes.find(theme => theme.id == 'black')
-      autoTheme['--color-primary-theme-light'] = light.config.themeColors['--color-theme']
-      autoTheme['--background-image-theme-light'] = light.isCustom
-        ? light.config.extInfo['--background-image'] == 'none'
-          ? 'none'
-          : buildBgUrl(light.config.extInfo['--background-image'], info.dataPath)
-        : light.config.extInfo['--background-image']
-      autoTheme['--color-primary-theme-dark'] = dark.config.themeColors['--color-theme']
-      autoTheme['--background-image-theme-dark'] = dark.isCustom
-        ? dark.config.extInfo['--background-image'] == 'none'
-          ? 'none'
-          : buildBgUrl(dark.config.extInfo['--background-image'], info.dataPath)
-        : dark.config.extInfo['--background-image']
+    const selectedThemeId = computed(() => getBaseThemeId(appSetting))
+    const appearance = computed(() => getThemeAppearance(appSetting, allThemes.value.find(theme => theme.id == selectedThemeId.value)?.isDark))
+    const themeList = computed(() => showAllTheme.value ? allThemes.value : allThemes.value.filter(theme => theme.id == selectedThemeId.value))
+    const setAppearance = mode => {
+      updateSetting({ 'theme.id': selectedThemeId.value, 'theme.appearance': mode, 'theme.autoByTime': false })
+      applyTheme(selectedThemeId.value, appSetting['theme.lightId'], appSetting['theme.darkId'], dataPath)
     }
 
     let dataPath = ''
@@ -223,6 +195,7 @@ export default {
         defaultThemesRaw.splice(0, defaultThemesRaw.length, ...info.themes.map(t => {
           return {
             id: t.id,
+            isDark: t.isDark,
             styles: {
               '--color-primary-theme': t.config.themeColors['--color-theme'],
               '--background-image-theme': t.config.extInfo['--background-image'],
@@ -232,6 +205,7 @@ export default {
         userThemes.splice(0, userThemes.length, ...info.userThemes.map(t => {
           return {
             id: t.id,
+            isDark: t.isDark,
             name: t.name,
             styles: {
               '--color-primary-theme': t.config.themeColors['--color-theme'],
@@ -241,7 +215,6 @@ export default {
             },
           }
         }))
-        updateAutoTheme(info)
       })
     }
     const editThemeId = ref('')
@@ -267,27 +240,13 @@ export default {
       updateSetting({ 'tray.enable': action == 'tray' })
     }
     const toggleTheme = (theme) => {
-      if (themeId.value == theme.id && !appSetting['theme.autoByTime']) return
+      if (selectedThemeId.value == theme.id) return
+      const mode = appearance.value
       themeId.value = theme.id
-      updateSetting({ 'theme.id': theme.id, 'theme.autoByTime': false })
+      updateSetting({ 'theme.id': theme.id, 'theme.appearance': mode, 'theme.autoByTime': false })
       applyTheme(theme.id, appSetting['theme.lightId'], appSetting['theme.darkId'], dataPath)
     }
 
-    watch(() => [appSetting['theme.lightId'], appSetting['theme.darkId']], () => {
-      getThemes(updateAutoTheme)
-    })
-    const isShowThemeSelectorModal = ref(false)
-    const handleSetThemeAuto = () => {
-      if (themeId.value == 'auto' && !appSetting['theme.autoByTime']) return
-      if (window.localStorage.getItem('theme-auto-tip') != 'true') {
-        window.localStorage.setItem('theme-auto-tip', 'true')
-        void dialog({
-          message: t('setting__basic_theme_auto_tip'),
-          confirmButtonText: t('ok'),
-        })
-      }
-      toggleTheme({ id: 'auto' })
-    }
     const isShowThemeEditModal = ref(false)
 
     const isShowPlayTimeoutModal = ref(false)
@@ -405,7 +364,9 @@ export default {
       appSetting,
       updateSetting,
       userThemes,
-      autoTheme,
+      appearance,
+      setAppearance,
+      selectedThemeId,
       showAllTheme,
       themeList,
       closeAction,
@@ -415,9 +376,7 @@ export default {
       // currentStting,
       // themes,
       // themeClassName,
-      isShowThemeSelectorModal,
       isShowThemeEditModal,
-      handleSetThemeAuto,
       isShowPlayTimeoutModal,
       timeLabel,
       apiSources,
@@ -445,6 +404,11 @@ export default {
 
 <style lang="less" module>
 @import '@renderer/assets/styles/layout.less';
+.paletteSection { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--color-primary-alpha-900); }
+.paletteHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; font-size: 13px; color: var(--color-font-label); }
+.paletteToggle { padding: 4px 0; border: 0; background: none; color: var(--color-primary-font); font: inherit; cursor: pointer; }
+.paletteToggle:focus-visible, .themeItem:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
+
 
 .performanceTip {
   max-width: 560px;
@@ -547,16 +511,18 @@ export default {
   display: flex;
   flex-flow: row wrap;
   // padding: 0 15px;
-  margin-bottom: -20px;
+  gap: 16px;
+  margin: 0;
+  padding: 4px;
 
   .themeItem {
     display: flex;
     flex-flow: column nowrap;
     align-items: center;
     cursor: pointer;
-    margin-right: 10px;
+    margin-right: 0;
     transition: transform .28s ease, opacity .28s ease;
-    margin-bottom: 18px;
+    margin-bottom: 0;
     width: 96px;
 
     &:hover {
@@ -576,8 +542,8 @@ export default {
         font-weight: 700;
       }
       .bg {
-        border-color: var(--color-primary-theme);
-        box-shadow: 0 8px 20px rgba(24, 34, 45, .16), 0 0 0 3px rgb(from var(--color-primary-theme) r g b / .22);
+        border-color: var(--color-primary);
+        box-shadow: 0 2px 8px rgba(24, 34, 45, .1), 0 0 0 2px var(--color-primary-alpha-800);
       }
     }
 
@@ -626,71 +592,6 @@ export default {
       height: 1.2em;
       font-size: 12.5px;
       .mixin-ellipsis-1();
-    }
-
-    &.auto {
-
-      &.active {
-        color: var(--color-primary-font-active);
-        .bg {
-          border-color: var(--color-primary-font-active);
-        }
-      }
-
-      >.bg {
-        &:after {
-          content: none;
-        }
-        &:before {
-          content: none;
-        }
-      }
-      .bgContent {
-        position: relative;
-        height: 100%;
-        overflow: hidden;
-        border-radius: 9px;
-      }
-      .light, .dark {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        &:after {
-          display: block;
-          content: ' ';
-          width: 100%;
-          height: 100%;
-          background-position: center;
-          background-size: cover;
-          background-repeat: no-repeat;
-        }
-      }
-      .light {
-        &:after {
-          clip-path: polygon(0 0, 100% 0, 0 100%);
-        }
-        svg {
-          fill: var(--color-primary-theme-light);
-        }
-        &:after {
-          background-color: var(--color-primary-theme-light);
-          background-image: var(--background-image-theme-light);
-        }
-      }
-      .dark {
-        &:after {
-          clip-path: polygon(0 100%, 100% 0, 100% 100%);
-        }
-        svg {
-          fill: var(--color-primary-theme-dark);
-        }
-        &:after {
-          background-color: var(--color-primary-theme-dark);
-          background-image: var(--background-image-theme-dark);
-        }
-      }
     }
 
     &.add {

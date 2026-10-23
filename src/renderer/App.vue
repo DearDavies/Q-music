@@ -106,7 +106,9 @@ body {
   overflow: hidden;
   color: var(--color-font);
   // 用户自定义背景图优先，未设置时回退到主题自带背景
-  background: var(--q-user-bg-image, var(--background-image)) var(--background-image-position) no-repeat;
+  background:
+    linear-gradient(var(--q-background-scrim), var(--q-background-scrim)),
+    var(--q-user-bg-image, var(--background-image)) var(--background-image-position) no-repeat;
   background-size: var(--background-image-size);
   transition: background-color @transition-normal;
   background-color: var(--color-content-background);

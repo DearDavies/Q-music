@@ -617,6 +617,7 @@ declare global {
        */
       'theme.darkId': string
       'theme.autoByTime': boolean
+      'theme.appearance': 'light' | 'dark' | 'system' | 'time' | null
 
       /**
        * 毛玻璃面板不透明度（百分比 8-70）

@@ -1085,5 +1085,13 @@
   "local_remove_files": "Also delete audio and matching lyric files (move to recycle bin)",
   "local_remove_only": "Remove from list only",
   "local_remove_failed": "Files for {count} songs could not be fully deleted. Their list entries were kept. Check file permissions or whether the files are in use.",
-  "list_sync_preserve_local_tip": "Platform tracks follow the remote playlist. Extra songs added locally stay at the end and are not uploaded."
+  "list_sync_preserve_local_tip": "Platform tracks follow the remote playlist. Extra songs added locally stay at the end and are not uploaded.",
+  "theme_appearance": "Appearance",
+  "theme_appearance_light": "Light",
+  "theme_appearance_dark": "Dark",
+  "theme_appearance_system": "System",
+  "theme_appearance_time": "Scheduled",
+  "theme_appearance_tip": "Change the brightness while keeping your theme colors and background.",
+  "theme_appearance_time_tip": "Light from 07:00 to 19:00, dark otherwise. Your colors and background stay the same.",
+  "theme_palette_collapse": "Show less"
 }

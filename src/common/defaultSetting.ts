@@ -162,6 +162,7 @@ const defaultSetting: LX.AppSetting = {
   'theme.lightId': 'green',
   'theme.darkId': 'black',
   'theme.autoByTime': false,
+  'theme.appearance': null,
   'theme.glassOpacity': 22,
   'theme.glassBlur': 20,
   'theme.customBgImage': '',
