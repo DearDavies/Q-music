@@ -777,5 +777,17 @@
   "daily_kg_explanation": "登入酷狗後取得帳號每日推薦，無需額外授權；可在帳號頁匯入預設收藏、我喜歡與自己的歌單。",
   "daily_provider_current": "首頁正在使用",
   "daily_provider_use": "設為首頁推薦",
-  "daily_provider_saved": "已設定首頁推薦來源"
+  "daily_provider_saved": "已設定首頁推薦來源",
+  "download_empty_title": "還沒有下載任務",
+  "download_empty_hint": "在歌曲選單或播放列選擇下載，歌曲會顯示在這裡。",
+  "download_filter_empty": "此分類暫無任務",
+  "download_filter_hint": "可以切換到全部任務，查看其他下載狀態。",
+  "download_filter_all": "全部",
+  "download_filter_active": "進行中",
+  "download_filter_completed": "已完成",
+  "download_filter_error": "失敗",
+  "download_play_local": "播放本機檔案",
+  "download_retry": "重試下載",
+  "download_play_missing": "音樂檔案不存在，可能已被移動或刪除。請重新下載。",
+  "download_play_failed": "無法播放此檔案，請檢查檔案存取權限後重試。"
 }

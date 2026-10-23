@@ -777,5 +777,17 @@
   "daily_kg_explanation": "Sign in to Kugou for personal daily recommendations. Import saved songs and playlists from the account screen. No extra authorization needed.",
   "daily_provider_current": "Used on home",
   "daily_provider_use": "Use on home",
-  "daily_provider_saved": "Home recommendation source saved"
+  "daily_provider_saved": "Home recommendation source saved",
+  "download_empty_title": "No downloads yet",
+  "download_empty_hint": "Choose Download from a song menu or the player to add music here.",
+  "download_filter_empty": "No downloads in this category",
+  "download_filter_hint": "Switch to all downloads to see tasks with other statuses.",
+  "download_filter_all": "All",
+  "download_filter_active": "In progress",
+  "download_filter_completed": "Completed",
+  "download_filter_error": "Failed",
+  "download_play_local": "Play local file",
+  "download_retry": "Retry download",
+  "download_play_missing": "The music file is missing. It may have been moved or deleted. Please download it again.",
+  "download_play_failed": "Could not play this file. Check file access permissions and try again."
 }
