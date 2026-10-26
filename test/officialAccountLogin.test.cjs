@@ -132,3 +132,16 @@ test('官方导航权限仅属于对应窗口，不能绕过主界面或其他�
     assert.equal(blocked(qq, target), true, target)
   }
 })
+
+test('网易云 QQ 授权留在原账号窗口，回调返回网易云仍共享同一个会话', () => {
+  const policy = load('../../utils/navigationPolicy.ts', { '@common/config': { navigationUrlWhiteList: [] } })
+  const navigation = load('accountLoginNavigation.ts', { '../../utils/navigationPolicy': policy })
+  const domains = ['163.com', '126.com', 'netease.com']
+  for (const target of ['https://graph.qq.com/oauth2.0/authorize', 'https://xui.ptlogin2.qq.com/cgi-bin/xlogin', 'https://ssl.ptlogin2.qq.com/check', 'https://music.163.com/back/qq?code=test']) {
+    assert.equal(navigation.allowAccountLoginNavigation('wy', target, domains), true, target)
+  }
+  for (const target of ['https://graph.qq.com.evil.test/', 'https://graph.qq.com@evil.test/', 'https://y.qq.com/', 'http://graph.qq.com/', 'https://graph.qq.com:444/', 'https://user:pass@graph.qq.com/']) {
+    assert.equal(navigation.allowAccountLoginNavigation('wy', target, domains), false, target)
+  }
+  assert.equal(navigation.allowAccountLoginNavigation('kg', 'https://graph.qq.com/', ['kugou.com']), false)
+})

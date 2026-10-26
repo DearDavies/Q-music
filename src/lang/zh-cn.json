@@ -1107,5 +1107,10 @@
   "lists__drag_sort": "拖动调整歌单顺序",
   "lists__sort_failed": "歌单顺序保存失败，请重试。",
   "download__remove_tip": "移除选中的 {count} 条下载记录？默认保留已下载文件，仍可在本地歌单中播放。勾选下方选项才会删除文件，并清理本地歌单中的引用。",
-  "download__remove_records": "移除记录…"
+  "download__remove_records": "移除记录…",
+  "lyric_font_title": "歌词字体",
+  "lyric_font_default": "默认字体",
+  "lyric_font_preview": "让音乐陪你走过每一天",
+  "lyric_font_hint": "仅更换播放详情中的歌词与翻译，不影响界面和桌面歌词。选择本机已安装的字体，缺少的字形会自动回退。",
+  "player__errors_stopped": "连续播放失败，已停止自动跳歌。请检查音源或网络后重新播放。"
 }

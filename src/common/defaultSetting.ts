@@ -74,6 +74,7 @@ const defaultSetting: LX.AppSetting = {
   'playDetail.isShowLyricProgressSetting': false,
   'playDetail.style.layout': 'immersive',
   'playDetail.style.fontSize': 140,
+  'playDetail.style.font': '',
   'playDetail.style.align': 'center',
   'playDetail.isDelayScroll': true,
 

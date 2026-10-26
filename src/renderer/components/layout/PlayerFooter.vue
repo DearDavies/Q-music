@@ -30,8 +30,8 @@
             <path d="M17.6 7.65c.65-.43 1.4.04 1.4.82v7.06c0 .78-.75 1.25-1.4.82l-6.04-3.53a.95.95 0 0 1 0-1.64z" />
           </svg>
         </button>
-        <button type="button" :class="[$style.playBtn, $style.playBtnPrimary]" :aria-label="isPlay ? $t('player__pause') : $t('player__play')" @click="togglePlay">
-          <svg v-if="isPlay" viewBox="0 0 24 24" aria-hidden="true">
+        <button type="button" :class="[$style.playBtn, $style.playBtnPrimary]" :aria-label="(isPlay || isPlayPending) ? $t('player__pause') : $t('player__play')" @click="togglePlay">
+          <svg v-if="isPlay || isPlayPending" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="7.6" y="6.4" width="3.4" height="11.2" rx="1.6" />
             <rect x="13" y="6.4" width="3.4" height="11.2" rx="1.6" />
           </svg>
@@ -85,7 +85,7 @@
 <script setup>
 import { playNext, playPrev, togglePlay } from '@renderer/core/player'
 import { computed } from '@common/utils/vueTools'
-import { status, isPlay, isShowPlayComment, isShowPlayQueue, musicInfo, tempPlayList } from '@renderer/store/player/state'
+import { status, isPlay, isPlayPending, isShowPlayComment, isShowPlayQueue, musicInfo, tempPlayList } from '@renderer/store/player/state'
 import { setMusicInfo, setShowPlayerDetail, setShowPlayQueue } from '@renderer/store/player/action'
 import usePlayProgress from '@renderer/utils/compositions/usePlayProgress'
 import { appSetting } from '@renderer/store/setting'

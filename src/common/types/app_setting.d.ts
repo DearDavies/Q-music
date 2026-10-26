@@ -324,6 +324,9 @@ declare global {
        */
       'playDetail.style.fontSize': number
 
+      /** 播放详情页独立字体；留空跟随界面字体 */
+      'playDetail.style.font': string
+
       /**
        * 播放详情页-歌词对齐方式
        */

@@ -1,24 +1,25 @@
 import { onBeforeUnmount } from '@common/utils/vueTools'
 import { useI18n } from '@renderer/plugins/i18n'
-import { musicInfo, playMusicInfo } from '@renderer/store/player/state'
+import { musicInfo, playMusicInfo, isPlayPending } from '@renderer/store/player/state'
 import { setStop, isEmpty } from '@renderer/plugins/player'
-import { retryMusicUrl } from '@renderer/core/player'
+import { retryMusicUrl, handlePlaybackFailure } from '@renderer/core/player'
+import { playbackRecovery } from '@renderer/core/player/recovery'
 import { setAllStatus } from '@renderer/store/player/action'
 import { appSetting } from '@renderer/store/setting'
 
 export default () => {
   const t = useI18n()
+  let retries = 0
   let loadingTimeout: NodeJS.Timeout | null = null
   const startLoadingTimeout = () => {
     // console.log('start load timeout')
     clearLoadingTimeout()
+    const token = playbackRecovery.token()
     loadingTimeout = setTimeout(() => {
-      if (window.lx.isPlayedStop) {
-        setAllStatus('')
-        return
-      }
+      if (window.lx.isPlayedStop || !playbackRecovery.isCurrent(token)) return
       if (!isEmpty()) setStop()
-      if (playMusicInfo.musicInfo) retryMusicUrl(playMusicInfo.musicInfo)
+      if (playMusicInfo.musicInfo && retries++ < 2) retryMusicUrl(playMusicInfo.musicInfo)
+      else handlePlaybackFailure()
     }, 25000)
   }
   const clearLoadingTimeout = () => {
@@ -29,16 +30,21 @@ export default () => {
   }
 
   const handleLoadstart = () => {
-    if (window.lx.isPlayedStop) return
+    if (window.lx.isPlayedStop || playbackRecovery.isCancelled()) return
+    isPlayPending.value = true
     if (appSetting['player.autoSkipOnError']) startLoadingTimeout()
     setAllStatus(t('player__loading'))
   }
 
   const handleLoadeddata = () => {
+    if (playbackRecovery.isCancelled()) return
     setAllStatus(t('player__loading'))
   }
 
   const handlePlaying = () => {
+    if (playbackRecovery.isCancelled()) return
+    isPlayPending.value = false
+    playbackRecovery.resetFailures()
     setAllStatus('')
     clearLoadingTimeout()
   }
@@ -48,6 +54,8 @@ export default () => {
   }
 
   const handleWating = () => {
+    if (playbackRecovery.isCancelled()) return
+    isPlayPending.value = true
     if (appSetting['player.autoSkipOnError']) startLoadingTimeout()
     setAllStatus(t('player__buffering'))
   }
@@ -55,18 +63,19 @@ export default () => {
   const handleError = (errCode?: number) => {
     if (!musicInfo.id) return
     clearLoadingTimeout()
-    if (window.lx.isPlayedStop) return
+    if (window.lx.isPlayedStop || playbackRecovery.isCancelled()) return
     if (!isEmpty()) setStop()
-    if (playMusicInfo.musicInfo && errCode !== 1) {
+    if (playMusicInfo.musicInfo && errCode !== 1 && retries++ < 2) {
       retryMusicUrl(playMusicInfo.musicInfo)
       setAllStatus(t('player__refresh_url'))
       return
     }
 
-    setAllStatus(t('player__error'))
+    handlePlaybackFailure()
   }
 
   const handleSetPlayInfo = () => {
+    retries = 0
     clearLoadingTimeout()
   }
 
@@ -81,6 +90,7 @@ export default () => {
   window.app_event.on('playerPlaying', handlePlaying)
   window.app_event.on('playerWaiting', handleWating)
   window.app_event.on('playerEmptied', handleEmpied)
+  window.app_event.on('playerPause', clearLoadingTimeout)
   window.app_event.on('playerError', handleError)
   window.app_event.on('musicToggled', handleSetPlayInfo)
 
@@ -90,6 +100,7 @@ export default () => {
     window.app_event.off('playerPlaying', handlePlaying)
     window.app_event.off('playerWaiting', handleWating)
     window.app_event.off('playerEmptied', handleEmpied)
+    window.app_event.off('playerPause', clearLoadingTimeout)
     window.app_event.off('playerError', handleError)
     window.app_event.off('musicToggled', handleSetPlayInfo)
   })

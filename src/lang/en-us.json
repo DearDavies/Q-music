@@ -1107,5 +1107,10 @@
   "lists__drag_sort": "Drag to reorder playlists",
   "lists__sort_failed": "Could not save playlist order. Please try again.",
   "download__remove_tip": "Remove {count} download records? Downloaded files are kept by default and remain playable in local playlists. Select the option below to also delete the files and their local playlist entries.",
-  "download__remove_records": "Remove records…"
+  "download__remove_records": "Remove records…",
+  "lyric_font_title": "Lyrics font",
+  "lyric_font_default": "Default",
+  "lyric_font_preview": "Let music brighten your day",
+  "lyric_font_hint": "Applies to lyrics and translations in the player. Interface and desktop lyrics keep their fonts. Choose an installed font; missing characters use a system fallback.",
+  "player__errors_stopped": "Playback keeps failing. Automatic skipping has stopped. Check your music source or network, then play again."
 }

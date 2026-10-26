@@ -1,6 +1,6 @@
 import { BrowserWindow, safeStorage, session, shell, type Session, type WebContents } from 'electron'
 import { getProxy } from '@main/utils'
-import { allowOfficialNavigation, setWindowNavigationPolicy } from '@main/utils/navigationPolicy'
+import { setWindowNavigationPolicy } from '@main/utils/navigationPolicy'
 import getStore from '@main/utils/store'
 import { constants, createCipheriv, createHash, publicEncrypt, randomBytes } from 'node:crypto'
 import { getQQCredentials, getQQRequestComm, getQQWebRequestComm } from '@common/utils/qqCredentials'
@@ -8,6 +8,7 @@ import { signQQRequest } from '@common/utils/qqSign'
 import { collectQQPlaylistIds } from '@common/utils/qqPlaylist'
 import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
 import { closeOfficialAccountLogin, openOfficialAccountLogin } from './officialAccountLogin'
+import { allowAccountLoginNavigation } from './accountLoginNavigation'
 import { fitAccountLoginWindow, getAccountLoginBounds } from './accountLoginLayout'
 import { getKugouDailyHashes, getKugouPlaylistHashes, getKugouPlaylists, logoutKugou, openKugouLogin, readKugouSession } from './kugouAccount'
 
@@ -177,7 +178,7 @@ const buildNeteaseEapiForm = (path: string, data: Record<string, unknown>) => {
 }
 
 const isAllowedHost = (provider: MusicAccountProvider, target: string) => {
-  return allowOfficialNavigation(target, providerConfig[provider].domains)
+  return allowAccountLoginNavigation(provider, target, providerConfig[provider].domains)
 }
 
 const hasLoginCookie = async(provider: MusicAccountProvider) => {

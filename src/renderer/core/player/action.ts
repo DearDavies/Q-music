@@ -1,5 +1,6 @@
 import { isEmpty, setPause, setPlay, setResource, setStop } from '@renderer/plugins/player'
-import { isPlay, playedList, playInfo, playMusicInfo, playbackSourceInfo, tempPlayList, musicInfo as _musicInfo } from '@renderer/store/player/state'
+import { isPlay, isPlayPending, playedList, playInfo, playMusicInfo, playbackSourceInfo, tempPlayList, musicInfo as _musicInfo } from '@renderer/store/player/state'
+import { playbackRecovery } from './recovery'
 import {
   getList,
   clearPlayedList,
@@ -117,9 +118,10 @@ const createDelayNextTimeout = (delay: number) => {
 
   const addDelayNextTimeout = () => {
     clearDelayNextTimeout()
+    const token = playbackRecovery.token()
     timeout = setTimeout(() => {
       timeout = null
-      if (window.lx.isPlayedStop) return
+      if (window.lx.isPlayedStop || !playbackRecovery.isCurrent(token)) return
       console.warn('delay next timeout timeout', delay)
       void playNext(true)
     }, delay)
@@ -131,6 +133,32 @@ const createDelayNextTimeout = (delay: number) => {
   }
 }
 const { addDelayNextTimeout, clearDelayNextTimeout } = createDelayNextTimeout(5000)
+
+const cancelPendingPlayback = () => {
+  playbackRecovery.cancel()
+  ++musicUrlRequestId
+  musicUrlAbortController?.abort()
+  musicUrlAbortController = null
+  cancelDelayRetry?.()
+  clearDelayNextTimeout()
+  gettingUrlId = ''
+  isPlayPending.value = false
+}
+
+export const handlePlaybackFailure = (message = window.i18n.t('player__error')) => {
+  if (playbackRecovery.isCancelled() || window.lx.isPlayedStop) return
+  clearDelayNextTimeout()
+  const music = playMusicInfo.musicInfo
+  const canSkip = music && playbackRecovery.canSkip(createGettingUrlId(music))
+  if (!appSetting['player.autoSkipOnError'] || !canSkip) {
+    pause()
+    setAllStatus(canSkip ? message : window.i18n.t('player__errors_stopped'))
+    return
+  }
+  isPlayPending.value = true
+  setAllStatus(message)
+  addDelayNextTimeout()
+}
 
 const RATE_LIMIT_COOLDOWN = 15_000
 const releaseRateLimitedRoutes = () => {
@@ -286,6 +314,7 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
   let lastError: unknown = new Error('music URL unavailable')
   let rateLimitError: Error | null = null
   for (const attempt of attempts) {
+    if (signal.aborted || requestId != musicUrlRequestId) return null
     try {
       const url = await getMusicUrl({
         musicInfo: attempt.musicInfo,
@@ -317,6 +346,7 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
 }
 
 const setMusicUrlInternal = (musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, isRefresh?: boolean, quality?: LX.Quality, preserveFailedRoutes = false) => {
+  if (playbackRecovery.isCancelled()) return
   if (!preserveFailedRoutes && !isRefresh && quality == null && !diffCurrentMusicInfo(musicInfo)) return
   if (preserveFailedRoutes && musicInfo.id != playMusicInfo.musicInfo?.id) return
   if (cancelDelayRetry) cancelDelayRetry()
@@ -328,6 +358,7 @@ const setMusicUrlInternal = (musicInfo: LX.Music.MusicInfo | LX.Download.ListIte
   playbackSourceInfo.value = null
   gettingUrlId = createGettingUrlId(musicInfo)
   const requestId = ++musicUrlRequestId
+  isPlayPending.value = true
   void getMusicPlayUrl(musicInfo, requestId, abortController.signal, isRefresh, false, quality).then((url) => {
     if (requestId != musicUrlRequestId) return
     if (!url) return
@@ -336,9 +367,8 @@ const setMusicUrlInternal = (musicInfo: LX.Music.MusicInfo | LX.Download.ListIte
   }).catch((err: any) => {
     if (requestId != musicUrlRequestId) return
     console.log(err)
-    setAllStatus(err.message)
     window.app_event.error()
-    if (appSetting['player.autoSkipOnError']) addDelayNextTimeout()
+    handlePlaybackFailure(err.message)
   }).finally(() => {
     if (musicUrlAbortController == abortController) musicUrlAbortController = null
     if (requestId == musicUrlRequestId && musicInfo === playMusicInfo.musicInfo) {
@@ -392,6 +422,8 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
 
 // 处理音乐播放
 const handlePlay = () => {
+  cancelPendingPlayback()
+  playbackRecovery.begin()
   window.lx.isPlayedStop &&= false
 
   resetRandomNextMusicInfo()
@@ -436,6 +468,7 @@ const handlePlay = () => {
  * @param id 歌曲id
  */
 export const playListById = (listId: string, id: string) => {
+  playbackRecovery.resetFailures()
   const prevListId = playInfo.playerListId
   setPlayListId(listId)
   // pause()
@@ -453,6 +486,7 @@ export const playListById = (listId: string, id: string) => {
  * @param index 播放的歌曲位置
  */
 export const playList = (listId: string, index: number) => {
+  playbackRecovery.resetFailures()
   const prevListId = playInfo.playerListId
   setPlayListId(listId)
   // pause()
@@ -572,7 +606,8 @@ const handlePlayNext = (playMusicInfo: LX.Player.PlayMusicInfo) => {
  * 播放“稍后播放”列表内的指定歌曲
  * @param index 歌曲位置
  */
-export const playTempListByIndex = (index: number) => {
+export const playTempListByIndex = (index: number, isAutoToggle = false) => {
+  if (!isAutoToggle) playbackRecovery.resetFailures()
   const targetMusicInfo = tempPlayList[index]
   if (!targetMusicInfo) return
   removeTempPlayList(index)
@@ -585,9 +620,14 @@ export const playTempListByIndex = (index: number) => {
  * @returns
  */
 export const playNext = async(isAutoToggle = false): Promise<void> => {
+  if (isAutoToggle && (playbackRecovery.isCancelled() || window.lx.isPlayedStop)) return
+  if (!isAutoToggle) playbackRecovery.resetFailures()
+  cancelPendingPlayback()
+  const token = playbackRecovery.begin()
+  isPlayPending.value = true
   console.log('skip next', isAutoToggle)
   if (tempPlayList.length) { // 如果稍后播放列表存在歌曲则直接播放改列表的歌曲
-    playTempListByIndex(0)
+    playTempListByIndex(0, isAutoToggle)
     console.log('play temp list')
     return
   }
@@ -646,6 +686,8 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
     isNext: true,
   })
 
+  if (!playbackRecovery.isCurrent(token)) return
+
   if (!filteredList.length) {
     handleToggleStop()
     console.log('filtered list empty')
@@ -679,9 +721,11 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
     default:
       nextIndex = -1
       console.log('stop toggle play', togglePlayMethod, isAutoToggle)
+      cancelPendingPlayback()
       return
   }
   if (nextIndex < 0) {
+    cancelPendingPlayback()
     console.log('next index empty')
     return
   }
@@ -697,6 +741,11 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
  * 上一曲
  */
 export const playPrev = async(isAutoToggle = false): Promise<void> => {
+  if (isAutoToggle && (playbackRecovery.isCancelled() || window.lx.isPlayedStop)) return
+  if (!isAutoToggle) playbackRecovery.resetFailures()
+  cancelPendingPlayback()
+  const token = playbackRecovery.begin()
+  isPlayPending.value = true
   if (playMusicInfo.musicInfo == null) {
     handleToggleStop()
     return
@@ -743,6 +792,7 @@ export const playPrev = async(isAutoToggle = false): Promise<void> => {
     playerMusicInfo: currentList[playInfo.playerPlayIndex],
     isNext: false,
   })
+  if (!playbackRecovery.isCurrent(token)) return
   if (!filteredList.length) {
     handleToggleStop()
     return
@@ -789,6 +839,9 @@ export const playPrev = async(isAutoToggle = false): Promise<void> => {
  * 恢复播放
  */
 export const play = () => {
+  if (isPlayPending.value) return
+  playbackRecovery.begin()
+  playbackRecovery.resetFailures()
   window.lx.isPlayedStop &&= false
   if (playMusicInfo.musicInfo == null) return
   if (isEmpty()) {
@@ -802,15 +855,20 @@ export const play = () => {
  * 暂停播放
  */
 export const pause = () => {
+  cancelPendingPlayback()
   setPause()
+  setAllStatus('')
 }
 
 /**
  * 停止播放
  */
 export const stop = () => {
+  cancelPendingPlayback()
+  const token = playbackRecovery.token()
   setStop()
   setTimeout(() => {
+    if (token != playbackRecovery.token()) return
     window.app_event.stop()
   })
 }
@@ -819,8 +877,7 @@ export const stop = () => {
  * 播放、暂停播放切换
  */
 export const togglePlay = () => {
-  window.lx.isPlayedStop &&= false
-  if (isPlay.value) {
+  if (isPlay.value || isPlayPending.value) {
     pause()
   } else {
     play()

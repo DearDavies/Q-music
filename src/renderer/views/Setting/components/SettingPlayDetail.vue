@@ -1,6 +1,8 @@
 <template lang="pug">
 dt#play_detail {{ $t('setting__play_detail') }}
 dd
+  lyric-font-setting
+dd
   .gap-top
     base-checkbox(id="setting_play_detail_font_zoom_enable" :model-value="appSetting['playDetail.isZoomActiveLrc']" :label="$t('setting__play_detail_font_zoom')" @update:model-value="updateSetting({'playDetail.isZoomActiveLrc': $event})")
   .gap-top
@@ -35,9 +37,11 @@ dd
 <script>
 // import { ref, onBeforeUnmount } from '@common/utils/vueTools'
 import { appSetting, updateSetting } from '@renderer/store/setting'
+import LyricFontSetting from '@renderer/components/common/LyricFontSetting.vue'
 
 export default {
   name: 'SettingPlayDetail',
+  components: { LyricFontSetting },
   setup() {
     const setVisualizationStyle = style => {
       if (!style) return

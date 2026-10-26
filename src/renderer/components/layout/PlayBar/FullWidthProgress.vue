@@ -26,8 +26,8 @@
           <use xlink:href="#icon-prevMusic" />
         </svg>
       </div>
-      <div :class="$style.playBtn" :aria-label="isPlay ? $t('player__pause') : $t('player__play')" @click="togglePlay">
-        <svg v-if="isPlay" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 1024 1024" space="preserve">
+      <div :class="$style.playBtn" :aria-label="(isPlay || isPlayPending) ? $t('player__pause') : $t('player__play')" @click="togglePlay">
+        <svg v-if="isPlay || isPlayPending" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 1024 1024" space="preserve">
           <use xlink:href="#icon-pause" />
         </svg>
         <svg v-else version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 1024 1024" space="preserve">
@@ -55,7 +55,7 @@ import {
   statusText,
   musicInfo,
   isShowPlayerDetail,
-  isPlay,
+  isPlay, isPlayPending,
   playInfo,
   playMusicInfo,
 } from '@renderer/store/player/state'
@@ -134,6 +134,7 @@ export default {
       title,
       showPlayerDetail,
       isPlay,
+      isPlayPending,
       togglePlay,
       playNext,
       playPrev,

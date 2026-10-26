@@ -1107,5 +1107,10 @@
   "lists__drag_sort": "拖曳調整歌單順序",
   "lists__sort_failed": "歌單順序儲存失敗，請重試。",
   "download__remove_tip": "移除選取的 {count} 筆下載記錄？預設保留已下載檔案，仍可在本地歌單播放。勾選下方選項才會刪除檔案，並清理本地歌單中的參照。",
-  "download__remove_records": "移除記錄…"
+  "download__remove_records": "移除記錄…",
+  "lyric_font_title": "歌詞字體",
+  "lyric_font_default": "預設字體",
+  "lyric_font_preview": "讓音樂陪你走過每一天",
+  "lyric_font_hint": "僅更換播放詳情中的歌詞與翻譯，不影響介面和桌面歌詞。選擇本機已安裝的字體，缺少的字形會自動回退。",
+  "player__errors_stopped": "連續播放失敗，已停止自動跳歌。請檢查音源或網路後重新播放。"
 }

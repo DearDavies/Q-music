@@ -94,7 +94,7 @@ app.whenReady().then(async () => {
       '@main/utils/navigationPolicy': {}, 'node:crypto': require('node:crypto'),
       '@common/utils/qqCredentials': load('src/common/utils/qqCredentials.ts'),
       '@common/utils/qqPlaylist': load('src/common/utils/qqPlaylist.ts'), '@common/utils/qqSign': signing,
-      './kugouAccount': {}, './accountLoginLayout': {}, './officialAccountLogin': {},
+      './kugouAccount': {}, './accountLoginLayout': {}, './officialAccountLogin': {}, './accountLoginNavigation': {},
     })
     assert.equal((await api.addQQFavoriteSong({ songMid })).status, 'added')
     assert.equal(receivedWrites, 1, '修复后的请求携带会话 Cookie 且只提交一次')

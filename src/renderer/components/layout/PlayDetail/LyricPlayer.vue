@@ -60,7 +60,7 @@
       </div>
     </transition>
     <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-      <div v-if="isShowLrcSelectContent" ref="dom_lrc_select_content" tabindex="-1" :class="[$style.lyricSelectContent, 'select', 'scroll', 'lyricSelectContent']" @contextmenu="handleCopySelectText">
+      <div v-if="isShowLrcSelectContent" ref="dom_lrc_select_content" tabindex="-1" :class="[$style.lyricSelectContent, 'select', 'scroll', 'lyricSelectContent']" :style="{ fontFamily: appSetting['playDetail.style.font'] || undefined }" @contextmenu="handleCopySelectText">
         <div v-for="(info, index) in lyric.lines" :key="index" :class="[$style.lyricSelectline, { [$style.lrcActive]: lyric.line == index }]">
           <span>{{ info.text }}</span>
           <template v-for="(lrc, i) in info.extendedLyrics" :key="i">
@@ -219,6 +219,7 @@ export default {
     const lrcStyles = computed(() => {
       return {
         textAlign: appSetting['playDetail.style.align'],
+        fontFamily: appSetting['playDetail.style.font'] || undefined,
       }
     })
     const lrcFontSize = computed(() => {
@@ -234,7 +235,7 @@ export default {
       }
     })
 
-    watch(() => appSetting['playDetail.style.layout'], () => {
+    watch([() => appSetting['playDetail.style.layout'], () => appSetting['playDetail.style.font']], () => {
       syncLyricScrollAfterLayout()
     })
 

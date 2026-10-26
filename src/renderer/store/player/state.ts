@@ -29,6 +29,7 @@ export const musicInfo = window.lxData.musicInfo = reactive<PlayerMusicInfo>({
 })
 
 export const isPlay = ref(false)
+export const isPlayPending = ref(false)
 
 export const status = window.lxData.status = ref('')
 

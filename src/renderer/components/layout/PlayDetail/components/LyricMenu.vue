@@ -1,6 +1,7 @@
 <template>
   <teleport to="#root">
-    <div ref="dom_menu" :class="$style.container" :style="menuStyles" :aria-hidden="!modelValue">
+    <div ref="dom_menu" :class="[$style.container, { [$style.immersive]: appSetting['playDetail.style.layout'] == 'immersive' }]" :style="menuStyles" :aria-hidden="!modelValue">
+      <LyricFontSetting compact />
       <!-- <div :class="$style.group">
       <div :class="$style.title">{{ $t('lyric_menu__align') }}</div>
       <div :class="$style.subGroup">
@@ -50,6 +51,7 @@ import useMenuLocation from '@renderer/utils/compositions/useMenuLocation'
 import { debounce } from '@common/utils/common'
 import { saveLyricEdited, removeLyricEdited } from '@renderer/utils/ipc'
 import { appSetting, setPlayDetailLyricFont, setPlayDetailLyricAlign } from '@renderer/store/setting'
+import LyricFontSetting from '@renderer/components/common/LyricFontSetting.vue'
 
 const offsetTagRxp = /(?:^|\n)\s*\[offset:\s*(\S+(?:\d+)*)\s*\]/
 const offsetTagAllRxp = /(^|\n)\s*\[offset:\s*(\S+(?:\d+)*)\s*\]/g
@@ -72,6 +74,7 @@ const getOffset = lrc => {
 
 export default {
   name: 'LyricMenu',
+  components: { LyricFontSetting },
   props: {
     modelValue: Boolean,
     xy: {
@@ -221,7 +224,20 @@ export default {
   background-color: var(--color-content-background);
   box-shadow: 0 1px 8px 0 rgba(0,0,0,.2);
   z-index: 10;
-  overflow: hidden;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+
+.immersive {
+  color-scheme: dark;
+  --color-content-background: #25272d;
+  --color-font: #f5f5f7;
+  --color-font-label: #b7b8c0;
+  --q-outline: rgba(255, 255, 255, .18);
+  --color-primary-background-hover: rgba(255, 255, 255, .08);
+  --color-primary-background-active: rgba(255, 255, 255, .14);
+  color: var(--color-font);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .24), inset 0 0 0 1px var(--q-outline);
 }
 
 .group {

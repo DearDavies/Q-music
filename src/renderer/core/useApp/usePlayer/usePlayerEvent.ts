@@ -10,11 +10,14 @@ import {
   onEmptied,
   onWaiting,
   getErrorCode,
+  setPause,
 } from '@renderer/plugins/player'
+import { playbackRecovery } from '@renderer/core/player/recovery'
 
 
 export default () => {
   const rOnPlaying = onPlaying(() => {
+    if (playbackRecovery.isCancelled()) { setPause(); return }
     console.log('onPlaying')
     window.app_event.playerPlaying()
     window.app_event.play()
