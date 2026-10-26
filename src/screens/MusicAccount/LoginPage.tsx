@@ -97,7 +97,7 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
     const link = Linking.addEventListener('url', event => {
       if (!awaitingQQ.current || !isQQCallback(event.url)) return
       // QQ 音乐只恢复自己发起的会话，不加载外部回调携带的票据。
-      const target = provider == 'tx' ? null : getQQCallbackUrl(event.url)
+      const target = provider == 'tx' ? null : getQQCallbackUrl(event.url, provider)
       if (target) { setUrl(target); setFailed(false); setAppError(false) } else webview.current?.injectJavaScript(QQ_RESUME_AUTH)
       refreshConnection()
     })
@@ -207,7 +207,8 @@ const LoginPage = ({ provider, connected, onConnected, initialUrl = LOGIN_URLS[p
         userAgent={onDailyKey ? QQ_DAILY_USER_AGENT : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'}
         onShouldStartLoadWithRequest={request => {
           if (isQQCallback(request.url)) {
-            webview.current?.injectJavaScript(QQ_RESUME_AUTH)
+            const target = awaitingQQ.current && provider == 'wy' ? getQQCallbackUrl(request.url, provider) : null
+            if (target) { setUrl(target); setFailed(false); setAppError(false) } else if (provider == 'tx') webview.current?.injectJavaScript(QQ_RESUME_AUTH)
             refreshConnection()
             return false
           }

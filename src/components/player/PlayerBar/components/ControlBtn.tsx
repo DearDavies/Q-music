@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native'
 import { useRef } from 'react'
-import { useIsPlay } from '@/store/player/hook'
+import { usePlayControlState } from '@/store/player/hook'
 import { playNext, playPrev, togglePlay } from '@/core/player/player'
 import PlayQueue, { type PlayQueueType } from '@/components/player/PlayQueue'
 import TransportButton from '@/components/player/TransportButton'
@@ -8,7 +8,7 @@ import { useGlassColors } from '@/components/common/GlassSurface'
 import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 export default () => {
-  const isPlay = useIsPlay()
+  const isPlay = usePlayControlState()
   const colors = useGlassColors()
   const { isCar, wide } = useAdaptiveLayout()
   const targetSize = isCar ? 56 : wide ? 48 : 40

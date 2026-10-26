@@ -17,6 +17,7 @@ export interface InitState {
   musicInfo: LX.Player.MusicInfo
 
   isPlay: boolean
+  isPlayPending: boolean
   volume: number
   playRate: number
   statusText: string
@@ -65,6 +66,7 @@ const state: InitState = {
   },
 
   isPlay: false,
+  isPlayPending: false,
   volume: 1,
   playRate: 1,
   statusText: '',

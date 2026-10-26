@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { playNext, playPrev, togglePlay } from '@/core/player/player'
-import { useIsPlay } from '@/store/player/hook'
+import { usePlayControlState } from '@/store/player/hook'
 import { useWindowSize } from '@/utils/hooks'
 import TransportButton from '@/components/player/TransportButton'
 import PlayQueue, { type PlayQueueType } from '@/components/player/PlayQueue'
@@ -10,7 +10,7 @@ import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
 
 export default () => {
   const { width, height } = useWindowSize()
-  const isPlay = useIsPlay()
+  const isPlay = usePlayControlState()
   const { isCar } = useAdaptiveLayout()
   const queueRef = useRef<PlayQueueType>(null)
   const size = isCar ? (width < 360 ? 64 : 72) : width < 360 || height < 700 ? 56 : 60

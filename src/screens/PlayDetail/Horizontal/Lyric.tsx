@@ -11,6 +11,7 @@ import { setSpText } from '@/utils/pixelRatio'
 import playerState from '@/store/player/state'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
+import { getLyricFontFamily } from '@/core/lyricFont'
 // import { screenkeepAwake } from '@/utils/nativeModules/utils'
 // import { log } from '@/utils/log'
 // import { toast } from '@/utils/tools'
@@ -27,6 +28,7 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
   const theme = useTheme()
   const lrcFontSize = useSettingValue('playDetail.horizontal.style.lrcFontSize')
   const textAlign = useSettingValue('playDetail.style.align')
+  const fontFamily = getLyricFontFamily(useSettingValue('playDetail.style.font'))
   const size = lrcFontSize / 10
   const lineHeight = setSpText(size) * 1.3
 
@@ -54,6 +56,7 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
       <AnimatedColorText style={{
         ...styles.lineText,
         textAlign,
+        fontFamily,
         lineHeight,
       }} textBreakStrategy="simple" color={colors[0]} opacity={colors[2]} size={size}>{line.text}</AnimatedColorText>
       {
@@ -61,6 +64,7 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
           return (<AnimatedColorText style={{
             ...styles.lineTranslationText,
             textAlign,
+            fontFamily,
             lineHeight: lineHeight * 0.8,
           }} textBreakStrategy="simple" key={index} color={colors[1]} opacity={colors[2]} size={size * 0.8}>{lrc}</AnimatedColorText>)
         })
@@ -76,6 +80,7 @@ const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 
 export default () => {
   const lyricLines = useLrcSet()
+  const fontFamily = getLyricFontFamily(useSettingValue('playDetail.style.font'))
   const { line } = useLrcPlay()
   const flatListRef = useRef<FlatList>(null)
   const playLineRef = useRef<PlayLineType>(null)
@@ -208,7 +213,7 @@ export default () => {
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lyricLines])
+  }, [lyricLines, fontFamily])
 
   useEffect(() => {
     if (line < 0) return
@@ -271,6 +276,7 @@ export default () => {
   return (
     <>
       <FlatList
+        key={fontFamily ?? 'default'}
         data={lyricLines}
         renderItem={renderItem}
         keyExtractor={getkey}

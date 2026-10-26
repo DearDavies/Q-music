@@ -17,6 +17,7 @@ import IsS2T from './IsS2T'
 import MaxCache from './MaxCache'
 import { useI18n } from '@/lang'
 import PlayerStyleSelector from '@/components/player/PlayerStyleSelector'
+import LyricFontSelector from '@/components/player/LyricFontSelector'
 
 
 export default memo(() => {
@@ -25,6 +26,7 @@ export default memo(() => {
   return (
     <Section title={t('setting_player')}>
       <PlayerStyleSelector />
+      <LyricFontSelector />
       <IsSavePlayTime />
       <IsAutoCleanPlayedList />
       <IsHandleAudioFocus />

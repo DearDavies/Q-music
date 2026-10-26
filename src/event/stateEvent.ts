@@ -64,6 +64,10 @@ export class StateEvent extends Event {
     this.emit('playStateChanged', state)
   }
 
+  playPendingChanged(pending: boolean) {
+    this.emit('playPendingChanged', pending)
+  }
+
   playProgressChanged(progress: PlayerState['progress']) {
     this.emit('playProgressChanged', progress)
   }

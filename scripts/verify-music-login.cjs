@@ -27,6 +27,12 @@ for (const rejected of [
   'https://qq.com\\@evil.example/', 'https://qq.com\n.evil.example/',
 ]) assert.equal(getQQCallbackUrl(QQ_CALLBACK + rejected), null, rejected)
 assert.equal(getQQCallbackUrl('qmusic://music/play?url=' + target), null)
+const netease = 'https://music.163.com/back/qq?code=test%2Bcode&state=xyz'
+assert.equal(getQQCallbackUrl(QQ_CALLBACK + encodeURIComponent(netease), 'wy'), netease)
+assert.equal(getQQCallbackUrl(QQ_CALLBACK + netease, 'tx'), null)
+for (const rejected of ['https://music.163.com.evil.test/', 'https://music.163.com@evil.test/', 'https://music.163.com:444/', 'http://music.163.com/', 'https://music.163.com\\@evil.test/']) {
+  assert.equal(getQQCallbackUrl(QQ_CALLBACK + encodeURIComponent(rejected), 'wy'), null)
+}
 
 const login = 'wtloginmqq://ptlogin/qlogin?p=appid%3D716027609%26nonce%3Da%253Db&schemacallback=googlechrome%3A%2F%2F'
 const routed = new URL(getLoginAppUrl(login, 'tx'))

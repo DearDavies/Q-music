@@ -165,7 +165,11 @@ jobs:
 
       - name: Verify background playback and lyrics
         working-directory: mobile
-        run: npm run test:background
+        run: |
+          npm run test:background
+          npm run test:playback-preferences
+          npm run test:playback-recovery
+          node scripts/verify-music-login.cjs
 
       - name: Verify update mirror fallback
         working-directory: mobile

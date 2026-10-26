@@ -16,6 +16,7 @@ import { toggleTranslation } from '@/core/lyric'
 import Button from '@/components/common/Button'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
 import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
+import { getLyricFontFamily } from '@/core/lyricFont'
 
 type FlatListType = FlatListProps<Line>
 interface LineProps {
@@ -33,6 +34,7 @@ const LrcLine = memo(({ line, lineNum, distance, motion, immersive, onLayout }: 
   const theme = useTheme()
   const fontSize = useSettingValue('playDetail.vertical.style.lrcFontSize')
   const textAlign = useSettingValue('playDetail.style.align')
+  const fontFamily = getLyricFontFamily(useSettingValue('playDetail.style.font'))
   const size = getLyricSize(fontSize, immersive)
   const opacity = distance == 0 ? 1 : distance == 1 ? (immersive ? 0.44 : 0.52) : (immersive ? 0.24 : 0.32)
   const emphasis = useRef(new Animated.Value(opacity)).current
@@ -47,8 +49,8 @@ const LrcLine = memo(({ line, lineNum, distance, motion, immersive, onLayout }: 
   }, [distance, emphasis, motion, opacity, scale])
   return <View style={[styles.line, immersive && { paddingVertical: 18 }]} onLayout={({ nativeEvent }) => { onLayout(lineNum, nativeEvent.layout.height) }}>
     <Animated.View style={{ opacity: emphasis, transform: [{ scale }] }}>
-      <Text style={[styles.lineText, { textAlign, lineHeight: setSpText(size) * (immersive ? 1.24 : 1.4) }, immersive && { fontWeight: '800', letterSpacing: -0.7 }]} textBreakStrategy="simple" color={theme['q-text-primary']} size={size}>{line.text}</Text>
-      {line.extendedLyrics.map((text, index) => <Text key={index} style={{ textAlign, marginTop: 7, lineHeight: setSpText(size * (immersive ? 0.6 : 0.72)) * 1.45 }} color={immersive ? theme['q-text-secondary'] : theme['q-text-primary']} size={size * (immersive ? 0.6 : 0.72)}>{text}</Text>)}
+      <Text style={[styles.lineText, { textAlign, fontFamily, lineHeight: setSpText(size) * (immersive ? 1.24 : 1.4) }, immersive && { fontWeight: '800', letterSpacing: -0.7 }]} textBreakStrategy="simple" color={theme['q-text-primary']} size={size}>{line.text}</Text>
+      {line.extendedLyrics.map((text, index) => <Text key={index} style={{ textAlign, fontFamily, marginTop: 7, lineHeight: setSpText(size * (immersive ? 0.6 : 0.72)) * 1.45 }} color={immersive ? theme['q-text-secondary'] : theme['q-text-primary']} size={size * (immersive ? 0.6 : 0.72)}>{text}</Text>)}
     </Animated.View>
   </View>
 })
@@ -63,6 +65,7 @@ export default ({ active = true, wide = false, immersive = false }: { active?: b
   const { line } = useLrcPlay(active)
   const fontSize = useSettingValue('playDetail.vertical.style.lrcFontSize')
   const showProgress = useSettingValue('playDetail.isShowLyricProgressSetting')
+  const fontFamily = getLyricFontFamily(useSettingValue('playDetail.style.font'))
   const showTranslation = useSettingValue('player.isShowLyricTranslation')
   const [height, setHeight] = useState(0)
   const flatListRef = useRef<FlatList<Line>>(null)
@@ -98,6 +101,14 @@ export default ({ active = true, wide = false, immersive = false }: { active?: b
     if (complete) flatListRef.current?.scrollToOffset({ offset: Math.max(0, offset + heights[index] / 2 - height * 0.4), animated })
     else flatListRef.current?.scrollToIndex({ index, animated, viewPosition: 0.4 })
   }, [active, estimatedHeight, height, lyricLines.length, motion])
+
+  useEffect(() => {
+    measured.current.clear()
+    layout.current.lineHeights = lyricLines.map(() => estimatedHeight)
+    retryCount.current = 0
+    const frame = requestAnimationFrame(() => { scrollToLine(currentLine.current, false) })
+    return () => { cancelAnimationFrame(frame) }
+  }, [fontFamily, estimatedHeight, lyricLines, scrollToLine])
 
   useEffect(() => {
     clearTimers()
@@ -201,6 +212,7 @@ export default ({ active = true, wide = false, immersive = false }: { active?: b
     </View>
     <View style={styles.page} onLayout={onLayout}>
       {lyricLines.length ? <FlatList
+        key={`${fontFamily ?? 'default'}:${fontSize}:${immersive}`}
         ref={flatListRef}
         data={lyricLines}
         extraData={line}

@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native'
 import IconButton from '@/components/common/IconButton'
 import { useTheme } from '@/store/theme/hook'
-// import { useIsPlay } from '@/store/player/hook'
+// import { usePlayControlState } from '@/store/player/hook'
 import { playNext, playPrev, togglePlay } from '@/core/player/player'
 // import { scaleSizeW } from '@/utils/pixelRatio'
-import { useIsPlay } from '@/store/player/hook'
+import { usePlayControlState } from '@/store/player/hook'
 import { useLayout } from '@/utils/hooks'
 import { marginLeft } from '../constant'
 import { BTN_WIDTH } from '../MoreBtn/Btn'
@@ -50,7 +50,7 @@ const NextBtn = ({ size }: { size: number }) => {
 
 const TogglePlayBtn = ({ size }: { size: number }) => {
   const theme = useTheme()
-  const isPlay = useIsPlay()
+  const isPlay = usePlayControlState()
   return (
     <IconButton
       accessibilityLabel={global.i18n.t(isPlay ? 'pause' : 'play')}

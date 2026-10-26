@@ -44,6 +44,7 @@ const outlineIcons: Record<string, string> = {
   'chevron-left-2': 'chevron-left',
   'chevron-right-2': 'chevron-right',
   'chevron-down': 'chevron-down',
+  'chevron-up': 'chevron-up',
   remove: 'x',
   close: 'x',
   'dots-vertical': 'more-vertical',

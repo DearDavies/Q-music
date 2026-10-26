@@ -17,14 +17,16 @@ export const QQ_RETURN = 'qmusic://account/qq'
 
 export const isQQCallback = (url: string) => url == QQ_RETURN || url.startsWith(QQ_CALLBACK)
 
-export const getQQCallbackUrl = (url: string): string | null => {
+export const getQQCallbackUrl = (url: string, provider: 'tx' | 'wy' | 'kg' = 'tx'): string | null => {
   if (!url.startsWith(QQ_CALLBACK)) return null
   let target = url.slice(QQ_CALLBACK.length)
   try {
     if (!target.startsWith('https://')) target = decodeURIComponent(target)
   } catch { return null }
-  // 回跳只能继续 QQ 官方 HTTPS 页面，不接受其他站点、用户信息或自定义协议。
-  return /^https:\/\/(?:[a-z0-9-]+\.)*qq\.com(?::443)?(?:[/?#]|$)/i.test(target) && !/[\s\\]/.test(target) ? target : null
+  // 网易云 QQ 授权也可能直接返回网易云回调；凭证始终由原 WebView 接收。
+  const official = /^https:\/\/(?:[a-z0-9-]+\.)*qq\.com(?::443)?(?:[/?#]|$)/i.test(target) ||
+    (provider == 'wy' && /^https:\/\/music\.163\.com(?::443)?(?:[/?#]|$)/i.test(target))
+  return official && !/[\s\\]/.test(target) ? target : null
 }
 
 export const getLoginAppUrl = (url: string, provider: 'tx' | 'wy' | 'kg'): string | null => {

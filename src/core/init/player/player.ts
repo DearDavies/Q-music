@@ -6,10 +6,12 @@ import { setStop } from '@/plugins/player'
 import { delayUpdateMusicInfo } from '@/plugins/player/playList'
 import playerState from '@/store/player/state'
 import settingState from '@/store/setting/state'
+import { playbackRecovery } from '@/core/player/recovery'
 
 
 export default async(setting: LX.AppSetting) => {
   const setPlayStatus = () => {
+    if (playbackRecovery.isCancelled()) { void pause(); return }
     setIsPlay(true)
   }
   const setPauseStatus = () => {

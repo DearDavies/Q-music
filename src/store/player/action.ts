@@ -37,6 +37,10 @@ export default {
 
     global.state_event.playStateChanged(isPlay)
   },
+  setIsPlayPending(pending: boolean) {
+    state.isPlayPending = pending
+    global.state_event.playPendingChanged(pending)
+  },
   setStatusText(statusText: string) {
     state.statusText = statusText
     global.state_event.playStateTextChanged(statusText)

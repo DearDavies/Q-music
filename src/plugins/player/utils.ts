@@ -1,6 +1,6 @@
 import TrackPlayer, { Capability, Event, RepeatMode, State } from 'react-native-track-player'
 import BackgroundTimer from 'react-native-background-timer'
-import { playMusic as handlePlayMusic } from './playList'
+import { playMusic as handlePlayMusic, cancelPlayMusic } from './playList'
 import { existsFile, moveFile, privateStorageDirectoryPath, temporaryDirectoryPath } from '@/utils/fs'
 import { toast } from '@/utils/tools'
 // import { PlayerMusicInfo } from '@/store/modules/player/playInfo'
@@ -106,64 +106,25 @@ export const isTempId = (trackId = global.lx.playerTrackId) => !trackId || tempI
 //   },
 // }
 
-const playMusic = ((fn: (musicInfo: LX.Player.PlayMusic, url: string, time: number) => void, delay = 800) => {
-  let delayTimer: number | null = null
-  let isDelayRun = false
-  let timer: number | null = null
-  let _musicInfo: LX.Player.PlayMusic | null = null
-  let _url = ''
-  let _time = 0
-  return (musicInfo: LX.Player.PlayMusic, url: string, time: number) => {
-    _musicInfo = musicInfo
-    _url = url
-    _time = time
-    if (timer) {
-      BackgroundTimer.clearTimeout(timer)
-      timer = null
-    }
-    if (isDelayRun) {
-      if (delayTimer) {
-        BackgroundTimer.clearTimeout(delayTimer)
-        delayTimer = null
-      }
-      timer = BackgroundTimer.setTimeout(() => {
-        timer = null
-        let musicInfo = _musicInfo
-        let url = _url
-        let time = _time
-        _musicInfo = null
-        _url = ''
-        _time = 0
-        isDelayRun = false
-        fn(musicInfo!, url, time)
-      }, delay)
-    } else {
-      isDelayRun = true
-      fn(musicInfo, url, time)
-      delayTimer = BackgroundTimer.setTimeout(() => {
-        delayTimer = null
-        isDelayRun = false
-      }, 500)
-    }
-  }
-})((musicInfo, url, time) => {
-  handlePlayMusic(musicInfo, url, time)
-})
-
-export const setResource = (musicInfo: LX.Player.PlayMusic, url: string, duration?: number) => {
-  playMusic(musicInfo, url, duration ?? 0)
+// 原生队列统一串行执行，取消检查贯穿 add/skip/seek，避免迟到任务重新开播。
+export const setResource = (musicInfo: LX.Player.PlayMusic, url: string, duration?: number, shouldPlay?: () => boolean) => {
+  handlePlayMusic(musicInfo, url, duration ?? 0, shouldPlay)
 }
 
 export const setPlay = async() => TrackPlayer.play()
 export const getPosition = async() => TrackPlayer.getPosition()
 export const getDuration = async() => TrackPlayer.getDuration()
 export const setStop = async() => {
+  cancelPlayMusic()
   await TrackPlayer.stop()
   if (!isEmpty()) await TrackPlayer.skipToNext()
 }
 export const setLoop = async(loop: boolean) => TrackPlayer.setRepeatMode(loop ? RepeatMode.Off : RepeatMode.Track)
 
-export const setPause = async() => TrackPlayer.pause()
+export const setPause = async() => {
+  cancelPlayMusic()
+  await TrackPlayer.pause()
+}
 // export const skipToNext = () => TrackPlayer.skipToNext()
 export const setCurrentTime = async(time: number) => TrackPlayer.seekTo(time)
 export const setVolume = async(num: number) => TrackPlayer.setVolume(num)

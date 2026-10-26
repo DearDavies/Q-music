@@ -40,6 +40,7 @@ const defaultSetting: LX.AppSetting = {
   // 'playDetail.isShowLyricProgressSetting': false,
   'playDetail.style.align': 'left',
   'playDetail.style.layout': 'classic',
+  'playDetail.style.font': '',
   'playDetail.vertical.style.lrcFontSize': 210,
   'playDetail.horizontal.style.lrcFontSize': 220,
   'playDetail.isShowLyricProgressSetting': false,

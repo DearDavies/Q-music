@@ -9,7 +9,7 @@ import TransportButton from '@/components/player/TransportButton'
 import PlayQueue, { type PlayQueueType } from '@/components/player/PlayQueue'
 import { useCoverPlayScale } from '@/components/player/useCoverPlayScale'
 import { useTrackChangeAnimation } from '@/components/player/useTrackChangeAnimation'
-import { usePlayerMusicInfo, useIsPlay } from '@/store/player/hook'
+import { usePlayerMusicInfo, usePlayControlState } from '@/store/player/hook'
 import { useTheme } from '@/store/theme/hook'
 import { useLayout } from '@/utils/hooks'
 import useAdaptiveLayout from '@/utils/hooks/useAdaptiveLayout'
@@ -56,7 +56,7 @@ const TrackInfo = ({ compact }: { compact: boolean }) => {
 }
 
 const Controls = ({ compact, lyricActive, onToggleLyric }: { compact: boolean, lyricActive: boolean, onToggleLyric?: () => void }) => {
-  const playing = useIsPlay()
+  const playing = usePlayControlState()
   const { isCar } = useAdaptiveLayout()
   const theme = useTheme()
   const queue = useRef<PlayQueueType>(null)

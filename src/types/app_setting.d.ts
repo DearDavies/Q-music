@@ -237,6 +237,9 @@ declare global {
        */
       'playDetail.vertical.style.lrcFontSize': number
 
+      /** 歌词字体；留空使用默认，导入字体在启动时注册 */
+      'playDetail.style.font': string
+
       /**
        * 横屏歌词字体大小
        */

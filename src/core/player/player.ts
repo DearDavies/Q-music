@@ -1,7 +1,9 @@
 import { isInitialized, initial as playerInitial, isEmpty, setPause, setPlay, setResource, setStop, initTrackInfo } from '@/plugins/player'
 import {
   setStatusText,
+  setIsPlayPending,
 } from '@/core/player/playStatus'
+import { playbackRecovery } from './recovery'
 import playerState from '@/store/player/state'
 import settingState from '@/store/setting/state'
 import {
@@ -46,11 +48,13 @@ const createDelayNextTimeout = (delay: number) => {
 
   const addDelayNextTimeout = () => {
     clearDelayNextTimeout()
+    const token = playbackRecovery.token()
     timeout = BackgroundTimer.setTimeout(() => {
       timeout = null
-      if (global.lx.isPlayedStop) return
+      if (global.lx.isPlayedStop || !playbackRecovery.isCurrent(token)) return
       console.log('delay next timeout timeout', delay)
-      void playNext(true)
+      if (delay == 5000) void playNext(true)
+      else handlePlaybackFailure()
     }, delay)
   }
 
@@ -61,6 +65,36 @@ const createDelayNextTimeout = (delay: number) => {
 }
 const { addDelayNextTimeout, clearDelayNextTimeout } = createDelayNextTimeout(5000)
 const { addDelayNextTimeout: addLoadTimeout, clearDelayNextTimeout: clearLoadTimeout } = createDelayNextTimeout(100000)
+let musicUrlRequestId = 0
+
+const cancelPendingPlayback = () => {
+  playbackRecovery.cancel()
+  ++musicUrlRequestId
+  ++playRequest
+  cancelDelayRetry?.()
+  clearDelayNextTimeout()
+  clearLoadTimeout()
+  global.lx.gettingUrlId = ''
+  setIsPlayPending(false)
+}
+
+export const handlePlaybackFailure = (message = global.i18n.t('player__error')) => {
+  if (playbackRecovery.isCancelled() || global.lx.isPlayedStop) return
+  ++musicUrlRequestId
+  global.lx.gettingUrlId = ''
+  cancelDelayRetry?.()
+  clearLoadTimeout()
+  clearDelayNextTimeout()
+  const music = playerState.playMusicInfo.musicInfo
+  if (!music || !playbackRecovery.canSkip(createGettingUrlId(music))) {
+    void pause()
+    setStatusText(global.i18n.t('player__errors_stopped'))
+    return
+  }
+  setIsPlayPending(true)
+  setStatusText(message)
+  addDelayNextTimeout()
+}
 
 const createGettingUrlId = (musicInfo: LX.Music.MusicInfo | LX.Download.ListItem) => {
   const tInfo = 'progress' in musicInfo ? musicInfo.metadata.musicInfo.meta.toggleMusicInfo : musicInfo.meta.toggleMusicInfo
@@ -91,13 +125,13 @@ const diffCurrentMusicInfo = (curMusicInfo: LX.Music.MusicInfo | LX.Download.Lis
 }
 
 let cancelDelayRetry: (() => void) | null = null
-const delayRetry = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, isRefresh = false): Promise<string | null> => {
+const delayRetry = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, requestId: number, isRefresh = false): Promise<string | null> => {
   // if (cancelDelayRetry) cancelDelayRetry()
   return new Promise<string | null>((resolve, reject) => {
     const time = getRandom(2, 6)
     setStatusText(global.i18n.t('player__getting_url_delay_retry', { time }))
     const tiemout = setTimeout(() => {
-      getMusicPlayUrl(musicInfo, isRefresh, true).then((result) => {
+      getMusicPlayUrl(musicInfo, requestId, isRefresh, true).then((result) => {
         cancelDelayRetry = null
         resolve(result)
       }).catch(async(err: any) => {
@@ -112,7 +146,9 @@ const delayRetry = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, i
     }
   })
 }
-const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, isRefresh = false, isRetryed = false): Promise<string | null> => {
+const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, requestId: number, isRefresh = false, isRetryed = false): Promise<string | null> => {
+  const isCurrent = () => requestId == musicUrlRequestId && !playbackRecovery.isCancelled()
+  if (!isCurrent()) return null
   // this.musicInfo.url = await getMusicPlayUrl(targetSong, type)
   setStatusText(global.i18n.t('player__getting_url'))
   addLoadTimeout()
@@ -125,49 +161,55 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
     isRefresh,
     allowToggleSource: false,
   }) : Promise.reject(new Error('not found'))).catch(async() => {
+    if (!isCurrent()) throw new Error(requestMsg.cancelRequest)
     return getMusicPlayUrlInfo({
       musicInfo,
       isRefresh,
       onToggleSource(mInfo) {
-        if (diffCurrentMusicInfo(musicInfo)) return
+        if (!isCurrent() || diffCurrentMusicInfo(musicInfo)) return
         setStatusText(global.i18n.t('toggle_source_try'))
       },
     })
   }).then(({ url, quality }) => {
-    if (global.lx.isPlayedStop || diffCurrentMusicInfo(musicInfo)) return null
+    if (!isCurrent() || global.lx.isPlayedStop || diffCurrentMusicInfo(musicInfo)) return null
 
     // 回写实际播放音质（音源降级后可能与请求档位不同）
     setMusicInfo({ quality })
     return url
   }).catch(async err => {
     // console.log('err', err.message)
-    if (global.lx.isPlayedStop ||
+    if (!isCurrent() || global.lx.isPlayedStop ||
       diffCurrentMusicInfo(musicInfo) ||
       err.message == requestMsg.cancelRequest) return null
 
-    if (err.message == requestMsg.tooManyRequests) return delayRetry(musicInfo, isRefresh)
+    if (err.message == requestMsg.tooManyRequests && !isRetryed) return delayRetry(musicInfo, requestId, isRefresh)
 
-    if (!isRetryed) return getMusicPlayUrl(musicInfo, isRefresh, true)
+    if (!isRetryed) return getMusicPlayUrl(musicInfo, requestId, isRefresh, true)
 
     throw err
   })
 }
 
 export const setMusicUrl = (musicInfo: LX.Music.MusicInfo | LX.Download.ListItem, isRefresh?: boolean) => {
+  if (playbackRecovery.isCancelled()) return
   // addLoadTimeout()
   if (!diffCurrentMusicInfo(musicInfo)) return
   if (cancelDelayRetry) cancelDelayRetry()
   global.lx.gettingUrlId = createGettingUrlId(musicInfo)
-  void getMusicPlayUrl(musicInfo, isRefresh).then((url) => {
-    if (!url) return
-    setResource(musicInfo, url, playerState.progress.nowPlayTime)
+  const requestId = ++musicUrlRequestId
+  clearDelayNextTimeout()
+  setIsPlayPending(true)
+  const isCurrent = () => requestId == musicUrlRequestId && !playbackRecovery.isCancelled()
+  void getMusicPlayUrl(musicInfo, requestId, isRefresh).then((url) => {
+    if (!url || !isCurrent()) return
+    setResource(musicInfo, url, playerState.progress.nowPlayTime, isCurrent)
   }).catch((err: any) => {
+    if (!isCurrent()) return
     console.log(err)
-    setStatusText(err.message as string)
     global.app_event.error()
-    addDelayNextTimeout()
+    handlePlaybackFailure(err.message as string)
   }).finally(() => {
-    if (musicInfo === playerState.playMusicInfo.musicInfo) {
+    if (isCurrent() && musicInfo === playerState.playMusicInfo.musicInfo) {
       global.lx.gettingUrlId = ''
       clearLoadTimeout()
     }
@@ -225,7 +267,8 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
 }
 
 
-const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) => {
+const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic, request: number) => {
+  if (request != playRequest || playbackRecovery.isCancelled()) return
   setMusicUrl(musicInfo)
 
   void getPicPath({ musicInfo, listId: playerState.playMusicInfo.listId }).then((url: string) => {
@@ -250,12 +293,18 @@ const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) =>
 // 处理音乐播放
 let playRequest = 0
 const handlePlay = async() => {
+  cancelPendingPlayback()
+  playbackRecovery.begin()
+  setIsPlayPending(true)
   const request = ++playRequest
   const selected = playerState.playMusicInfo.musicInfo
   if (selected && !('progress' in selected) && selected.source == 'local' && await needsSharedFileAccess(selected.meta.filePath)) {
     if (request != playRequest) return
     if (!await requestStoragePermission()) {
-      if (request == playRequest) setStatusText(global.i18n.t('storage_all_files_unconfirmed'))
+      if (request == playRequest) {
+        cancelPendingPlayback()
+        setStatusText(global.i18n.t('storage_all_files_unconfirmed'))
+      }
       return
     }
     if (request != playRequest) return
@@ -279,6 +328,7 @@ const handlePlay = async() => {
   resetRandomNextMusicInfo()
 
   if (global.lx.restorePlayInfo) {
+    setIsPlayPending(false)
     void handleRestorePlay(global.lx.restorePlayInfo)
     global.lx.restorePlayInfo = null
     return
@@ -287,7 +337,7 @@ const handlePlay = async() => {
   const playMusicInfo = playerState.playMusicInfo
   const musicInfo = playMusicInfo.musicInfo
 
-  if (!musicInfo) return
+  if (!musicInfo) { cancelPendingPlayback(); return }
 
   await setStop()
   if (request != playRequest) return
@@ -299,7 +349,7 @@ const handlePlay = async() => {
 
   if (settingState.setting['player.togglePlayMethod'] == 'random' && !playMusicInfo.isTempPlay) addPlayedList(playMusicInfo as LX.Player.PlayMusicInfo)
 
-  debouncePlay(musicInfo)
+  debouncePlay(musicInfo, request)
 }
 
 /**
@@ -308,6 +358,7 @@ const handlePlay = async() => {
  * @param id 歌曲id
  */
 export const playListById = async(listId: string, id: string) => {
+  playbackRecovery.resetFailures()
   const prevListId = playerState.playInfo.playerListId
   setPlayListId(listId)
   const musicInfo = getList(listId).find(m => m.id == id)
@@ -324,6 +375,7 @@ export const playListById = async(listId: string, id: string) => {
  * @param index 播放的歌曲位置
  */
 export const playList = async(listId: string, index: number) => {
+  playbackRecovery.resetFailures()
   const prevListId = playerState.playInfo.playerListId
   setPlayListId(listId)
   setPlayMusicInfo(listId, getList(listId)[index])
@@ -446,6 +498,11 @@ const handlePlayNext = async(playMusicInfo: LX.Player.PlayMusicInfo) => {
  * @returns
  */
 export const playNext = async(isAutoToggle = false): Promise<void> => {
+  if (isAutoToggle && (playbackRecovery.isCancelled() || global.lx.isPlayedStop)) return
+  if (!isAutoToggle) playbackRecovery.resetFailures()
+  cancelPendingPlayback()
+  const token = playbackRecovery.begin()
+  setIsPlayPending(true)
   if (playerState.tempPlayList.length) { // 如果稍后播放列表存在歌曲则直接播放改列表的歌曲
     const playMusicInfo = playerState.tempPlayList[0]
     removeTempPlayList(0)
@@ -502,6 +559,8 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
     isNext: true,
   })
 
+  if (!playbackRecovery.isCurrent(token)) return
+
   if (!filteredList.length) return handleToggleStop()
   // let currentIndex: number = filteredList.indexOf(currentList[playInfo.playerPlayIndex])
   if (playerIndex == -1 && filteredList.length) playerIndex = 0
@@ -530,9 +589,10 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
       break
     default:
       nextIndex = -1
+      cancelPendingPlayback()
       return
   }
-  if (nextIndex < 0) return
+  if (nextIndex < 0) { cancelPendingPlayback(); return }
 
   await handlePlayNext({
     musicInfo: filteredList[nextIndex],
@@ -545,6 +605,11 @@ export const playNext = async(isAutoToggle = false): Promise<void> => {
  * 上一曲
  */
 export const playPrev = async(isAutoToggle = false): Promise<void> => {
+  if (isAutoToggle && (playbackRecovery.isCancelled() || global.lx.isPlayedStop)) return
+  if (!isAutoToggle) playbackRecovery.resetFailures()
+  cancelPendingPlayback()
+  const token = playbackRecovery.begin()
+  setIsPlayPending(true)
   const playMusicInfo = playerState.playMusicInfo
   if (playMusicInfo.musicInfo == null) return handleToggleStop()
   const playInfo = playerState.playInfo
@@ -588,6 +653,7 @@ export const playPrev = async(isAutoToggle = false): Promise<void> => {
     playerMusicInfo: currentList[playInfo.playerPlayIndex],
     isNext: false,
   })
+  if (!playbackRecovery.isCurrent(token)) return
   if (!filteredList.length) return handleToggleStop()
 
   // let currentIndex = filteredList.indexOf(currentList[playInfo.playerPlayIndex])
@@ -632,7 +698,12 @@ export const playPrev = async(isAutoToggle = false): Promise<void> => {
  * 恢复播放
  */
 export const play = () => {
+  if (playerState.isPlayPending) return
+  global.lx.isPlayedStop = false
+  playbackRecovery.begin()
+  playbackRecovery.resetFailures()
   if (playerState.playMusicInfo.musicInfo == null) return
+  if (!isInitialized()) { void handlePlay(); return }
   if (isEmpty()) {
     if (createGettingUrlId(playerState.playMusicInfo.musicInfo) != global.lx.gettingUrlId) setMusicUrl(playerState.playMusicInfo.musicInfo)
     return
@@ -644,15 +715,20 @@ export const play = () => {
  * 暂停播放
  */
 export const pause = async() => {
-  await setPause()
+  cancelPendingPlayback()
+  setStatusText('')
+  if (isInitialized()) await setPause()
 }
 
 /**
  * 停止播放
  */
 export const stop = async() => {
-  await setStop()
+  cancelPendingPlayback()
+  const token = playbackRecovery.token()
+  if (isInitialized()) await setStop()
   setTimeout(() => {
+    if (token != playbackRecovery.token()) return
     global.app_event.stop()
   })
 }
@@ -661,8 +737,7 @@ export const stop = async() => {
  * 播放、暂停播放切换
  */
 export const togglePlay = () => {
-  global.lx.isPlayedStop &&= false
-  if (playerState.isPlay) {
+  if (playerState.isPlay || playerState.isPlayPending) {
     void pause()
   } else {
     play()

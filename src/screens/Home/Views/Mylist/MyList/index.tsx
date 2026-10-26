@@ -23,6 +23,7 @@ export default ({ embedded = false }: { embedded?: boolean }) => {
   const t = useI18n()
   const syncRef = useRef<PlaylistSyncModalType>(null)
   const [visible, setVisible] = useState(embedded)
+  const [sorting, setSorting] = useState(false)
   const listMenuRef = useRef<ListMenuType>(null)
   const listNameEditRef = useRef<ListNameEditType>(null)
   const listMusicSortRef = useRef<ListMusicSortType>(null)
@@ -52,16 +53,20 @@ export default ({ embedded = false }: { embedded?: boolean }) => {
           <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, gap: 8, borderBottomWidth: 0.5, borderColor: theme['q-outline'] }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text size={16} numberOfLines={1} style={{ flex: 1, fontWeight: '700' }}>{t('mobile_playlists')}</Text>
+              <Button accessibilityLabel={t(sorting ? 'playlist_order_done' : 'playlist_order_title')} accessibilityState={{ selected: sorting }}
+                onPress={() => { setSorting(!sorting) }} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' }}>
+                <Text size={12} color={theme['q-accent-text']}>{t(sorting ? 'playlist_order_done' : 'playlist_order_title')}</Text>
+              </Button>
               <Button accessibilityLabel={t('list_create')} onPress={() => listNameEditRef.current?.showCreate(0)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="add" size={20} color={theme['q-accent-text']} /></Button>
               {!embedded ? <Button accessibilityLabel={t('close')} onPress={() => { global.app_event.changeLoveListVisible(false) }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={20} color={theme['q-text-secondary']} /></Button> : null}
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            {sorting ? <Text size={11} color={theme['q-text-secondary']}>{t('playlist_order_hint')}</Text> : <View style={{ flexDirection: 'row', gap: 8 }}>
               <Button onPress={() => { if (commonState.componentIds.home) pushMusicAccountScreen(commonState.componentIds.home) }} style={{ flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme['q-surface-tint'] }}><Text size={12} color={theme['q-accent-text']}>{t('list_import')}</Text></Button>
               <Button onPress={() => syncRef.current?.show()} style={{ flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme['q-surface-tint'] }}><Text size={12} color={theme['q-accent-text']}>{t('list_sync_entry')}</Text></Button>
-            </View>
+            </View>}
           </View>
           <PlaylistSyncModal ref={syncRef} />
-          <List onShowMenu={(info, position) => listMenuRef.current?.show(info, position)} />
+          <List sorting={sorting} onShowMenu={(info, position) => listMenuRef.current?.show(info, position)} />
           <ListNameEdit ref={listNameEditRef} />
           <ListMusicSort ref={listMusicSortRef} />
           <DuplicateMusic ref={duplicateMusicRef} />

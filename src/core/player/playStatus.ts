@@ -7,6 +7,10 @@ export const setIsPlay = (val: boolean) => {
   playerActions.setIsPlay(val)
 }
 
+export const setIsPlayPending = (pending: boolean) => {
+  if (playerState.isPlayPending != pending) playerActions.setIsPlayPending(pending)
+}
+
 
 export const setStatusText = (val: string) => {
   if (playerState.statusText == val) return

@@ -147,19 +147,24 @@ export const initTrackInfo = async(musicInfo: LX.Player.PlayMusic, mInfo: LX.Pla
 }
 
 
-const handlePlayMusic = async(musicInfo: LX.Player.PlayMusic, url: string, time: number) => {
+const handlePlayMusic = async(musicInfo: LX.Player.PlayMusic, url: string, time: number, isCurrent: () => boolean) => {
 // console.log(tracks, time)
   const tracks = buildTracks(musicInfo, url)
   const track = tracks[0]
   // await updateMusicInfo(track)
   const currentTrackIndex = await TrackPlayer.getCurrentTrack()
+  if (!isCurrent()) return
   await TrackPlayer.add(tracks).then(() => list.push(...tracks))
+  if (!isCurrent()) return
   const queue = await TrackPlayer.getQueue() as LX.Player.Track[]
+  if (!isCurrent()) return
   await TrackPlayer.skip(queue.findIndex(t => t.id == track.id))
+  if (!isCurrent()) return
 
   if (currentTrackIndex == null) {
     if (!isTempTrack(track.id as string)) {
       if (time) await TrackPlayer.seekTo(time)
+      if (!isCurrent()) return
       if (global.lx.restorePlayInfo) {
         await TrackPlayer.pause()
         // let startupAutoPlay = settingState.setting['player.startupAutoPlay']
@@ -173,23 +178,33 @@ const handlePlayMusic = async(musicInfo: LX.Player.PlayMusic, url: string, time:
     }
   } else {
     await TrackPlayer.pause()
+    if (!isCurrent()) return
     if (!isTempTrack(track.id as string)) {
       await TrackPlayer.seekTo(time)
+      if (!isCurrent()) return
       await TrackPlayer.play()
     }
   }
 
+  if (!isCurrent()) return
+
   if (queue.length > 2) {
-    void TrackPlayer.remove(Array(queue.length - 2).fill(null).map((_, i) => i)).then(() => list.splice(0, list.length - 2))
+    const removeCount = queue.length - 2
+    // 清理也留在串行队列中，防止迟到的删除操作影响下一首新加入的曲目。
+    await TrackPlayer.remove(Array(removeCount).fill(null).map((_, i) => i)).then(() => list.splice(0, removeCount)).catch(() => {})
   }
 }
 let playPromise = Promise.resolve()
 let actionId = Math.random()
-export const playMusic = (musicInfo: LX.Player.PlayMusic, url: string, time: number) => {
+export const cancelPlayMusic = () => { actionId = Math.random() }
+export const playMusic = (musicInfo: LX.Player.PlayMusic, url: string, time: number, shouldPlay: () => boolean = () => true) => {
   const id = actionId = Math.random()
-  void playPromise.finally(() => {
-    if (id != actionId) return
-    playPromise = handlePlayMusic(musicInfo, url, time)
+  const isCurrent = () => id == actionId && shouldPlay()
+  playPromise = playPromise.catch(() => {}).then(async() => {
+    if (!isCurrent()) return
+    await handlePlayMusic(musicInfo, url, time, isCurrent)
+  }).catch(() => {
+    if (isCurrent()) global.app_event.playerError()
   })
 }
 

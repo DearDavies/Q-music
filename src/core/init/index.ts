@@ -15,6 +15,7 @@ import { checkUpdate } from '@/core/version'
 import { bootLog } from '@/utils/bootLog'
 import { cheatTip } from '@/utils/tools'
 import { initPlaylistAutoSync } from '@/core/musicAccount/autoSync'
+import { initLyricFont } from '@/core/lyricFont'
 
 let isFirstPush = true
 const handlePushedHomeScreen = async() => {
@@ -39,6 +40,7 @@ export default async() => {
   bootLog('Font size changed.')
   const setting = await initSetting()
   bootLog('Setting inited.')
+  await initLyricFont()
   // console.log(setting)
 
   await initTheme(setting)
