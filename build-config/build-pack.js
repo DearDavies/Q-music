@@ -137,6 +137,8 @@ const macOptions = {
   mac: {
     icon: './resources/icons/icon.icns',
     category: 'public.app-category.music',
+    // 独立测试构建使用临时签名，正式证书构建仍由 electron-builder 自动发现身份。
+    ...(process.env.Q_MUSIC_MAC_ADHOC == 'true' ? { identity: '-' } : {}),
     // artifactName: '${productName}-${version}.${ext}',
   },
   dmg: {

@@ -13,7 +13,6 @@
     >
       <source-icon v-if="selectedSource != 'all'" :source="selectedSource" :size="18" />
       <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z" /></svg>
-      <i aria-hidden="true" />
     </button>
     <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
       <div v-show="panelVisible || sourceMenuVisible" :class="[$style.searchPopover, { [$style.expandedPopover]: isFocused }]">
@@ -47,9 +46,10 @@
             <div v-if="appSetting['search.isShowHistorySearch']" :class="[$style.panelSection, $style.historySection]">
               <header><strong>{{ $t('history_search') }}</strong><button v-if="historyList.length" type="button" @click="clearHistoryList">{{ $t('history_clear') }}</button></header>
               <div v-if="historyList.length" :class="$style.chips">
-                <button v-for="(item, index) in historyList.slice(0, 10)" :key="item" type="button" @click="search(item)" @contextmenu.prevent="removeHistoryWord(index)">{{ item }}</button>
+                <button v-for="(item, index) in historyExpanded ? historyList : historyList.slice(0, 8)" :key="item" type="button" @click="search(item)" @contextmenu.prevent="removeHistoryWord(index)">{{ item }}</button>
               </div>
-              <div v-else :class="$style.emptyHistory">{{ $t('history_search_empty') }}</div>
+              <button v-if="historyList.length > 8" type="button" :class="$style.historyMore" :aria-expanded="historyExpanded" @click="historyExpanded = !historyExpanded">{{ $t(historyExpanded ? 'history_search_less' : 'history_search_more') }}</button>
+              <div v-if="!historyList.length" :class="$style.emptyHistory">{{ $t('history_search_empty') }}</div>
             </div>
             <div v-if="appSetting['search.isShowHotSearch']" :class="[$style.panelSection, $style.hotSection]">
               <header><strong>{{ selectedSourceLabel }} · {{ $t('search__hot_search') }}</strong><button type="button" :disabled="isHotSearchLoading" @click="refreshHotSearch">{{ $t('search__hot_search_refresh') }}</button></header>
@@ -94,6 +94,7 @@ export default {
     const isTipSearchLoading = ref(false)
     const selectedTipIndex = ref(-1)
     const isFocused = ref(false)
+    const historyExpanded = ref(false)
     const sourceMenuVisible = ref(false)
     const searchSlotRef = ref(null)
     const hotSearchList = shallowRef([])
@@ -133,6 +134,10 @@ export default {
     })
     watch(searchText, () => {
       handleTipSearch()
+      if (isFocused.value && !searchText.value.trim()) void loadHotSearch()
+    })
+    watch(() => appSetting['search.isShowHotSearch'], enabled => {
+      if (enabled && isFocused.value && !searchText.value.trim()) void loadHotSearch()
     })
 
 
@@ -205,6 +210,7 @@ export default {
     const closePanel = () => {
       isFocused.value = false
       sourceMenuVisible.value = false
+      historyExpanded.value = false
       searchSlotRef.value?.querySelector('input')?.blur()
     }
     const handleFocusOut = event => {
@@ -296,6 +302,8 @@ export default {
       window.addEventListener('blur', closePanel)
     })
     onBeforeUnmount(() => {
+      hotSearchRequestId++
+      tipSearchGeneration++
       document.removeEventListener('pointerdown', handleOutside, true)
       window.removeEventListener('blur', closePanel)
     })
@@ -319,6 +327,7 @@ export default {
       hotSearchList,
       isHotSearchLoading,
       historyList,
+      historyExpanded,
       clearHistoryList,
       removeHistoryWord,
       toggleSourceMenu,
@@ -342,7 +351,7 @@ export default {
   will-change: width, transform;
 
   &.focused {
-    width: min(940px, calc(100vw - 260px));
+    width: min(680px, calc(100vw - 260px));
     min-width: min(300px, calc(100vw - 260px));
     transform: translateY(-2px);
   }
@@ -477,7 +486,7 @@ export default {
 
 .discoveryPanel {
   display: grid;
-  grid-template-columns: minmax(170px, .75fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding-top: 0;
   > :only-child { grid-column: 1 / -1; }
@@ -485,19 +494,17 @@ export default {
 .panelSection {
   min-width: 0;
   min-height: 0;
-  padding: 16px;
-  border: 1px solid rgb(from var(--color-font) r g b / .07);
-  border-radius: 16px;
-  background: linear-gradient(145deg, rgb(from var(--color-font) r g b / .045), rgb(from var(--color-font) r g b / .018));
-  box-shadow: inset 0 1px rgba(255, 255, 255, .28), 0 8px 20px rgba(30, 54, 44, .035);
+  padding: 8px;
+  & + & { padding-top: 18px; border-top: 1px solid var(--color-primary-alpha-600); }
   header { min-height: 24px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   strong { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
   header button { flex: none; padding: 4px 8px; color: var(--color-font-label); border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 10.5px; }
   header button:hover { color: var(--color-primary); }
 }
 
-.historySection { align-self: start; min-height: 116px; box-sizing: border-box; }
-.hotSection { min-height: 300px; }
+.historySection { align-self: start; box-sizing: border-box; }
+.hotSection { min-height: 0; }
+.historyMore { margin-top: 10px; padding: 5px 0; color: var(--color-primary); border: 0; background: transparent; cursor: pointer; font-size: 11px; }
 .chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; button { max-width: 100%; padding: 8px 11px; overflow: hidden; color: var(--color-font); border: 0; border-radius: 10px; background: rgb(from var(--color-font) r g b / .055); cursor: pointer; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; transition: color .15s ease, background-color .15s ease; } button:hover { color: var(--color-primary); background: var(--color-primary-alpha-800); } }
 .emptyHistory { min-height: 88px; display: flex; align-items: center; justify-content: center; color: var(--color-font-label); font-size: 11.5px; line-height: 1.5; text-align: center; }
 .hotList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 14px; li { min-width: 0; } button { width: 100%; height: 44px; padding: 0 7px; display: flex; align-items: center; gap: 8px; color: var(--color-font); border: 0; border-radius: 9px; background: transparent; cursor: pointer; text-align: left; transition: background-color .15s ease; } button:hover { background: rgb(from var(--color-font) r g b / .055); } b { width: 20px; color: var(--color-font-label); font-size: 10.5px; font-weight: 600; text-align: center; } li:nth-child(-n+3) b { color: var(--color-primary); } span { min-width: 0; overflow: hidden; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; } }

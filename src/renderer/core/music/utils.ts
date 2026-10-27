@@ -14,6 +14,7 @@ import { langS2T, toNewMusicInfo, toOldMusicInfo } from '@renderer/utils'
 import { requestMsg } from '@renderer/utils/message'
 import { apis } from '@renderer/utils/musicSdk/api-source'
 import type { MusicUrlRequestOptions } from './index'
+import { resolveCustomMusicUrl } from './userApiFallback'
 
 
 interface OtherSourceRequestEntry {
@@ -219,6 +220,7 @@ export const getOnlineOtherSourceMusicUrlByLocal = async(musicInfo: LX.Music.Mus
   cacheProviderId: string
 }> => {
   const quality: LX.Quality = '128k'
+  if (isCustomApiSource()) return resolveCustomMusicRoute(musicInfo, quality, isRefresh, requestOptions)
   const providerId = getMusicUrlCacheProviderId()
   const tryCachedRoute = async(targetProviderId: string) => {
     const cacheRouteKey = createMusicRouteKey('cache', musicInfo, quality, targetProviderId)
@@ -379,6 +381,7 @@ export const getPlayQualityCandidates = (highQuality: LX.Quality, musicInfo: LX.
   // 与官方/内置接口不同，它不一定能在搜索结果的歌曲元数据中完整标注，
   // 因此不能再用歌曲元数据把自定义高音质提前过滤掉。
   const isUserApi = isCustomApiSource()
+  if (isUserApi && appSetting['common.apiBackupSources'].length) return fallbackQualitys
   if (!supportedQualitys?.length) {
     // 自定义接口刚切换或仍在初始化时 qualityList 可能暂时为空。
     // 不要立即把用户选择降成 128K：接口声明未知时先按自定义接口
@@ -498,6 +501,50 @@ const getOfficialQuality = (quality: LX.Quality) => {
   return getQualityFallbacks(quality).find(item => OFFICIAL_QUALITYS.includes(item)) ?? '128k'
 }
 
+const resolveCustomMusicRoute = async<T extends LX.Music.MusicInfo>(musicInfo: T, quality: LX.Quality, isRefresh: boolean, requestOptions: MusicUrlRequestOptions) => {
+  const result = await resolveCustomMusicUrl(musicInfo, quality, {
+    signal: requestOptions.signal,
+    excludedUrls: requestOptions.excludedUrls,
+    isProviderBlocked: id => requestOptions.blockedApiProviders?.has(id) ?? false,
+    isExcluded: (id, targetQuality, cached) => {
+      const routeKey = createMusicRouteKey(cached ? 'cache' : 'api', musicInfo, targetQuality, id)
+      return (requestOptions.excludedRouteKeys?.has(routeKey) ?? false) || (cached && (isRefresh || (requestOptions.refreshRouteKeys?.has(routeKey) ?? false)))
+    },
+    readCache: async(id, targetQuality) => {
+      const cachedUrl = await getStoreMusicUrl(musicInfo, targetQuality, id)
+      if (!cachedUrl) return null
+      try {
+        const url = normalizeOnlineMusicUrl(cachedUrl)
+        if (!requestOptions.excludedUrls?.has(url)) return url
+      } catch {}
+      requestOptions.onRouteFailed?.(createMusicRouteKey('cache', musicInfo, targetQuality, id), cachedUrl)
+      void removeStoreMusicUrl(musicInfo, targetQuality, id)
+      return null
+    },
+    onFailure: (id, targetQuality, error, url) => {
+      if (error.message === requestMsg.tooManyRequests) {
+        requestOptions.blockedApiProviders?.set(id, error)
+        requestOptions.onRouteRateLimited?.(`api-provider:${id}`)
+        if (targetQuality) requestOptions.onRouteRateLimited?.(createMusicRouteKey('api', musicInfo, targetQuality, id))
+        return
+      }
+      requestOptions.onRouteFailed?.(targetQuality ? createMusicRouteKey('api', musicInfo, targetQuality, id) : `api-init:${id}`, url)
+      if (isMusicApiTransportFailure(error)) requestOptions.blockedApiProviders?.set(id, error)
+    },
+  })
+  const mode = result.isFromCache ? 'cache' : 'api'
+  return {
+    musicInfo,
+    url: result.url,
+    quality: result.quality,
+    isFromCache: result.isFromCache,
+    isOfficial: false,
+    routeKey: createMusicRouteKey(mode, musicInfo, result.quality, result.providerId),
+    transportMode: mode as 'cache' | 'api',
+    cacheProviderId: result.providerId,
+  }
+}
+
 const resolveOnlineMusicUrl = async({ musicInfo, quality, isRefresh, requestOptions = {} }: {
   musicInfo: LX.Music.MusicInfoOnline
   quality: LX.Quality
@@ -590,6 +637,7 @@ const resolveOnlineMusicUrl = async({ musicInfo, quality, isRefresh, requestOpti
 
   if (routeStrategy == 'official') throw new Error('official music URL unavailable')
   try {
+    if (isCustomApiSource()) return resolveCustomMusicRoute(musicInfo, quality, isRefresh, requestOptions)
     const initialProviderId = getMusicUrlCacheProviderId()
     const initialQualitys = getCacheQualityCandidates(quality)
     const initialCachedResult = await tryCachedRoutes(initialProviderId, initialQualitys)

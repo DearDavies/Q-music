@@ -1,5 +1,5 @@
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
-import { mainHandle } from '@common/mainIpc'
+import { mainHandle, mainOn } from '@common/mainIpc'
 import {
   getApiList,
   importApi,
@@ -29,8 +29,8 @@ export default () => {
     return getApiList()
   })
 
-  mainHandle<LX.UserApi.UserApiStatus>(WIN_MAIN_RENDERER_EVENT_NAME.get_user_api_status, async() => {
-    return getStatus()
+  mainHandle<string | undefined, LX.UserApi.UserApiStatus>(WIN_MAIN_RENDERER_EVENT_NAME.get_user_api_status, async({ params }) => {
+    return getStatus(params)
   })
 
   mainHandle<LX.UserApi.UserApiSetAllowUpdateAlertParams>(WIN_MAIN_RENDERER_EVENT_NAME.user_api_set_allow_update_alert, async({ params: { id, enable } }) => {
@@ -40,7 +40,7 @@ export default () => {
   mainHandle<LX.UserApi.UserApiRequestParams>(WIN_MAIN_RENDERER_EVENT_NAME.request_user_api, async({ params }) => {
     return request(params)
   })
-  mainHandle<LX.UserApi.UserApiRequestCancelParams>(WIN_MAIN_RENDERER_EVENT_NAME.request_user_api_cancel, async({ params: requestKey }) => {
+  mainOn<LX.UserApi.UserApiRequestCancelParams>(WIN_MAIN_RENDERER_EVENT_NAME.request_user_api_cancel, ({ params: requestKey }) => {
     cancelRequest(requestKey)
   })
 }

@@ -25,7 +25,7 @@
               <span :class="$style.providerMark"><source-icon :source="item.id" :size="30" :label="$t(item.name)" /></span>
               <span>
                 <strong>{{ $t(item.name) }}</strong>
-                <small>{{ accountStatus[item.id] ? $t('playlist_import_modal__account_connected') : $t('playlist_import_modal__account_login') }}</small>
+                <small>{{ $t(accountStatus[item.id] ? 'playlist_import_modal__account_connected' : accountHasSession[item.id] ? 'search__account_unavailable' : 'playlist_import_modal__account_login') }}</small>
               </span>
               <em>{{ accountStatus[item.id] ? '✓' : '›' }}</em>
             </button>
@@ -37,7 +37,7 @@
               <p>{{ $t('playlist_import_modal__account_playlists_tip') }}</p>
               <p v-if="accountProvider == 'tx'">{{ $t('list_sync_import_tip') }}</p>
             </div>
-            <button type="button" :disabled="isAccountLoading || !accountStatus[accountProvider]" @click="loadAccountPlaylists(accountProvider)">
+            <button type="button" :disabled="isAccountLoading || (!accountStatus[accountProvider] && !accountHasSession[accountProvider])" @click="loadAccountPlaylists(accountProvider)">
               {{ $t('playlist_import_modal__refresh') }}
             </button>
           </div>
@@ -62,8 +62,9 @@
             </button>
           </div>
           <div v-else-if="accountLoadError" :class="$style.accountState" role="status">
-            {{ $t(accountLoadError == 'verification_required' ? 'kugou__verification_required' : 'list__load_failed') }}
+            {{ $t(accountLoadError == 'login_required' ? 'search__account_expired' : accountLoadError == 'verification_required' ? 'kugou__verification_required' : 'playlist_import_modal__account_unavailable') }}
             <base-btn min @click="loadAccountPlaylists(accountProvider)">{{ $t('search__retry') }}</base-btn>
+            <base-btn min @click="handleAccountProvider(accountProvider, true)">{{ $t('playlist_import_modal__account_login') }}</base-btn>
           </div>
           <div v-else :class="$style.accountState">
             {{ accountStatus[accountProvider] ? $t('playlist_import_modal__account_empty') : $t('playlist_import_modal__account_login_tip') }}
@@ -92,7 +93,7 @@
           <base-input
             v-model="text"
             :class="$style.input"
-            :disabled="isLoading || (source == 'spotify' && spotifySavedTracks)"
+            :disabled="isLoading"
             :placeholder="inputPlaceholder"
             :auto-paste="true"
           />
@@ -109,23 +110,6 @@
           />
         </section>
 
-        <section v-if="source == 'spotify'" :class="$style.field">
-          <h3 :class="$style.label">{{ $t('playlist_import_modal__spotify_token') }}</h3>
-          <base-input
-            v-model="spotifyAccessToken"
-            :class="$style.input"
-            :disabled="isLoading"
-            type="password"
-            :placeholder="$t('playlist_import_modal__spotify_token_placeholder')"
-          />
-          <base-checkbox
-            id="playlist_import_spotify_saved_tracks"
-            v-model="spotifySavedTracks"
-            :class="$style.checkbox"
-            :disabled="isLoading"
-            :label="$t('playlist_import_modal__spotify_liked')"
-          />
-        </section>
       </template>
 
       <section :class="$style.field">
@@ -170,14 +154,12 @@ const sourceOptions = [
   { id: 'tx', name: 'QQ音乐' },
   { id: 'wy', name: '网易云' },
   { id: 'kg', name: '酷狗' },
-  { id: 'spotify', name: 'Spotify' },
 ]
 
 const sourceNames = {
   tx: 'QQ音乐',
   wy: '网易云音乐',
   kg: '酷狗音乐',
-  spotify: 'Spotify',
 }
 
 const accountProviderOptions = [
@@ -208,24 +190,21 @@ export default {
     const listName = ref('')
     const target = ref('new')
     const neteaseToken = ref('')
-    const spotifyAccessToken = ref('')
-    const spotifySavedTracks = ref(false)
     const isLoading = ref(false)
     const cancelRequested = ref(false)
     const statusText = ref('')
     const accountProvider = ref('tx')
     const accountStatus = ref({ tx: false, wy: false, kg: false })
+    const accountHasSession = ref({ tx: false, wy: false, kg: false })
     const accountPlaylists = ref(/** @type {import('@renderer/utils/ipc').MusicAccountPlaylist[]} */ ([]))
     const selectedAccountPlaylistId = ref('')
     const isAccountLoading = ref(false)
     const accountLoadError = ref('')
     const progressStageKeys = {
       fetch: 'playlist_import_modal__stage_fetch',
-      match: 'playlist_import_modal__stage_match',
       save: 'playlist_import_modal__stage_save',
     }
     const errorMessageKeys = {
-      missing_token: 'playlist_import_modal__error_missing_token',
       invalid_link: 'playlist_import_modal__error_invalid_link',
       no_match: 'playlist_import_modal__error_no_match',
       account_unavailable: 'playlist_import_modal__account_unavailable',
@@ -262,17 +241,14 @@ export default {
     ])
 
     const inputLabel = computed(() => {
-      if (source.value == 'spotify' && spotifySavedTracks.value) return t('playlist_import_modal__spotify_liked')
       return t('playlist_import_modal__link')
     })
 
     const inputPlaceholder = computed(() => {
-      if (source.value == 'spotify') return t('playlist_import_modal__spotify_link_placeholder')
       return t('playlist_import_modal__link_placeholder')
     })
 
     const defaultListName = computed(() => {
-      if (source.value == 'spotify' && spotifySavedTracks.value) return 'Spotify 喜欢的歌曲'
       return `${sourceNames[source.value]}导入歌单`
     })
 
@@ -286,10 +262,6 @@ export default {
     const canSubmit = computed(() => {
       if (isLoading.value) return false
       if (mode.value == 'account') return !!accountStatus.value[accountProvider.value] && !!selectedAccountPlaylist.value
-      if (source.value == 'spotify') {
-        if (!spotifyAccessToken.value.trim()) return false
-        return spotifySavedTracks.value || !!text.value.trim()
-      }
       return !!text.value.trim()
     })
 
@@ -302,13 +274,18 @@ export default {
       text.value = ''
       listName.value = ''
       neteaseToken.value = ''
-      spotifyAccessToken.value = ''
-      spotifySavedTracks.value = false
       statusText.value = ''
     }
 
     const refreshAccountStatus = async() => {
-      accountStatus.value = await getMusicAccountStatus().catch(() => ({ tx: false, wy: false, kg: false }))
+      try {
+        const result = await getMusicAccountStatus()
+        accountStatus.value = result
+        for (const provider of ['tx', 'wy', 'kg']) accountHasSession.value[provider] = result.accounts[provider].hasSession
+      } catch {
+        // 网络失败不覆盖已有登录态，歌单读取仍可独立重试。
+        accountLoadError.value = 'unavailable'
+      }
     }
 
     const loadAccountPlaylists = async(provider = accountProvider.value) => {
@@ -316,16 +293,18 @@ export default {
       accountProvider.value = provider
       selectedAccountPlaylistId.value = ''
       accountPlaylists.value = []
-      if (!accountStatus.value[provider]) return
+      if (!accountStatus.value[provider] && !accountHasSession.value[provider]) return
 
       isAccountLoading.value = true
       try {
         const result = await getMusicAccountPlaylists(provider)
         if (result.status == 'available') {
+          accountStatus.value[provider] = true
           accountPlaylists.value = result.playlists
           selectedAccountPlaylistId.value = result.playlists[0]?.id ?? ''
         } else if (result.status == 'login_required') {
           accountStatus.value = { ...accountStatus.value, [provider]: false }
+          accountLoadError.value = 'login_required'
         } else accountLoadError.value = result.status
       } catch {
         accountPlaylists.value = []
@@ -335,10 +314,10 @@ export default {
       }
     }
 
-    const handleAccountProvider = async(provider) => {
+    const handleAccountProvider = async(provider, login = false) => {
       if (isLoading.value || isAccountLoading.value) return
       accountProvider.value = provider
-      if (!accountStatus.value[provider]) {
+      if (login || (!accountStatus.value[provider] && !accountHasSession.value[provider])) {
         const result = await loginMusicAccount(provider).catch(() => ({ status: 'cancelled' }))
         if (result.status != 'connected') return
         await refreshAccountStatus()
@@ -401,8 +380,6 @@ export default {
             target: target.value,
             currentListId: props.listId,
             neteaseToken: neteaseToken.value,
-            spotifyAccessToken: spotifyAccessToken.value,
-            spotifySavedTracks: spotifySavedTracks.value,
           }, value => {
             setProgress(value)
           }, () => cancelRequested.value)
@@ -443,9 +420,6 @@ export default {
       await loadAccountPlaylists(preferredProvider)
     })
 
-    watch(spotifySavedTracks, (enabled) => {
-      if (enabled) text.value = ''
-    })
 
     return {
       sourceOptions,
@@ -456,8 +430,6 @@ export default {
       listName,
       target,
       neteaseToken,
-      spotifyAccessToken,
-      spotifySavedTracks,
       isLoading,
       cancelRequested,
       targetOptions,
@@ -469,6 +441,7 @@ export default {
       statusText,
       accountProvider,
       accountStatus,
+      accountHasSession,
       accountPlaylists,
       selectedAccountPlaylistId,
       selectedAccountPlaylist,

@@ -468,6 +468,8 @@ if (!mobile) {
     contents.getUserAgent = () => 'Chrome/1 Electron/40'
     contents.setUserAgent = () => {}
     contents.setWindowOpenHandler = () => {}
+    const loadedUrls = []
+    contents.loadURL = async url => { loadedUrls.push(url) }
     // 模拟真实创建顺序：全局 guard 先安装，账号窗口的专属规则后注册。
     navigation.installNavigationGuard(contents)
     const current = { login_type: '2', wxuin: '9876', qm_keyst: 'W_X_key' }
@@ -493,6 +495,9 @@ if (!mobile) {
         const allowed = { defaultPrevented: false, preventDefault() { this.defaultPrevented = true } }
         contents.emit('will-navigate', allowed, 'https://y.qq.com/portal/wx_redirect.html?login_type=2&code=test')
         assert.equal(allowed.defaultPrevented, false)
+        contents.emit('will-redirect', allowed, 'http://y.qq.com/portal/wx_redirect.html?login_type=2&code=test')
+        assert.equal(allowed.defaultPrevented, true)
+        assert.equal(loadedUrls.at(-1), 'https://y.qq.com/portal/wx_redirect.html?login_type=2&code=test')
         assert.equal(await options.verify(), true)
         return 'connected'
       } },

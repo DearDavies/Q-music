@@ -1,0 +1,73 @@
+name: Build macOS preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IS_CI: 'true'
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  Q_MUSIC_MAC_ADHOC: 'true'
+
+jobs:
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x64
+          - runner: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify native build host
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: node -e 'if (process.platform !== "darwin" || process.arch !== process.env.TARGET_ARCH) throw Error("Build on the matching macOS architecture")'
+      - name: Install dependencies for this Mac architecture
+        run: npm ci
+      - name: Check code and regressions
+        run: |
+          npm run lint
+          npm test
+          npm run test:api-fallback
+          npm run test:feedback
+          node --test test/macosPackaging.test.cjs
+      - name: Build application and disk image
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          npm run build
+          node build-config/build-pack.js target=mac arch="$TARGET_ARCH" type=dmg
+      - name: Verify packaged native modules and signature
+        run: |
+          app_path="$(find build -maxdepth 2 -name 'Q-music.app' -print -quit)"
+          test -n "$app_path"
+          codesign --verify --deep --strict "$app_path"
+          ELECTRON_RUN_AS_NODE=1 "$app_path/Contents/MacOS/Q-music" build-config/verify-macos-native.cjs "$app_path"
+      - name: Generate checksums
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          cd build
+          shasum -a 256 *.dmg > "SHA256SUMS-macos-$TARGET_ARCH.txt"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: q-music-macos-${{ matrix.arch }}-preview
+          path: |
+            build/*.dmg
+            build/SHA256SUMS-macos-*.txt
+          if-no-files-found: error

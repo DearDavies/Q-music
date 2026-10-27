@@ -1,6 +1,5 @@
 import { LIST_IDS } from '@common/constants'
-import { filterMusicList, formatPlayTime, toNewMusicInfo } from '@renderer/utils'
-import { httpFetch } from '@renderer/utils/request'
+import { filterMusicList, toNewMusicInfo } from '@renderer/utils'
 import musicSdk from '@renderer/utils/musicSdk'
 import { getListDetail } from '@renderer/store/songList/action'
 import { addListMusics, createUserList, overwriteListMusics, getListMusics } from '@renderer/store/list/action'
@@ -12,10 +11,10 @@ import { getMusicAccountPlaylistDetail, type MusicAccountPlaylist, type MusicAcc
 import wyMusicDetail from '@renderer/utils/musicSdk/wy/musicDetail'
 import txMusicInfo from '@renderer/utils/musicSdk/tx/musicInfo'
 
-export type ExternalImportSource = 'tx' | 'wy' | 'kg' | 'spotify'
+export type ExternalImportSource = 'tx' | 'wy' | 'kg'
 export type ExternalImportTarget = 'new' | 'current' | 'love'
 
-export type ExternalImportErrorCode = 'missing_token' | 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled' | 'verification_required' | 'login_required' | 'playlist_incomplete'
+export type ExternalImportErrorCode = 'invalid_link' | 'no_match' | 'account_unavailable' | 'account_changed' | 'cancelled' | 'verification_required' | 'login_required' | 'playlist_incomplete'
 
 export class ExternalImportError extends Error {
   code: ExternalImportErrorCode
@@ -33,12 +32,10 @@ export interface ExternalImportParams {
   target: ExternalImportTarget
   currentListId: string
   neteaseToken?: string
-  spotifyAccessToken?: string
-  spotifySavedTracks?: boolean
 }
 
 export interface ExternalImportProgress {
-  stage: 'fetch' | 'match' | 'save'
+  stage: 'fetch' | 'save'
   current: number
   total: number
 }
@@ -60,42 +57,10 @@ export interface AccountPlaylistImportParams {
   currentListId: string
 }
 
-interface SpotifyTrack {
-  name: string
-  singer: string
-  albumName: string
-  interval: string | null
-}
-
-interface SpotifyApiTrack {
-  name?: string
-  duration_ms?: number
-  is_local?: boolean
-  artists?: Array<{
-    name?: string
-  }>
-  album?: {
-    name?: string
-  }
-}
-
-interface SpotifyTracksResponse {
-  items: Array<{
-    track?: SpotifyApiTrack | null
-  }>
-  next: string | null
-  total: number
-}
-
-interface SpotifyPlaylistResponse {
-  name?: string
-}
-
 const sourceNames: Record<ExternalImportSource, string> = {
   tx: 'QQ音乐',
   wy: '网易云音乐',
   kg: '酷狗音乐',
-  spotify: 'Spotify',
 }
 
 const getDefaultListName = (source: ExternalImportSource) => {
@@ -104,20 +69,8 @@ const getDefaultListName = (source: ExternalImportSource) => {
 
 const normalizeToken = (token = '') => token.trim().replace(/^Bearer\s+/i, '')
 
-const SPOTIFY_API_ORIGIN = 'https://api.spotify.com'
-// 每页 50 首，上限约 10000 首，防止异常响应导致无限翻页
-const SPOTIFY_MAX_FETCH_PAGES = 200
 // 国内源歌单分页上限，total/limit 来自外部响应，不可信
 const NATIVE_MAX_FETCH_PAGES = 500
-
-// 分页 next 链接来自响应体，必须校验仍指向 Spotify 官方 API，避免携带 token 请求任意地址
-const isSpotifyApiUrl = (url: string) => {
-  try {
-    return new URL(url).origin == SPOTIFY_API_ORIGIN
-  } catch {
-    return false
-  }
-}
 
 export type ShouldCancel = () => boolean
 
@@ -131,140 +84,8 @@ const getNeteaseInput = (text: string, token?: string) => {
   return `${text}###${trimmedToken}`
 }
 
-const getSpotifyPlaylistId = (text: string) => {
-  text = text.trim()
-  if (!text) return ''
-
-  let result = /open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/.exec(text)
-  if (result) return result[1]
-
-  result = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(text)
-  if (result) return result[1]
-
-  const id = text.replace(/[?#].*$/, '')
-  return /^[A-Za-z0-9]+$/.test(id) ? id : ''
-}
-
-const fetchSpotifyJson = async<T>(url: string, accessToken: string): Promise<T> => {
-  const token = normalizeToken(accessToken)
-  if (!token) throw new ExternalImportError('missing_token')
-
-  const request = httpFetch(url, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    timeout: 20000,
-  }) as unknown as { promise: Promise<{ statusCode?: number, body: unknown }> }
-  const { statusCode, body } = await request.promise
-
-  if (statusCode && statusCode >= 400) {
-    const message = typeof body == 'object' && body && 'error' in body
-      ? JSON.stringify(body.error)
-      : `Spotify request failed: ${statusCode}`
-    throw new Error(message)
-  }
-  return body as T
-}
-
-const toSpotifyTracks = (items: SpotifyTracksResponse['items']) => {
-  const tracks: SpotifyTrack[] = []
-  if (!Array.isArray(items)) return tracks
-  for (const item of items) {
-    const track = item.track
-    if (!track) continue
-    if (track.is_local) continue
-    if (!track.name) continue
-    tracks.push({
-      name: track.name,
-      singer: track.artists?.map(artist => artist.name).filter(Boolean).join('、') ?? '',
-      albumName: track.album?.name ?? '',
-      interval: track.duration_ms ? formatPlayTime(track.duration_ms / 1000) : null,
-    })
-  }
-  return tracks
-}
-
-const fetchSpotifyTracks = async(params: ExternalImportParams, onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel) => {
-  const token = params.spotifyAccessToken ?? ''
-  const tracks: SpotifyTrack[] = []
-  let listName = getDefaultListName('spotify')
-  let url: string
-
-  if (params.spotifySavedTracks) {
-    listName = 'Spotify 喜欢的歌曲'
-    url = `${SPOTIFY_API_ORIGIN}/v1/me/tracks?limit=50`
-  } else {
-    const playlistId = getSpotifyPlaylistId(params.text)
-    if (!playlistId) throw new ExternalImportError('invalid_link')
-    const playlist = await fetchSpotifyJson<SpotifyPlaylistResponse>(`${SPOTIFY_API_ORIGIN}/v1/playlists/${playlistId}?fields=name`, token)
-    listName = playlist.name ?? listName
-    url = `${SPOTIFY_API_ORIGIN}/v1/playlists/${playlistId}/tracks?limit=50&fields=items(track(name,album(name),artists(name),duration_ms,is_local)),next,total`
-  }
-
-  let total = 0
-  let page = 0
-  while (url && page < SPOTIFY_MAX_FETCH_PAGES) {
-    assertNotCancelled(shouldCancel)
-    let data: SpotifyTracksResponse
-    try {
-      data = await fetchSpotifyJson<SpotifyTracksResponse>(url, token)
-    } catch (error) {
-      // 已拿到部分数据时不整单作废，用已抓取的曲目继续后续流程
-      if (tracks.length) break
-      throw error
-    }
-    page++
-    if (!total && typeof data.total == 'number') total = data.total
-    tracks.push(...toSpotifyTracks(data.items))
-    onProgress?.({
-      stage: 'fetch',
-      current: total ? Math.min(tracks.length, total) : tracks.length,
-      total,
-    })
-    url = typeof data.next == 'string' && isSpotifyApiUrl(data.next) ? data.next : ''
-  }
-
-  return {
-    listName,
-    tracks,
-    sourceTotal: Math.max(total, tracks.length),
-  }
-}
-
-const matchSpotifyTracks = async(tracks: SpotifyTrack[], onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel) => {
-  const matchedList: LX.Music.MusicInfo[] = []
-  let unmatched = 0
-
-  for (let index = 0; index < tracks.length; index++) {
-    assertNotCancelled(shouldCancel)
-    const track = tracks[index]
-    const result = await musicSdk.findMusic({
-      name: track.name,
-      singer: track.singer,
-      albumName: track.albumName,
-      interval: track.interval,
-      source: 'spotify',
-    }).catch(() => [])
-
-    if (result.length) matchedList.push(toNewMusicInfo(result[0]))
-    else unmatched++
-
-    onProgress?.({
-      stage: 'match',
-      current: index + 1,
-      total: tracks.length,
-    })
-  }
-
-  return {
-    list: filterMusicList(matchedList),
-    unmatched,
-  }
-}
-
 const fetchNativeList = async(params: ExternalImportParams, onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel) => {
-  const source = params.source as Exclude<ExternalImportSource, 'spotify'>
+  const source = params.source
   const text = source == 'wy' ? getNeteaseInput(params.text, params.neteaseToken) : params.text
   const detail = await getListDetail(text, source, 1, true)
   const list: LX.Music.MusicInfo[] = [...detail.list]
@@ -474,28 +295,11 @@ export const importAccountPlaylist = async(
 }
 
 export const importExternalPlaylist = async(params: ExternalImportParams, onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel): Promise<ExternalImportResult> => {
-  let listName = params.listName || getDefaultListName(params.source)
-  let list: LX.Music.MusicInfo[]
-  let total: number
-  let sourceTotal: number
-  let unmatched = 0
-
-  if (params.source == 'spotify') {
-    const spotifyResult = await fetchSpotifyTracks(params, onProgress, shouldCancel)
-    listName = params.listName || spotifyResult.listName
-    const matchedResult = await matchSpotifyTracks(spotifyResult.tracks, onProgress, shouldCancel)
-    list = matchedResult.list
-    total = spotifyResult.tracks.length
-    sourceTotal = spotifyResult.sourceTotal
-    unmatched = matchedResult.unmatched
-  } else {
-    const nativeResult = await fetchNativeList(params, onProgress, shouldCancel)
-    listName = params.listName || nativeResult.listName
-    list = nativeResult.list
-    total = nativeResult.list.length
-    sourceTotal = nativeResult.sourceTotal
-    unmatched = nativeResult.unmatched
-  }
+  assertNotCancelled(shouldCancel)
+  const result = await fetchNativeList(params, onProgress, shouldCancel)
+  const listName = params.listName || result.listName
+  const { list, sourceTotal, unmatched } = result
+  const total = list.length
 
   assertNotCancelled(shouldCancel)
   const imported = await writeMusicList({

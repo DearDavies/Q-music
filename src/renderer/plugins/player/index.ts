@@ -2,6 +2,8 @@ interface HTMLAudioElementChrome extends HTMLAudioElement {
   setSinkId: (id: string) => Promise<void>
 }
 let audio: HTMLAudioElementChrome | null = null
+let playRevision = 0
+let playErrorCode: number | undefined
 let audioContext: AudioContext
 let mediaSource: MediaElementAudioSourceNode
 let analyser: AnalyserNode
@@ -62,7 +64,7 @@ export const createAudio = () => {
   if (audio) return
   audio = new window.Audio() as HTMLAudioElementChrome
   audio.controls = false
-  audio.autoplay = true
+  audio.autoplay = false
   audio.preload = 'auto'
   audio.crossOrigin = 'anonymous'
 
@@ -393,18 +395,35 @@ export const setPitchShifter = (val: number) => {
 export const hasInitedAdvancedAudioFeatures = (): boolean => audioContext != null
 
 export const setResource = (src: string) => {
-  if (audio) audio.src = src
+  if (!audio) return
+  ++playRevision
+  playErrorCode = undefined
+  audio.src = src
+  setPlay()
 }
 
 export const setPlay = () => {
-  void audio?.play()
+  if (!audio) return
+  const current = audio
+  const revision = ++playRevision
+  playErrorCode = undefined
+  void current.play().catch((error: unknown) => {
+    // 暂停/切歌会正常中断旧 play Promise；不能把迟到的拒绝算到新歌曲上。
+    if (revision != playRevision || current != audio || current.error) return
+    if (error instanceof DOMException && error.name == 'AbortError') return
+    playErrorCode = error instanceof DOMException && error.name == 'NotAllowedError' ? 1 : 4
+    current.dispatchEvent(new Event('error'))
+  })
 }
 
 export const setPause = () => {
+  ++playRevision
   audio?.pause()
 }
 
 export const setStop = () => {
+  ++playRevision
+  playErrorCode = undefined
   if (audio) {
     audio.src = ''
     audio.removeAttribute('src')
@@ -570,5 +589,5 @@ export const onVisibilityChange = (callback: Noop) => {
 
 
 export const getErrorCode = () => {
-  return audio?.error?.code
+  return audio?.error?.code ?? playErrorCode
 }

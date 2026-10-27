@@ -1,7 +1,8 @@
 <template lang="pug">
-material-modal(:show="modelValue" bg-close teleport="#view" @close="handleClose")
-  main.scroll(:class="$style.main")
+material-modal(:show="modelValue" bg-close teleport="#root" width="min(620px, calc(100vw - 32px))" max-width="calc(100vw - 32px)" height="min(660px, calc(100vh - 48px))" max-height="calc(100vh - 48px)" @close="handleClose")
+  main(:class="$style.main")
     h2 {{ $t('user_api__title') }}
+    p(:class="$style.backupHint") {{ $t('user_api_backup_hint') }}
     ul.scroll(v-if="apiList.length" :class="$style.content")
       li(v-for="(api, index) in apiList" :key="api.id" :class="[$style.listItem, {[$style.active]: appSetting['common.apiSource'] == api.id}]")
         div(:class="$style.listLeft")
@@ -10,7 +11,13 @@ material-modal(:show="modelValue" bg-close teleport="#view" @close="handleClose"
             span(v-if="api.version") {{ /^\d/.test(api.version) ? `v${api.version}` : api.version }}
             span(v-if="api.author") {{ api.author }}
           p {{ api.description }}
-          div
+          div(:class="$style.sourceOptions")
+            span(v-if="appSetting['common.apiSource'] == api.id" :class="$style.primaryBadge") {{ $t('user_api_primary') }}
+            base-checkbox(v-else :id="`user_api_backup_${api.id}`" :model-value="backupIds.includes(api.id)" :class="$style.checkbox" :label="$t('user_api_backup')" @update:model-value="handleBackup(api.id, $event)")
+            div(v-if="backupIds.includes(api.id) && appSetting['common.apiSource'] != api.id" :class="$style.backupOrder")
+              span {{ $t('user_api_backup_priority', { order: backupIds.indexOf(api.id) + 1 }) }}
+              base-btn(outline :disabled="backupIds.indexOf(api.id) == 0" @click="moveBackup(api.id, -1)") {{ $t('user_api_backup_up') }}
+              base-btn(outline :disabled="backupIds.indexOf(api.id) == backupIds.length - 1" @click="moveBackup(api.id, 1)") {{ $t('user_api_backup_down') }}
             base-checkbox(:id="`user_api_${api.id}`" v-model="api.allowShowUpdateAlert" :class="$style.checkbox" :label="$t('user_api__allow_show_update_alert')" @change="handleChangeAllowUpdateAlert(api, $event)")
         base-btn(:class="$style.listBtn" outline :aria-label="$t('user_api__btn_remove')" @click.stop="handleRemove(index)")
           svg(v-once version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 212.982 212.982" space="preserve")
@@ -54,16 +61,32 @@ export default {
   emits: ['update:modelValue'],
   setup() {
     const isShowOnlineImportModal = ref(false)
-    const apiList = computed(() => userApi.list)
+    const apiList = computed(() => {
+      const order = [...new Set([appSetting['common.apiSource'], ...appSetting['common.apiBackupSources']])]
+      const rank = id => order.includes(id) ? order.indexOf(id) : order.length
+      return [...userApi.list].sort((a, b) => rank(a.id) - rank(b.id))
+    })
 
     return {
       userApi,
       apiList,
+      backupIds: computed(() => appSetting['common.apiBackupSources'].filter(id => id != appSetting['common.apiSource'] && userApi.list.some(api => api.id == id))),
       appSetting,
       isShowOnlineImportModal,
     }
   },
   methods: {
+    handleBackup(id, enabled) {
+      updateSetting({ 'common.apiBackupSources': enabled ? [...new Set([...this.backupIds, id])] : this.backupIds.filter(value => value != id) })
+    },
+    moveBackup(id, offset) {
+      const ids = [...this.backupIds]
+      const index = ids.indexOf(id)
+      const next = index + offset
+      if (index < 0 || next < 0 || next >= ids.length) return
+      ;[ids[index], ids[next]] = [ids[next], ids[index]]
+      updateSetting({ 'common.apiBackupSources': ids })
+    },
     async importUserApi(script) {
       return importUserApi(script).then(({ apiList }) => {
         userApi.list = apiList
@@ -100,11 +123,11 @@ export default {
       const api = this.apiList[index]
       if (!api) return
       if (appSetting['common.apiSource'] == api.id) {
-        let backApi = apiSourceInfo.find(api => !api.disabled)
-        if (!backApi) backApi = userApi.list[0]
-        updateSetting({ 'common.apiSource': backApi?.id ?? '' })
+        const backApiId = this.backupIds[0] ?? apiSourceInfo.find(api => !api.disabled)?.id ?? userApi.list.find(item => item.id != api.id)?.id ?? ''
+        updateSetting({ 'common.apiSource': backApiId })
       }
       userApi.list = await removeUserApi([api.id])
+      this.handleBackup(api.id, false)
     },
     handleClose() {
       this.$emit('update:modelValue', false)
@@ -124,15 +147,16 @@ export default {
 @import '@renderer/assets/styles/layout.less';
 
 .main {
-  padding: 15px 8px;
-  max-width: 550px;
-  min-width: 300px;
+  padding: 10px 16px 18px;
+  flex: 1;
+  overflow: hidden;
   display: flex;
   flex-flow: column nowrap;
   min-height: 0;
   // max-height: 100%;
   // overflow: hidden;
   h2 {
+    flex-shrink: 0;
     font-size: 16px;
     color: var(--color-font);
     line-height: 1.3;
@@ -143,17 +167,40 @@ export default {
 .name {
   color: var(--color-primary);
 }
+.backupHint {
+  flex-shrink: 0;
+  padding: 10px 7px 0;
+  color: var(--color-font-label);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.primaryBadge {
+  display: inline-block;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+.sourceOptions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 8px; }
+.backupOrder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-font-label);
+  margin: 0;
+  button { padding: 4px 8px; }
+}
 
 .checkbox {
-  margin-top: 3px;
-  font-size: 14px;
+  margin-top: 0;
+  font-size: 12px;
   opacity: .86;
 }
 
 .content {
   flex: auto;
-  min-height: 80px;
-  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
   margin-top: 15px;
   padding: 0 7px;
 }
@@ -163,6 +210,7 @@ export default {
   align-items: center;
   transition: background-color 0.2s ease;
   padding: 15px 10px;
+  + .listItem { margin-top: 6px; }
   border-radius: @radius-border;
   &:hover {
     background-color: var(--color-primary-background-hover);
@@ -215,6 +263,7 @@ export default {
   }
 }
 .note {
+  flex-shrink: 0;
   padding: 0 7px;
   margin-top: 15px;
   font-size: 12px;
@@ -227,6 +276,7 @@ export default {
   }
 }
 .footer {
+  flex-shrink: 0;
   padding: 0 7px;
   margin-top: 15px;
   display: flex;

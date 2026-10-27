@@ -41,6 +41,7 @@ declare namespace LX {
     }
 
     interface UserApiRequestParams {
+      apiId?: string
       requestKey: string
       data: any
     }

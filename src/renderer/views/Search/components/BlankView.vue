@@ -70,7 +70,7 @@
                 <div v-else :class="$style.dailyLoading">{{ $t('search__daily_recommend_empty') }}</div>
                 <div :class="$style.dailyActions">
                   <button type="button" :disabled="!dailyRecommendList.length" @click.stop="playDailyRecommend()">{{ $t('search__daily_recommend_play') }}</button>
-                  <button type="button" :disabled="isDailyLoading" @click.stop="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</button>
+                  <button v-if="dailyRefreshAction" type="button" :disabled="isDailyLoading" @click.stop="loadDailyRecommend(true)">{{ $t(dailyRefreshAction == 'shuffle' ? 'search__daily_recommend_refresh' : 'search__retry') }}</button>
                   <span :class="$style.openHint">{{ $t('search__daily_open') }} ›</span>
                 </div>
               </div>
@@ -97,7 +97,7 @@
             </div>
           </section>
 
-          <section v-if="accountStatus[accountPlaylistsProvider]" :class="$style.playlistShelf">
+          <section v-if="canReadAccountPlaylists(accountPlaylistsProvider)" :class="$style.playlistShelf">
             <header>
               <div>
                 <h3>{{ $t('search__provider_playlists', { name: $t(accountProviderOptions.find(item => item.id == accountPlaylistsProvider)?.nameKey || 'search__account_playlists') }) }}</h3>
@@ -123,7 +123,7 @@
               <div v-for="index in 5" :key="index"><i /><b /><b /></div>
             </div>
             <div v-else-if="accountPlaylistsError" :class="$style.playlistEmpty" role="status">
-              <p>{{ $t(accountPlaylistsError == 'login_required' ? 'search__account_expired' : accountPlaylistsError == 'verification_required' ? 'kugou__verification_required' : 'list__load_failed') }}</p>
+              <p>{{ $t(accountPlaylistsError == 'login_required' ? 'search__account_expired' : accountPlaylistsError == 'verification_required' ? 'kugou__verification_required' : 'playlist_import_modal__account_unavailable') }}</p>
               <base-btn min @click="accountPlaylistsError == 'login_required' ? openAccountModal() : loadAccountPlaylists(true, accountPlaylistsProvider)">{{ $t(accountPlaylistsError == 'login_required' ? 'search__account_manage' : 'search__retry') }}</base-btn>
             </div>
             <p v-else :class="$style.playlistEmpty">{{ $t('search__account_playlists_empty') }}</p>
@@ -148,8 +148,8 @@
             </div>
             <div :class="$style.detailActions">
               <base-btn min :disabled="!detailMusicList.length" @click="playDetailList()">{{ $t('search__daily_recommend_play') }}</base-btn>
-              <base-btn v-if="detailKind == 'daily'" min :disabled="isDailyLoading" @click="loadDailyRecommend(true)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
-              <base-btn v-else min :disabled="isPlaylistDetailLoading" @click="openAccountPlaylist(selectedAccountPlaylist)">{{ $t('search__daily_recommend_refresh') }}</base-btn>
+              <base-btn v-if="detailKind == 'daily' && dailyRefreshAction" min :disabled="isDailyLoading" @click="loadDailyRecommend(true)">{{ $t(dailyRefreshAction == 'shuffle' ? 'search__daily_recommend_refresh' : 'search__retry') }}</base-btn>
+              <base-btn v-if="detailKind == 'playlist'" min :disabled="isPlaylistDetailLoading" @click="openAccountPlaylist(selectedAccountPlaylist)">{{ $t('search__hot_search_refresh') }}</base-btn>
             </div>
           </header>
           <div :class="$style.detailList">
@@ -291,6 +291,7 @@ import AccountTransferModal from '@renderer/components/common/AccountTransferMod
 import { computed, watch, shallowRef, ref } from '@common/utils/vueTools'
 import { onDeactivated } from 'vue'
 import { getDailyRecommend } from '@renderer/core/dailyRecommend'
+import { getDailyRefreshAction } from '@common/utils/dailyRecommendPolicy'
 import { setTempList } from '@renderer/store/list/action'
 import { playList, togglePlay } from '@renderer/core/player/action'
 import { isPlay, playMusicInfo } from '@renderer/store/player/state'
@@ -357,6 +358,8 @@ onDeactivated(() => {
 const importProvider = ref(selectedDailyProvider.value)
 const dailyRecommendMode = ref('loading')
 const dailyRecommendKind = ref('radar')
+const dailyFallbackReason = ref('')
+const dailyRefreshAction = computed(() => getDailyRefreshAction(dailyRecommendMode.value, dailyFallbackReason.value))
 let dailyRequestId = 0
 let accountStatusRequestId = 0
 let accountPlaylistsRequestId = 0
@@ -440,9 +443,12 @@ const loadDailyRecommend = async(force = false, sourceOverride = selectedDailyPr
     let mode = 'fallback'
     let kind = sourceOverride == 'tx' ? 'radar' : sourceOverride == 'kg' ? 'kugou_daily' : 'netease_daily'
     let list = []
-    if (accountStatus.value[sourceOverride]) {
+    const account = accountStatus.value.accounts[sourceOverride]
+    let fallbackReason = account.state == 'unavailable' ? 'unavailable' : 'login_required'
+    if (accountStatus.value[sourceOverride] || account.state == 'unavailable') {
       const result = await getMusicAccountDaily(sourceOverride).catch(() => null)
       if (requestId != dailyRequestId) return
+      fallbackReason = result?.status == 'login_required' ? 'login_required' : 'unavailable'
       if (result?.ids.length) {
         if (sourceOverride == 'kg') {
           const { loadKugouHashMusic } = await import('@renderer/views/List/MyList/importPlaylist')
@@ -462,6 +468,7 @@ const loadDailyRecommend = async(force = false, sourceOverride = selectedDailyPr
       list = await getDailyRecommend(sourceOverride, force)
     }
     if (requestId != dailyRequestId) return
+    dailyFallbackReason.value = fallbackReason
     dailyRecommendMode.value = mode
     dailyRecommendKind.value = kind
     dailyRecommendList.value = list
@@ -475,6 +482,7 @@ const loadDailyRecommend = async(force = false, sourceOverride = selectedDailyPr
     if (requestId == dailyRequestId) {
       dailyRecommendList.value = []
       dailyCoverUrls.value = []
+      dailyFallbackReason.value = 'unavailable'
       dailyRecommendMode.value = 'fallback'
     }
   } finally {
@@ -513,9 +521,10 @@ const closeDailyDetail = () => {
   isShowDailyDetail.value = false
 }
 
+const canReadAccountPlaylists = provider => !!accountStatus.value[provider] || !!accountStatus.value.accounts[provider]?.hasSession
 const loadAccountPlaylists = async(force = false, provider = selectedDailyProvider.value) => {
   accountPlaylistsError.value = ''
-  if (!accountStatus.value[provider]) {
+  if (!canReadAccountPlaylists(provider)) {
     accountPlaylistsRequestId++
     if (accountPlaylistsProvider.value == provider) {
       accountPlaylistsProvider.value = ''
@@ -614,14 +623,14 @@ const refreshAccountStatus = async() => {
   if (requestId != accountStatusRequestId) return
   accountStatus.value = status
   isAccountStatusLoading.value = false
-  if (accountPlaylistsProvider.value && !accountStatus.value[accountPlaylistsProvider.value]) {
+  if (accountPlaylistsProvider.value && !canReadAccountPlaylists(accountPlaylistsProvider.value)) {
     accountPlaylistsRequestId++
     accountPlaylistsProvider.value = ''
     accountPlaylists.value = []
   }
-  const playlistProvider = accountStatus.value[accountPlaylistsProvider.value]
+  const playlistProvider = canReadAccountPlaylists(accountPlaylistsProvider.value)
     ? accountPlaylistsProvider.value
-    : [selectedDailyProvider.value, 'tx', 'wy', 'kg'].find(provider => accountStatus.value[provider])
+    : [selectedDailyProvider.value, 'tx', 'wy', 'kg'].find(canReadAccountPlaylists)
   if (playlistProvider) void loadAccountPlaylists(false, playlistProvider)
 }
 
@@ -632,7 +641,7 @@ const selectDailyProvider = (provider, force = false) => {
   selectedDailyProvider.value = provider
   window.localStorage.setItem('qmusic.dailyRecommend.provider', provider)
   void loadDailyRecommend(true, provider)
-  if (accountStatus.value[provider]) void loadAccountPlaylists(false, provider)
+  if (canReadAccountPlaylists(provider)) void loadAccountPlaylists(false, provider)
   else {
     accountPlaylistsRequestId++
     accountPlaylistsProvider.value = ''

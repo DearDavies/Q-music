@@ -8,7 +8,7 @@ import { signQQRequest } from '@common/utils/qqSign'
 import { collectQQPlaylistIds } from '@common/utils/qqPlaylist'
 import { type QQFavoriteRequest, type QQFavoriteResult } from '@common/types/qqFavorite'
 import { closeOfficialAccountLogin, openOfficialAccountLogin } from './officialAccountLogin'
-import { allowAccountLoginNavigation } from './accountLoginNavigation'
+import { allowAccountLoginNavigation, upgradeAccountLoginNavigation } from './accountLoginNavigation'
 import { fitAccountLoginWindow, getAccountLoginBounds } from './accountLoginLayout'
 import { getKugouDailyHashes, getKugouPlaylistHashes, getKugouPlaylists, logoutKugou, openKugouLogin, readKugouSession } from './kugouAccount'
 
@@ -238,7 +238,9 @@ const getQQAccountProfile = async() => {
     const url = new URL('https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg')
     url.search = new URLSearchParams({ ct: '20', cv: '4747474', cid: '205360838', userid: uin }).toString()
     const response = await accountSession.fetch(url.toString(), {
+      credentials: 'include',
       headers: { Referer: 'https://y.qq.com/' },
+      signal: AbortSignal.timeout(12_000),
     })
     if (!response.ok) return emptyProfile
     const result = await response.json() as {
@@ -565,6 +567,11 @@ const configureLoginContents = (
   setWindowNavigationPolicy(contents, target => isAllowedHost(provider, target))
   contents.setUserAgent(getCompatibleUserAgent(contents.getUserAgent()))
   contents.setWindowOpenHandler(({ url }) => {
+    const upgraded = upgradeAccountLoginNavigation(provider, url)
+    if (upgraded != url) {
+      void contents.loadURL(upgraded)
+      return { action: 'deny' }
+    }
     if (!isAllowedHost(provider, url)) {
       void shell.openExternal(url)
       return { action: 'deny' }
@@ -586,11 +593,20 @@ const configureLoginContents = (
       },
     }
   })
-  contents.on('will-navigate', (event, url) => {
+  const handleNavigation = (event: Electron.Event, url: string) => {
+    const upgraded = upgradeAccountLoginNavigation(provider, url)
+    if (upgraded != url) {
+      event.preventDefault()
+      void contents.loadURL(upgraded)
+      return
+    }
     if (isAllowedHost(provider, url)) return
     event.preventDefault()
-    void shell.openExternal(url)
-  })
+    // 不将带授权码的未知回调交给浏览器，避免网页成功而本地会话仍未登录。
+    try { console.warn('[musicAccount] blocked login navigation', provider, new URL(url).origin) } catch {}
+  }
+  contents.on('will-navigate', handleNavigation)
+  contents.on('will-redirect', handleNavigation)
   contents.on('did-create-window', childWindow => {
     childWindow.setMenuBarVisibility(false)
     fitAccountLoginWindow(childWindow, 'https://graph.qq.com/')
@@ -813,16 +829,24 @@ const requestNeteaseWeapi = async<T>(path: string, data: Record<string, unknown>
   const csrfToken = await getNeteaseCsrfToken(accountSession)
   const response = await accountSession.fetch(`https://music.163.com${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Origin: 'https://music.163.com',
       Referer: 'https://music.163.com/',
     },
     body: buildNeteaseWeapiForm({ ...data, csrf_token: csrfToken }),
+    signal: AbortSignal.timeout(12_000),
   })
-  if (response.status == 401 || response.status == 403) throw new Error('login_required')
+  if (response.status == 401) throw new Error('login_required')
   if (!response.ok) throw new Error(`NetEase request failed (${path}): ${response.status}`)
-  return response.json() as Promise<T>
+  const result = await response.json() as T & { code?: number }
+  if ([301, 401].includes(Number(result.code))) {
+    accountValidationCache.delete('wy')
+    throw new Error('login_required')
+  }
+  if (Number(result.code) != 200) throw new Error('NetEase account request unavailable')
+  return result
 }
 
 const neteaseQualityLevel = {
@@ -1335,6 +1359,7 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
         creator?: { nickname?: string, userId?: string | number }
       }>
     }>('/weapi/user/playlist', { uid, offset: 0, limit: 1000, includeVideo: true })
+    if (!Array.isArray(result.playlist)) throw new Error('NetEase playlists response missing data')
     const playlists = (result.playlist ?? []).map(item => ({
       id: String(item.id ?? ''),
       name: item.name ?? '',
@@ -1345,7 +1370,7 @@ export const getMusicAccountPlaylists = async(provider: MusicAccountProvider): P
         ? 'favorite' as const
         : String(item.creator?.userId ?? '') != uid ? 'favorite' as const : 'created' as const,
     })).filter(item => item.id && item.name)
-    return { provider, playlists, status: playlists.length ? 'available' : 'unavailable' }
+    return { provider, playlists, status: 'available' }
   } catch (error) {
     console.warn(`[musicAccount] ${provider} playlists unavailable`, error)
     if (provider == 'kg' && error instanceof Error && error.message == 'verification_required') return { provider, playlists: [], status: 'verification_required' }
@@ -1449,7 +1474,8 @@ export const getMusicAccountPlaylistDetail = async(
 }
 
 export const getMusicAccountDailySongIds = async(provider: MusicAccountProvider): Promise<MusicAccountDailyResult> => {
-  if (!await verifyMusicAccount(provider)) return { provider, ids: [], status: 'login_required' }
+  const validation = await validateMusicAccount(provider)
+  if (!validation.connected) return { provider, ids: [], status: validation.state == 'unavailable' ? 'unavailable' : 'login_required' }
   try {
     if (provider == 'kg') {
       const ids = await getKugouDailyHashes()

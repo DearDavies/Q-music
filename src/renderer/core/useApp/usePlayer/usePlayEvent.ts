@@ -5,7 +5,6 @@ import { setStop, isEmpty } from '@renderer/plugins/player'
 import { retryMusicUrl, handlePlaybackFailure } from '@renderer/core/player'
 import { playbackRecovery } from '@renderer/core/player/recovery'
 import { setAllStatus } from '@renderer/store/player/action'
-import { appSetting } from '@renderer/store/setting'
 
 export default () => {
   const t = useI18n()
@@ -32,7 +31,8 @@ export default () => {
   const handleLoadstart = () => {
     if (window.lx.isPlayedStop || playbackRecovery.isCancelled()) return
     isPlayPending.value = true
-    if (appSetting['player.autoSkipOnError']) startLoadingTimeout()
+    // 关闭失败跳歌也必须结束无响应的加载，最终由 handlePlaybackFailure 决定停留或跳过。
+    startLoadingTimeout()
     setAllStatus(t('player__loading'))
   }
 
@@ -56,7 +56,7 @@ export default () => {
   const handleWating = () => {
     if (playbackRecovery.isCancelled()) return
     isPlayPending.value = true
-    if (appSetting['player.autoSkipOnError']) startLoadingTimeout()
+    startLoadingTimeout()
     setAllStatus(t('player__buffering'))
   }
 
@@ -65,6 +65,7 @@ export default () => {
     clearLoadingTimeout()
     if (window.lx.isPlayedStop || playbackRecovery.isCancelled()) return
     if (!isEmpty()) setStop()
+    if (errCode === 1) { handlePlaybackFailure(); return }
     if (playMusicInfo.musicInfo && errCode !== 1 && retries++ < 2) {
       retryMusicUrl(playMusicInfo.musicInfo)
       setAllStatus(t('player__refresh_url'))

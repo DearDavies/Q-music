@@ -498,7 +498,9 @@ export const playList = (listId: string, index: number) => {
 
 const handleToggleStop = () => {
   stop()
+  const token = playbackRecovery.token()
   setTimeout(() => {
+    if (token != playbackRecovery.token()) return
     setPlayMusicInfo(null, null)
   })
 }

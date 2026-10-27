@@ -144,4 +144,10 @@ test('网易云 QQ 授权留在原账号窗口，回调返回网易云仍共享�
     assert.equal(navigation.allowAccountLoginNavigation('wy', target, domains), false, target)
   }
   assert.equal(navigation.allowAccountLoginNavigation('kg', 'https://graph.qq.com/', ['kugou.com']), false)
+  assert.equal(navigation.upgradeAccountLoginNavigation('wy', 'http://music.163.com/back/qq?code=test&state=x'), 'https://music.163.com/back/qq?code=test&state=x')
+  assert.equal(navigation.allowAccountLoginNavigation('wy', 'http://music.163.com/back/qq?code=test', domains), true)
+  for (const target of ['http://music.163.com.evil.test/back/qq', 'http://music.163.com:8080/back/qq', 'http://user@music.163.com/back/qq', 'http://music.163.com/not-callback']) {
+    assert.equal(navigation.upgradeAccountLoginNavigation('wy', target), target)
+    assert.equal(navigation.allowAccountLoginNavigation('wy', target, domains), false)
+  }
 })

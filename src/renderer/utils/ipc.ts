@@ -305,10 +305,14 @@ export const onUserApiStatus = (listener: LX.IpcRendererEventListenerParams<LX.U
 export const getUserApiList = async() => {
   return rendererInvoke<LX.UserApi.UserApiInfo[]>(WIN_MAIN_RENDERER_EVENT_NAME.get_user_api_list)
 }
-export const sendUserApiRequest = async({ requestKey, data }: LX.UserApi.UserApiRequestParams): Promise<any> => {
+export const getUserApiStatus = async(id: string) => {
+  return rendererInvoke<string, LX.UserApi.UserApiStatus>(WIN_MAIN_RENDERER_EVENT_NAME.get_user_api_status, id)
+}
+export const sendUserApiRequest = async({ requestKey, data, apiId }: LX.UserApi.UserApiRequestParams): Promise<any> => {
   return rendererInvoke(WIN_MAIN_RENDERER_EVENT_NAME.request_user_api, {
     requestKey,
     data,
+    apiId,
   })
 }
 export const userApiRequestCancel = (requestKey: LX.UserApi.UserApiRequestCancelParams) => {

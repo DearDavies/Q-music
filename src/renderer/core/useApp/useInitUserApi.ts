@@ -24,10 +24,9 @@ export default () => {
 
   const rUserApiStatus = onUserApiStatus(({ params: { status, message, apiInfo } }) => {
     // console.log({ status, message, apiInfo })
+    if (!apiInfo || apiInfo.id !== appSetting['common.apiSource']) return
     userApi.status = status
     userApi.message = message
-
-    if (!apiInfo || apiInfo.id !== appSetting['common.apiSource']) return
     if (status) {
       if (apiInfo.sources) {
         let apis: any = {}
@@ -131,7 +130,7 @@ export default () => {
         userApi.apis = apis
       }
     } else {
-      if (message) {
+      if (message && !appSetting['common.apiBackupSources'].length) {
         void dialog({
           message: `${t('user_api__init_failed_alert', { name: apiInfo.name })}\n${message}`,
           selection: true,

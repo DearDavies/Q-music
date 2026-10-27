@@ -55,6 +55,7 @@ Q-music 基于 [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop)
 | Windows 10 / 11 x64 | 从 [GitHub Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载 `Q-music-*-x64-Setup.exe` | 稳定 |
 | Android arm64-v8a | 从 [GitHub Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载 arm64 APK；架构不确定时使用 universal APK | 测试版 |
 | Arch Linux x86_64 | 按下文命令构建 pacman 包 | 测试版 |
+| macOS Intel / Apple Silicon | [独立测试构建流程](./doc/macos-build.md)，生成对应架构的 DMG | 构建适配中，待 Mac 真机验证 |
 
 Android 源码位于本仓库 [`android`](https://github.com/Nshpiter/Q-music/tree/android) 分支。Release 同时提供 SHA256 校验文件，Windows 客户端支持应用内检查更新。
 
