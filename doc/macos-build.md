@@ -2,7 +2,7 @@
 
 桌面端已有 macOS 代码路径、图标及 Intel / Apple Silicon 歌词解码库。当前新增的是**测试构建流程**，尚未完成 Mac 真机验收，也未将 macOS 加入正式版自动发布。
 
-2026-10-28 首次双架构 CI 实测：Apple Silicon 已生成 DMG 并通过签名检查，但包内 SQLite 加载检查发现缺少 `bindings`。已在打包清单补充 `bindings` 及其运行依赖 `file-uri-to-path`；修复后的 Mac CI 和真机验收尚未完成，当前不能将旧构建当作可用版本分发。
+2026-10-28 首次双架构 CI 实测发现包内 SQLite 缺少 `bindings`。在打包清单补充 `bindings` 及其运行依赖 `file-uri-to-path` 后，[修复后的双架构构建](https://github.com/Nshpiter/Q-music/actions/runs/40639901248)已全部通过：Intel 与 Apple Silicon 均生成 DMG，并通过包内 SQLite、歌词原生模块加载及 ad-hoc 签名检查。该测试包包含本轮备用音源修复；Mac 真机交互验收仍未完成。
 
 ## 获取测试包
 
