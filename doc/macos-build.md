@@ -2,6 +2,8 @@
 
 桌面端已有 macOS 代码路径、图标及 Intel / Apple Silicon 歌词解码库。当前新增的是**测试构建流程**，尚未完成 Mac 真机验收，也未将 macOS 加入正式版自动发布。
 
+2026-10-28 首次双架构 CI 实测：Apple Silicon 已生成 DMG 并通过签名检查，但包内 SQLite 加载检查发现缺少 `bindings`。已在打包清单补充 `bindings` 及其运行依赖 `file-uri-to-path`；修复后的 Mac CI 和真机验收尚未完成，当前不能将旧构建当作可用版本分发。
+
 ## 获取测试包
 
 在 GitHub Actions 中手动运行 **Build macOS preview**。两个 job 分别在 Intel 和 Apple Silicon 的 Mac runner 上安装依赖、构建 DMG，避免把另一种架构的 Electron / SQLite 带进安装包。完成后下载对应的 `q-music-macos-x64-preview` 或 `q-music-macos-arm64-preview` artifact。

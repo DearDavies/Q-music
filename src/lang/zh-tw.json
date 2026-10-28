@@ -1,7 +1,7 @@
 {
   "history_search_more": "展開全部記錄",
   "history_search_less": "收起記錄",
-  "user_api_backup_hint": "主音源優先，失敗後按備用順序自動嘗試。僅勾選的備用源會執行；不支援的平台或音質會跳過。",
+  "user_api_backup_hint": "主音源優先，保留原有官方線路備援；仍失敗時依備用順序嘗試。僅勾選的備用源會執行，不支援的平台或音質會跳過。",
   "user_api_primary": "主音源",
   "user_api_backup": "用作備用音源",
   "user_api_backup_priority": "備用 {order}",
@@ -389,7 +389,7 @@
   "player__playback_rate_reset_btn": "重設",
   "player__playing": "播放中...",
   "player__prev": "上一首",
-  "player__refresh_url": "URL 過期，正在重新整理 URL...",
+  "player__refresh_url": "播放連線失敗，正在重新取得…",
   "player__sound_effect": "音效設定（實驗性）",
   "player__sound_effect_biquad_filter": "均衡器",
   "player__sound_effect_biquad_filter_preset_classical": "古典",

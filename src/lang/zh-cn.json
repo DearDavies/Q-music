@@ -1,7 +1,7 @@
 {
   "history_search_more": "展开全部历史",
   "history_search_less": "收起历史",
-  "user_api_backup_hint": "主音源优先，失败后按备用顺序自动尝试。仅勾选的备用源会运行；不支持的平台或音质会跳过。",
+  "user_api_backup_hint": "主音源优先，保留原有官方线路兜底；仍失败时按备用顺序尝试。仅勾选的备用源会运行，不支持的平台或音质会跳过。",
   "user_api_primary": "主音源",
   "user_api_backup": "用作备用音源",
   "user_api_backup_priority": "备用 {order}",
@@ -389,7 +389,7 @@
   "player__playback_rate_reset_btn": "重置",
   "player__playing": "播放中...",
   "player__prev": "上一首",
-  "player__refresh_url": "URL 过期，正在刷新 URL...",
+  "player__refresh_url": "播放连接失败，正在重新获取…",
   "player__sound_effect": "音效设置（实验性）",
   "player__sound_effect_biquad_filter": "均衡器",
   "player__sound_effect_biquad_filter_preset_classical": "古典",

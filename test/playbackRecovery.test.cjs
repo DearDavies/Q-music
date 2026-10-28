@@ -81,11 +81,25 @@ function harness() {
     for (const [id, timer] of [...timers]) if (timer.delay === delay) { timers.delete(id); timer.fn() }
     await flush()
   }
-  return { api, state, tracks, resources, timers, recovery: recovery.playbackRecovery, fire, status: () => status,
+  return { api, state, setting, tracks, resources, timers, recovery: recovery.playbackRecovery, fire, status: () => status,
     request: fn => { request = fn }, filter: fn => { filter = fn },
     start: async(index = 0) => { await api.playList('test', index); await fire(200); await flush() },
   }
 }
+
+if (!mobile) test('实际播放器先尝试主源与官方，勾选备用不抢占 QQ 原有兜底', async() => {
+  const h = harness()
+  h.setting['common.apiBackupSources'] = ['user_api_backup']
+  const attempts = []
+  h.request(async({ requestOptions }) => {
+    attempts.push([requestOptions.routeStrategy, requestOptions.userApiScope])
+    if (requestOptions.userApiScope === 'primary') throw Error('primary unavailable')
+    return requestOptions.routeStrategy === 'official' ? 'https://example.test/official.mp3' : 'https://example.test/expired-backup.mp3'
+  })
+  await h.start()
+  assert.deepEqual(attempts, [['api', 'primary'], ['official', undefined]])
+  assert.deepEqual(h.resources, ['https://example.test/official.mp3'])
+})
 
 test('取址时按播放键实际取消；迟到的成功结果不会再次播放', async() => {
   const h = harness(), result = deferred()

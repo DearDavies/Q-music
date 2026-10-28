@@ -1,7 +1,7 @@
 {
   "history_search_more": "Show all history",
   "history_search_less": "Show less",
-  "user_api_backup_hint": "Try the primary source first, then selected backups in order. Unsupported platforms and qualities are skipped. Only selected scripts will run.",
+  "user_api_backup_hint": "Try the primary source and existing official fallback first, then selected backups in order. Only selected scripts run; unsupported platforms and qualities are skipped.",
   "user_api_primary": "Primary source",
   "user_api_backup": "Use as backup",
   "user_api_backup_priority": "Backup {order}",
@@ -389,7 +389,7 @@
   "player__playback_rate_reset_btn": "Reset",
   "player__playing": "Now playing...",
   "player__prev": "Prev",
-  "player__refresh_url": "Music URL expired, refreshing...",
+  "player__refresh_url": "Playback connection failed, requesting a new URL…",
   "player__sound_effect": "Sound options (EXPERIMENTAL)",
   "player__sound_effect_biquad_filter": "Equalizer",
   "player__sound_effect_biquad_filter_preset_classical": "Classical",

@@ -503,6 +503,7 @@ const getOfficialQuality = (quality: LX.Quality) => {
 
 const resolveCustomMusicRoute = async<T extends LX.Music.MusicInfo>(musicInfo: T, quality: LX.Quality, isRefresh: boolean, requestOptions: MusicUrlRequestOptions) => {
   const result = await resolveCustomMusicUrl(musicInfo, quality, {
+    providerScope: requestOptions.userApiScope,
     signal: requestOptions.signal,
     excludedUrls: requestOptions.excludedUrls,
     isProviderBlocked: id => requestOptions.blockedApiProviders?.has(id) ?? false,
@@ -637,7 +638,12 @@ const resolveOnlineMusicUrl = async({ musicInfo, quality, isRefresh, requestOpti
 
   if (routeStrategy == 'official') throw new Error('official music URL unavailable')
   try {
-    if (isCustomApiSource()) return resolveCustomMusicRoute(musicInfo, quality, isRefresh, requestOptions)
+    if (isCustomApiSource()) {
+      // 新增备用不能抢在原本可用的官方兜底前；显式 API 线路由播放器安排顺序。
+      return await resolveCustomMusicRoute(musicInfo, quality, isRefresh, preferCustomApi
+        ? { ...requestOptions, userApiScope: 'primary' }
+        : requestOptions)
+    }
     const initialProviderId = getMusicUrlCacheProviderId()
     const initialQualitys = getCacheQualityCandidates(quality)
     const initialCachedResult = await tryCachedRoutes(initialProviderId, initialQualitys)
@@ -738,11 +744,13 @@ const resolveOnlineMusicUrl = async({ musicInfo, quality, isRefresh, requestOpti
     }
     throw rateLimitError ?? lastError ?? new Error('music API routes exhausted')
   } catch (error: any) {
-    // 自定义 API 的所有线路都失败后，再尝试官方账号线路，保证“优先自定义”
-    // 不会退化成“只能自定义、失败就跳过歌曲”。
+    // 主源失败先保留原有官方兜底，再追加备用脚本。
     if (preferCustomApi && error.message != requestMsg.cancelRequest) {
       const officialResult = await tryOfficialRoute()
       if (officialResult) return officialResult
+      if (appSetting['common.apiBackupSources'].length) {
+        return resolveCustomMusicRoute(musicInfo, quality, isRefresh, { ...requestOptions, userApiScope: 'backup' })
+      }
     }
     throw error
   }
@@ -768,7 +776,7 @@ export const getOnlineOtherSourceMusicUrl = async({ musicInfos, quality, onToggl
     return !retryedMusic.includes(key) && list.findIndex(item => createMusicCandidateKey(item) == key) == index
   })
 
-  const tryCandidates = async(routeStrategy: 'official' | 'api', items: LX.Music.MusicInfoOnline[]) => {
+  const tryCandidates = async(routeStrategy: 'official' | 'api', items: LX.Music.MusicInfoOnline[], userApiScope = requestOptions?.userApiScope) => {
     for (const musicInfo of items) {
       const candidateKey = createMusicCandidateKey(musicInfo)
       if (routeStrategy == 'official' && !isOfficialSource(musicInfo.source)) continue
@@ -779,7 +787,7 @@ export const getOnlineOtherSourceMusicUrl = async({ musicInfos, quality, onToggl
           musicInfo,
           quality: desiredQuality,
           isRefresh,
-          requestOptions: { ...requestOptions, routeStrategy },
+          requestOptions: { ...requestOptions, routeStrategy, userApiScope },
         })
       } catch (err: any) {
         if (err.message == requestMsg.cancelRequest) throw err
@@ -790,14 +798,17 @@ export const getOnlineOtherSourceMusicUrl = async({ musicInfos, quality, onToggl
     return null
   }
 
-  // 自定义 API 是默认首选时，跨平台回退也保持同样的顺序：先尝试
-  // 自定义接口返回的所有候选，再使用官方账号线路兜底。
+  // 跨平台候选同样先保留主源与官方兜底，最后追加备用脚本。
   if (preferCustomApi && strategy != 'official') {
-    const result = await tryCandidates('api', candidates)
+    const result = await tryCandidates('api', candidates, strategy == 'all' ? 'primary' : requestOptions?.userApiScope)
     if (result) return result
   }
   if (strategy != 'api') {
     const result = await tryCandidates('official', candidates.filter(item => isOfficialSource(item.source)))
+    if (result) return result
+  }
+  if (preferCustomApi && strategy == 'all' && appSetting['common.apiBackupSources'].length) {
+    const result = await tryCandidates('api', candidates, 'backup')
     if (result) return result
   }
   if (!preferCustomApi && strategy != 'official') {

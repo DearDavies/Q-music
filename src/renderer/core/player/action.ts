@@ -276,6 +276,7 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
     musicInfo: LX.Music.MusicInfo | LX.Download.ListItem
     allowToggleSource: boolean
     routeStrategy: MusicUrlRequestOptions['routeStrategy']
+    userApiScope?: MusicUrlRequestOptions['userApiScope']
     directOnly?: boolean
   }> = []
   const addOnlineAttempts = (onlineMusicInfo: LX.Music.MusicInfoOnline) => {
@@ -288,9 +289,12 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
       // 自定义 API 是默认线路；手动点选平台时保留明确的平台优先意图，
       // 官方失败后仍会尝试自定义 API。
       if (preferCustomApi) {
-        attempts.push({ musicInfo: candidate, allowToggleSource: false, routeStrategy: 'api' })
+        attempts.push({ musicInfo: candidate, allowToggleSource: false, routeStrategy: 'api', userApiScope: 'primary' })
         if (candidate.source == 'tx' || candidate.source == 'wy') {
           attempts.push({ musicInfo: candidate, allowToggleSource: false, routeStrategy: 'official' })
+        }
+        if (appSetting['common.apiBackupSources']?.length) {
+          attempts.push({ musicInfo: candidate, allowToggleSource: false, routeStrategy: 'api', userApiScope: 'backup' })
         }
       } else {
         if (candidate.source == 'tx' || candidate.source == 'wy') {
@@ -321,7 +325,7 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
         quality,
         isRefresh,
         allowToggleSource: attempt.allowToggleSource,
-        requestOptions: { ...requestOptions, routeStrategy: attempt.routeStrategy, directOnly: attempt.directOnly },
+        requestOptions: { ...requestOptions, routeStrategy: attempt.routeStrategy, userApiScope: attempt.userApiScope, directOnly: attempt.directOnly },
         onResolved: handleResolved,
         onToggleSource() {
           if (diffCurrentMusicInfo(musicInfo)) return
