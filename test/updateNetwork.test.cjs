@@ -96,3 +96,39 @@ test('PC 首条线路失败后自动切换，不提前报错，重复点击不�
   assert.equal(events.filter(event => event.name === 'update_error').length, 0)
   assert.equal(events.filter(event => event.name === 'update_downloaded').length, 1)
 })
+
+test('Mac 与 pacman 检查新版本但不进入自动下载或安装', async() => {
+  for (const platform of ['darwin', 'linux']) {
+    const updater = new EventEmitter()
+    const events = []
+    const handlers = {}
+    let version = '0.4.26'
+    const unsupported = () => { throw Error('不能调用自动安装链路') }
+    Object.assign(updater, { setFeedURL: unsupported, checkForUpdates: unsupported, downloadUpdate: unsupported, quitAndInstall: unsupported })
+    load('src/main/modules/winMain/autoUpdate.ts', {
+      'electron-updater': { autoUpdater: updater },
+      'builder-util-runtime': require('builder-util-runtime'),
+      '@common/utils': { log: { warn() {} }, isWin: false },
+      '@common/mainIpc': { mainOn: (name, handler) => { handlers[name] = handler } },
+      './index': { isExistWindow: () => true, sendEvent: (name, info) => events.push({ name, info }) },
+      '@common/ipcNames': { WIN_MAIN_RENDERER_EVENT_NAME: new Proxy({}, { get: (_, key) => key }) },
+      '@common/utils/updateSources': { ...sources, getUpdateVersion: async() => ({ version, desc: '修复说明' }) },
+      './updateProvider': { requestUpdate() {}, createUpdateProvider: unsupported, loadUpdateMetadata: unsupported },
+    }, {
+      process: { platform, arch: 'arm64', env: { Q_MUSIC_PACKAGE_TYPE: 'pacman' }, versions: { app: '0.4.25' } },
+      global: { lx: { appSetting: { 'common.tryAutoUpdate': true } } },
+    }).default()
+    handlers.update_check()
+    await new Promise(setImmediate)
+    assert.deepEqual(events.map(event => event.name), ['update_available'])
+    assert.equal(events[0].info.releaseNotes, '修复说明')
+    handlers.update_download_update()
+    handlers.quit_update()
+    await new Promise(setImmediate)
+    assert.equal(events.length, 1)
+    version = '0.4.25'
+    handlers.update_check()
+    await new Promise(setImmediate)
+    assert.equal(events[1].name, 'update_not_available')
+  }
+})

@@ -15,6 +15,7 @@ let sourceIndex = 0
 let downloadOrder = downloadSources
 let touchDownload: ((transferred?: number) => void) | null = null
 const isPackageManagerInstall = () => process.platform === 'linux' && process.env.Q_MUSIC_PACKAGE_TYPE === 'pacman'
+const isManualInstall = () => process.platform === 'darwin' || isPackageManagerInstall()
 const report = (type: string, info: any) => {
   if (isExistWindow()) sendEvent(type, info)
 }
@@ -27,7 +28,7 @@ const run = (task: () => Promise<void>) => {
 }
 
 const download = async() => {
-  if (isPackageManagerInstall()) return
+  if (isManualInstall()) return
   let lastError: unknown
   const attempts = [...downloadOrder.map(source => downloadSources.indexOf(source)), downloadSources.indexOf(downloadOrder[0])]
   for (const [attempt, index] of attempts.entries()) {
@@ -72,8 +73,13 @@ const download = async() => {
 const check = async(shouldDownload: boolean) => {
   prepared = false
   const version = await getUpdateVersion(requestUpdate, 'desktop')
-  if (compareVersions(version.version, process.versions.app ?? autoUpdater.currentVersion.version) <= 0 || isPackageManagerInstall()) {
+  if (compareVersions(version.version, process.versions.app ?? autoUpdater.currentVersion.version) <= 0) {
     report(WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, { version: version.version, releaseNotes: version.desc })
+    return
+  }
+  // 当前 Mac DMG 未做 Developer ID 签名/公证，不能交给自动安装器。
+  if (isManualInstall()) {
+    report(WIN_MAIN_RENDERER_EVENT_NAME.update_available, { version: version.version, releaseNotes: version.desc })
     return
   }
   if (isWin && process.arch.includes('arm')) throw new Error('此架构请从发布页下载安装包更新')
@@ -112,11 +118,11 @@ export default () => {
     run(async() => check(global.lx.appSetting['common.tryAutoUpdate']))
   })
   mainOn(WIN_MAIN_RENDERER_EVENT_NAME.update_download_update, () => {
-    if (isPackageManagerInstall()) return
+    if (isManualInstall()) return
     run(async() => { if (prepared) await download(); else await check(true) })
   })
   mainOn(WIN_MAIN_RENDERER_EVENT_NAME.quit_update, () => {
-    if (isPackageManagerInstall()) return
+    if (isManualInstall()) return
     global.lx.isSkipTrayQuit = true
     setTimeout(() => { autoUpdater.quitAndInstall(true, true) }, 1000)
   })

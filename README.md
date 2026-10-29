@@ -10,12 +10,13 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="Android" src="https://img.shields.io/badge/Android-支持-3ddc84">
   <img alt="Arch Linux" src="https://img.shields.io/badge/Arch%20Linux-x86__64-1793d1">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-Intel%20%2F%20Apple%20Silicon-555555">
   <img alt="Electron" src="https://img.shields.io/badge/electron-40.9.2-47848f">
   <img alt="Vue" src="https://img.shields.io/badge/vue-3-42b883">
   <a href="https://linux.do/"><img alt="LINUX DO 社区" src="https://img.shields.io/badge/LINUX%20DO-社区-f0b84c"></a>
 </p>
 
-<p align="center">面向 Windows、Arch Linux 与 Android 的多端音乐播放器，提供聚合搜索、账号推荐、歌单同步与沉浸式歌词体验。</p>
+<p align="center">面向 Windows、macOS、Arch Linux 与 Android 的多端音乐播放器，提供聚合搜索、账号推荐、歌单同步与沉浸式歌词体验。</p>
 
 <p align="center">
   <a href="https://github.com/Nshpiter/Q-music/releases/latest"><strong>下载最新版本</strong></a>
@@ -44,7 +45,7 @@
 
 ## 项目说明
 
-Q-music 基于 [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop) 二次开发。当前桌面端与 Android 端版本均为 `v0.3.21`；桌面端基于 LX Music Desktop `2.12.2`，主要重做了跨端界面、首页推荐、音乐账号接入、歌单同步、播放详情页、音频可视化与发布更新流程。
+Q-music 基于 [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop) 二次开发。最新版本见 [Releases](https://github.com/Nshpiter/Q-music/releases/latest)；桌面端基于 LX Music Desktop `2.12.2`，主要重做了跨端界面、首页推荐、音乐账号接入、歌单同步、播放详情页、音频可视化与发布更新流程。
 
 本仓库不是 LX Music 官方仓库，也不代表原作者对本项目提供支持或背书。完整变更可查看 [更新日志](./publish/changeLog.md) 与 [二次修改说明](./MODIFICATIONS.md)。
 
@@ -55,14 +56,14 @@ Q-music 基于 [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop)
 | Windows 10 / 11 x64 | 从 [GitHub Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载 `Q-music-*-x64-Setup.exe` | 稳定 |
 | Android arm64-v8a | 从 [GitHub Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载 arm64 APK；架构不确定时使用 universal APK | 测试版 |
 | Arch Linux x86_64 | 按下文命令构建 pacman 包 | 测试版 |
-| macOS Intel / Apple Silicon | [独立测试构建流程](./doc/macos-build.md)，生成对应架构的 DMG | 构建适配中，待 Mac 真机验证 |
+| macOS Intel / Apple Silicon | 从 [GitHub Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载 `x64.dmg`（Intel）或 `arm64.dmg`（M 系列）；[安装说明](./doc/macos-build.md) | 首次提供，待更多真机验证；DMG 手动更新 |
 
 Android 源码位于本仓库 [`android`](https://github.com/Nshpiter/Q-music/tree/android) 分支。Release 同时提供 SHA256 校验文件，Windows 客户端支持应用内检查更新。
 
 每个版本的发布说明维护在 [`publish/version.json`](./publish/version.json) 与
 [`publish/changeLog.md`](./publish/changeLog.md)；GitHub Release 由 Windows 发布工作流使用
-当前版本的人工说明创建，Android 与 Arch 工作流只上传对应平台资产。发布前会校验版本号、tag
-指向和三平台资产，避免出现只有自动比较链接或混合版本资产的 Release。
+当前版本的人工说明创建，Android、Arch 与 macOS 工作流只上传对应平台资产。发布前会校验版本号、tag
+指向和各平台资产，避免出现只有自动比较链接或混合版本资产的 Release。
 
 ## 功能亮点
 

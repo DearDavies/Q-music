@@ -4,8 +4,9 @@ dd
   .gap-top
     base-checkbox(id="setting__update_autoCheck" :model-value="appSetting['common.isAutoCheckUpdate']" :label="$t('setting__update_auto_check')" @update:model-value="updateSetting({'common.isAutoCheckUpdate': $event})")
   .gap-top
-    base-checkbox(id="setting__update_tryAutoUpdate" :disabled="isPackageManagerInstall || !appSetting['common.isAutoCheckUpdate']" :model-value="appSetting['common.tryAutoUpdate']" :label="$t('setting__update_try_auto_update')" @update:model-value="updateSetting({'common.tryAutoUpdate': $event})")
+    base-checkbox(id="setting__update_tryAutoUpdate" :disabled="isMac || isPackageManagerInstall || !appSetting['common.isAutoCheckUpdate']" :model-value="appSetting['common.tryAutoUpdate']" :label="$t('setting__update_try_auto_update')" @update:model-value="updateSetting({'common.tryAutoUpdate': $event})")
     .p.small.gap-top(v-if="isPackageManagerInstall") Arch/pacman 安装由系统包管理器负责更新，应用内仅检查新版本。
+    .p.small.gap-top(v-else-if="isMac") macOS 应用内检查新版本，从发布页下载对应芯片的 DMG 手动安装。
   .gap-top
     base-checkbox(id="setting__update_showChangeLog" :model-value="appSetting['common.showChangeLog']" :label="$t('setting__update_show_change_log')" @update:model-value="updateSetting({'common.showChangeLog': $event})")
   .gap-top
@@ -101,6 +102,7 @@ export default {
       commit_id,
       commit_date,
       isPackageManagerInstall,
+      isMac: process.platform === 'darwin',
     }
   },
 }

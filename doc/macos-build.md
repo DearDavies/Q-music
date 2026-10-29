@@ -1,14 +1,22 @@
-# macOS 测试构建
+# macOS 安装与构建
 
-桌面端已有 macOS 代码路径、图标及 Intel / Apple Silicon 歌词解码库。当前新增的是**测试构建流程**，尚未完成 Mac 真机验收，也未将 macOS 加入正式版自动发布。
+从 v0.4.26 起，Release 同时提供 Intel 与 Apple Silicon 的 DMG。双架构构建、原生模块加载及签名检查已通过；首次公开提供 Mac 安装包，账号授权、设备权限和界面交互仍需更多 Mac 真机验证。
 
 2026-10-28 首次双架构 CI 实测发现包内 SQLite 缺少 `bindings`。在打包清单补充 `bindings` 及其运行依赖 `file-uri-to-path` 后，[修复后的双架构构建](https://github.com/Nshpiter/Q-music/actions/runs/40639901248)已全部通过：Intel 与 Apple Silicon 均生成 DMG，并通过包内 SQLite、歌词原生模块加载及 ad-hoc 签名检查。该测试包包含本轮备用音源修复；Mac 真机交互验收仍未完成。
 
-## 获取测试包
+## 安装与更新
 
-在 GitHub Actions 中手动运行 **Build macOS preview**。两个 job 分别在 Intel 和 Apple Silicon 的 Mac runner 上安装依赖、构建 DMG，避免把另一种架构的 Electron / SQLite 带进安装包。完成后下载对应的 `q-music-macos-x64-preview` 或 `q-music-macos-arm64-preview` artifact。
+在 [Releases](https://github.com/Nshpiter/Q-music/releases/latest) 下载：Intel 芯片选 `Q-music-版本-x64.dmg`；M 系列芯片选 `Q-music-版本-arm64.dmg`。打开 DMG，将 Q-music 拖入「应用程序」。
 
-该流程只保存测试产物及 SHA256，不创建 Release、不修改版本、不上传正式版资产。包使用 ad-hoc 签名，未经过 Apple Developer ID 签名和公证；首次打开可能需要在“系统设置 → 隐私与安全性”中允许。无需关闭系统安全检查。
+包使用 ad-hoc 签名，未经过 Apple Developer ID 签名与公证。首次打开若被系统拦截，在「系统设置 → 隐私与安全性」确认允许打开。无需关闭系统安全检查。若仍被阻止，请反馈具体提示。
+
+应用内会检查新版本并提供发布页入口。更新时退出 Q-music，再用新版 DMG 替换「应用程序」中的旧版，保留用户数据。当前不支持应用内自动安装；不生成会误导更新器的 `latest-mac.yml`。
+
+## 构建流程
+
+发布标签触发 **Build macOS**，两个 job 分别在 Intel 和 Apple Silicon 的 Mac runner 上安装依赖、构建 DMG，避免把另一种架构的 Electron / SQLite 带进安装包。通过检查后上传 DMG 与 SHA256 到对应 Release；全部平台资产齐全后才能公开发布。
+
+也可从分支手动运行流程，只生成 Actions 测试产物，不创建或发布 Release。artifact 名为 `q-music-macos-x64-preview` 和 `q-music-macos-arm64-preview`。
 
 ## 本机构建
 

@@ -297,7 +297,11 @@ jobs:
               'latest.yml',
               'SHA256SUMS-windows.txt',
               'SHA256SUMS-arch.txt',
-              "Q-music_$($env:PACKAGE_VERSION)_x64.pacman"
+              "Q-music_$($env:PACKAGE_VERSION)_x64.pacman",
+              "Q-music-$($env:PACKAGE_VERSION)-x64.dmg",
+              "Q-music-$($env:PACKAGE_VERSION)-arm64.dmg",
+              'SHA256SUMS-macos-x64.txt',
+              'SHA256SUMS-macos-arm64.txt'
             )
             $mobileVersion = node -p "require('./publish/mobile-version.json').version"
             if ($mobileVersion -eq $env:PACKAGE_VERSION) {

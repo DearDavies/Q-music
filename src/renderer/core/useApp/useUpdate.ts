@@ -18,7 +18,7 @@ import { appSetting } from '@renderer/store/setting'
 
 export default () => {
   let isShowedChangeLog = false
-  const isPackageManagerInstall = process.platform === 'linux' && process.env.Q_MUSIC_PACKAGE_TYPE === 'pacman'
+  const isManualInstall = process.platform === 'darwin' || (process.platform === 'linux' && process.env.Q_MUSIC_PACKAGE_TYPE === 'pacman')
 
   // 更新超时定时器
   let updateTimeout: number | null = null
@@ -157,7 +157,7 @@ export default () => {
     versionInfo.reCheck = false
     versionInfoPromise = null
     versionInfo.isLatest = false
-    if (appSetting['common.tryAutoUpdate'] && !isPackageManagerInstall) {
+    if (appSetting['common.tryAutoUpdate'] && !isManualInstall) {
       versionInfo.status = 'downloading'
       startUpdateTimeout()
     } else versionInfo.status = 'idle'
