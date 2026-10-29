@@ -1,5 +1,5 @@
 <template>
-  <material-modal :show="show" teleport="#view" @close="handleClose" @after-enter="$refs.input.focus()">
+  <material-modal :show="show" teleport="#root" width="min(480px, calc(100vw - 32px))" max-width="calc(100vw - 32px)" @close="handleClose" @after-enter="$refs.input.focus()">
     <main :class="$style.main">
       <h2>{{ $t('user_api_import_online__title') }}</h2>
       <base-input
@@ -8,7 +8,7 @@
         :class="$style.input"
         type="url"
         :placeholder="$t('user_api_import_online__input_tip')"
-        @submit="handleSubmit" @blur="verify"
+        @submit="handleSubmit"
       />
       <div :class="$style.footer">
         <base-btn :class="$style.btn" @click="handleClose">{{ $t('btn_close') }}</base-btn>
@@ -21,6 +21,7 @@
 <script>
 import { dialog } from '@renderer/plugins/Dialog'
 import { httpFetch } from '@renderer/utils/request'
+import { createUserApiImporter } from '@common/utils/userApiImport'
 
 export default {
   props: {
@@ -35,10 +36,12 @@ export default {
       url: '',
       disabled: false,
       btnText: '',
+      importer: createUserApiImporter(url => httpFetch(url, { follow_max: 3 })),
     }
   },
   watch: {
     show(n) {
+      this.importer.cancel()
       if (n) {
         this.url = ''
         this.disabled = false
@@ -46,38 +49,28 @@ export default {
       }
     },
   },
+  beforeUnmount() {
+    this.importer.cancel()
+  },
   methods: {
     handleClose() {
+      this.importer.cancel()
       this.$emit('update:show', false)
     },
-    verify() {
-      if (!/^https?:\/\//.test(this.url)) this.url = ''
-      return this.url
-    },
     async handleSubmit() {
-      let url = this.verify()
-      if (!url) return
+      if (this.disabled || !this.show) return
       this.disabled = true
       this.btnText = this.$t('user_api_import_online__input_loading')
-      let script
       try {
-        script = await httpFetch(url, { follow_max: 3 }).promise.then(resp => resp.body)
+        const script = await this.importer.load(this.url)
+        if (script == null) return
+        this.$emit('import', script)
+        this.handleClose()
       } catch (err) {
         void dialog(this.$t('user_api_import__failed', { message: err.message }))
-        return
-      } finally {
-        this.disabled = false
-        this.btnText = this.$t('user_api_import_online__input_confirm')
       }
-      if (script.length > 9_000_000) {
-        void dialog(this.$t('user_api_import__failed', {
-          message: 'Too large script',
-          confirm: this.$t('ok'),
-        }))
-        return
-      }
-      this.$emit('import', script)
-      this.handleClose()
+      this.disabled = false
+      this.btnText = this.$t('user_api_import_online__input_confirm')
     },
   },
 }
@@ -89,8 +82,7 @@ export default {
 
 .main {
   padding: 0 15px;
-  width: 450px;
-  min-width: 280px;
+  min-width: 0;
   display: flex;
   flex-flow: column nowrap;
   min-height: 0;

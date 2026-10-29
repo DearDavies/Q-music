@@ -75,6 +75,11 @@ export default {
       isShowOnlineImportModal,
     }
   },
+  watch: {
+    modelValue(show) {
+      if (!show) this.isShowOnlineImportModal = false
+    },
+  },
   methods: {
     handleBackup(id, enabled) {
       updateSetting({ 'common.apiBackupSources': enabled ? [...new Set([...this.backupIds, id])] : this.backupIds.filter(value => value != id) })

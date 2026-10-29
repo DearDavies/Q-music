@@ -587,7 +587,7 @@
   "setting__basic_source_status_success": "初始化成功",
   "setting__basic_source_temp": "临时接口（软件的某些功能不可用，建议测试接口不可用再使用本接口）",
   "setting__basic_source_test": "测试接口（几乎软件的所有功能都可用）",
-  "setting__basic_source_preference_tip": "选中自定义源后优先尝试主音源；可在「自定义源管理」勾选备用源并调整顺序，失败后依次尝试，再回退到官方平台。",
+  "setting__basic_source_preference_tip": "优先尝试主音源，保留官方线路兜底；仍失败时按备用顺序尝试。可在「自定义源管理」勾选备用源并调整顺序。",
   "setting__basic_source_user_api_btn": "自定义源管理",
   "setting__basic_sourcename": "歌曲来源名称",
   "setting__basic_sourcename_alias": "别名",

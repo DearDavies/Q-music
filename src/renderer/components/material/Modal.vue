@@ -359,6 +359,8 @@ export default {
 @import '@renderer/assets/styles/layout.less';
 
 .container {
+  // 弹窗覆盖标题栏时也必须接收原生鼠标事件，不能透传给底层拖窗区域。
+  -webkit-app-region: no-drag;
   position: absolute;
   top: 0;
   left: 0;

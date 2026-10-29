@@ -587,7 +587,7 @@
   "setting__basic_source_status_success": "Successfully initialized",
   "setting__basic_source_temp": "Temporary API (Some features not available. Workaround if Test API is unavailable)",
   "setting__basic_source_test": "Test API (Available for most app features)",
-  "setting__basic_source_preference_tip": "The primary custom source is tried first. Select and reorder backups in Custom Source Management; official platforms are used after custom sources fail.",
+  "setting__basic_source_preference_tip": "Try the primary source and existing official fallback first, then selected backups in order. Select and reorder backups in Custom Source Management.",
   "setting__basic_source_user_api_btn": "Music API Management",
   "setting__basic_sourcename": "Music Streaming Service Name",
   "setting__basic_sourcename_alias": "Alias",
