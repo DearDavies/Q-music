@@ -10,7 +10,7 @@ function load(file, dependencies = {}) {
     dependencies['@common/utils/playlistMerge'] = load('src/common/utils/playlistMerge.ts')
     dependencies['@renderer/utils/data'] = {}
   }
-  const context = { exports: {}, setTimeout, clearTimeout, Number, console: { log() {} }, window: { i18n: { t: key => key } }, require: id => {
+  const context = { exports: {}, URL, setTimeout, clearTimeout, Number, console: { log() {} }, window: { i18n: { t: key => key } }, require: id => {
     if (!(id in dependencies)) throw Error(id)
     return dependencies[id]
   } }

@@ -38,6 +38,7 @@ const requestWithRetry = async<T>(factory: () => Promise<T>, validate: (result: 
       return result
     } catch (error) {
       lastError = error
+      if (error instanceof Error && ['login_required', 'verification_required', 'invalid_link', 'cancelled'].includes(error.message)) break
       if (!isCurrent() || attempt == retryCount || Date.now() >= deadline) break
       await wait(250 * (attempt + 1))
     }
@@ -225,7 +226,7 @@ export const getListDetailAll = async(id: string, source: LX.OnlineSource, isRef
   const loadData = (id: string, page: number): Promise<ListDetailInfo> => {
     let key = `sdetail__${source}__${id}__${page}`
     if (isRefresh && cache.has(key)) cache.delete(key)
-    return cache.has(key)
+    const result = cache.has(key)
       ? Promise.resolve(cache.get(key))
       : requestWithRetry(
         async() => musicSdk[source]?.songList.getListDetail(id, page) as Promise<ListDetailInfo>,
@@ -235,6 +236,10 @@ export const getListDetailAll = async(id: string, source: LX.OnlineSource, isRef
         cache.set(key, result)
         return result
       })
+    return result.then(info => {
+      if (info.incomplete) throw new Error('incomplete')
+      return info
+    })
   }
   // eslint-disable-next-line @typescript-eslint/promise-function-async
   return loadData(id, 1).then((result: ListDetailInfo) => {

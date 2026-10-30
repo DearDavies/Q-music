@@ -87,7 +87,13 @@ const getNeteaseInput = (text: string, token?: string) => {
 const fetchNativeList = async(params: ExternalImportParams, onProgress?: (progress: ExternalImportProgress) => void, shouldCancel?: ShouldCancel) => {
   const source = params.source
   const text = source == 'wy' ? getNeteaseInput(params.text, params.neteaseToken) : params.text
-  const detail = await getListDetail(text, source, 1, true)
+  const readPage = async(page: number) => getListDetail(text, source, page, page == 1).catch((error: unknown) => {
+    const code = error instanceof Error ? error.message : ''
+    if (code == 'invalid_link' || code == 'login_required' || code == 'verification_required' || code == 'cancelled') throw new ExternalImportError(code)
+    if (code == 'incomplete') throw new ExternalImportError('playlist_incomplete')
+    throw error
+  })
+  const detail = await readPage(1)
   const list: LX.Music.MusicInfo[] = [...detail.list]
 
   const total = typeof detail.total == 'number' && detail.total > 0 ? detail.total : list.length
@@ -103,8 +109,9 @@ const fetchNativeList = async(params: ExternalImportParams, onProgress?: (progre
     assertNotCancelled(shouldCancel)
     let pageDetail
     try {
-      pageDetail = await getListDetail(text, source, page)
+      pageDetail = await readPage(page)
     } catch (error) {
+      if (error instanceof ExternalImportError && ['login_required', 'verification_required', 'cancelled'].includes(error.code)) throw error
       // 已拿到部分数据时不整单作废，用已抓取的曲目继续后续流程
       if (list.length) break
       throw error
